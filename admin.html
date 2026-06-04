@@ -299,6 +299,13 @@
             return '<span style="color:#ffaa00;">Pending</span>';
         }
         
+        window.adminDeleteComment = async function(id) { if (!confirm('Delete?')) return; var r = await supabase.from('comments').delete().eq('id', id); if (r.error) alert('Delete failed: ' + r.error.message); loadComments(); };
+        window.adminApproveComment = async function(id) { var r = await supabase.from('comments').update({ status: 'approved' }).eq('id', id); if (r.error) alert('Approve failed: ' + r.error.message); loadComments(); };
+        window.adminRejectComment = async function(id) { var r = await supabase.from('comments').update({ status: 'denied' }).eq('id', id); if (r.error) alert('Deny failed: ' + r.error.message); loadComments(); };
+        window.adminDeleteIdea = async function(id) { if (!confirm('Delete?')) return; var r = await supabase.from('ideas').delete().eq('id', id); if (r.error) alert('Delete failed: ' + r.error.message); loadIdeas(); };
+        window.adminApproveIdea = async function(id) { var r = await supabase.from('ideas').update({ status: 'approved' }).eq('id', id); if (r.error) alert('Approve failed: ' + r.error.message); loadIdeas(); };
+        window.adminRejectIdea = async function(id) { var r = await supabase.from('ideas').update({ status: 'denied' }).eq('id', id); if (r.error) alert('Deny failed: ' + r.error.message); loadIdeas(); };
+        
         async function loadComments() {
             var q = supabase.from('comments').select('*', { count: 'exact' });
             if (commentsSearch) q = q.or('comment_text.ilike.%' + commentsSearch + '%,display_name.ilike.%' + commentsSearch + '%');
@@ -314,20 +321,12 @@
                     var comment = data[c], itemName = '(deleted)';
                     if (comment.equipment_id) { var eq = await supabase.from('equipment').select('name').eq('id', comment.equipment_id).single(); if (eq.data) itemName = eq.data.name; }
                     var s = comment.status || 'pending';
-                    rows.push('<tr><td>' + escapeHtml(comment.comment_text).substring(0, 80) + '</td><td>' + escapeHtml(comment.display_name) + '</td><td>' + escapeHtml(itemName) + '</td><td>' + statusIcon(s) + '</td><td>' + new Date(comment.created_at).toLocaleDateString() + '</td><td><button class="btn-delete" data-id="' + comment.id + '">Delete</button> <button class="btn-approve" data-id="' + comment.id + '"' + (s === 'approved' ? ' disabled' : '') + '>Approve</button> <button class="btn-reject" data-id="' + comment.id + '"' + (s === 'denied' ? ' disabled' : '') + '>Deny</button></td></tr>');
+                    rows.push('<tr><td>' + escapeHtml(comment.comment_text).substring(0, 80) + '</td><td>' + escapeHtml(comment.display_name) + '</td><td>' + escapeHtml(itemName) + '</td><td>' + statusIcon(s) + '</td><td>' + new Date(comment.created_at).toLocaleDateString() + '</td><td><button class="btn-delete" data-id="' + comment.id + '" onclick="adminDeleteComment(\'' + comment.id + '\')">Delete</button> <button class="btn-approve" data-id="' + comment.id + '"' + (s === 'approved' ? ' disabled' : '') + ' onclick="adminApproveComment(\'' + comment.id + '\')">Approve</button> <button class="btn-reject" data-id="' + comment.id + '"' + (s === 'denied' ? ' disabled' : '') + ' onclick="adminRejectComment(\'' + comment.id + '\')">Deny</button></td></tr>');
                 }
                 tbody.innerHTML = rows.join('');
             }
             renderPagination('comments', commentsPage, Math.ceil(commentsTotal / PER_PAGE));
         }
-        
-        document.getElementById('comments-table').addEventListener('click', async function(e) {
-            var btn = e.target.closest('button'); if (!btn) return;
-            var id = btn.getAttribute('data-id'); if (!id) return;
-            if (btn.classList.contains('btn-delete')) { if (!confirm('Delete?')) return; var r = await supabase.from('comments').delete().eq('id', id); if (r.error) alert('Delete failed: ' + r.error.message); loadComments(); }
-            else if (btn.classList.contains('btn-approve')) { var r = await supabase.from('comments').update({ status: 'approved' }).eq('id', id); if (r.error) alert('Approve failed: ' + r.error.message); loadComments(); }
-            else if (btn.classList.contains('btn-reject')) { var r = await supabase.from('comments').update({ status: 'denied' }).eq('id', id); if (r.error) alert('Deny failed: ' + r.error.message); loadComments(); }
-        });
         
         async function loadIdeas() {
             var result = await supabase.from('ideas').select('*').order('created_at', { ascending: false }).limit(50);
@@ -346,22 +345,14 @@
                         '<td>' + escapeHtml(idea.submitted_by) + '</td>' +
                         '<td>' + new Date(idea.created_at).toLocaleDateString() + '</td>' +
                         '<td>' + statusDisplay + '</td>' +
-                        '<td><button class="btn-delete" data-id="' + idea.id + '">Delete</button> ' +
-                        '<button class="btn-approve" data-id="' + idea.id + '"' + (status === 'approved' ? ' disabled' : '') + '>Approve</button> ' +
-                        '<button class="btn-reject" data-id="' + idea.id + '"' + (status === 'denied' ? ' disabled' : '') + '>Deny</button></td>' +
+                        '<td><button class="btn-delete" data-id="' + idea.id + '" onclick="adminDeleteIdea(\'' + idea.id + '\')">Delete</button> ' +
+                        '<button class="btn-approve" data-id="' + idea.id + '"' + (status === 'approved' ? ' disabled' : '') + ' onclick="adminApproveIdea(\'' + idea.id + '\')">Approve</button> ' +
+                        '<button class="btn-reject" data-id="' + idea.id + '"' + (status === 'denied' ? ' disabled' : '') + ' onclick="adminRejectIdea(\'' + idea.id + '\')">Deny</button></td>' +
                         '</tr>');
                 }
                 tbody.innerHTML = rows.join('');
             }
         }
-        
-        document.getElementById('ideas-table').addEventListener('click', async function(e) {
-            var btn = e.target.closest('button'); if (!btn) return;
-            var id = btn.getAttribute('data-id'); if (!id) return;
-            if (btn.classList.contains('btn-delete')) { if (!confirm('Delete?')) return; var r = await supabase.from('ideas').delete().eq('id', id); if (r.error) { alert('Delete failed: ' + r.error.message); } loadIdeas(); }
-            else if (btn.classList.contains('btn-approve')) { var r = await supabase.from('ideas').update({ status: 'approved' }).eq('id', id); if (r.error) { alert('Approve failed: ' + r.error.message); } loadIdeas(); }
-            else if (btn.classList.contains('btn-reject')) { var r = await supabase.from('ideas').update({ status: 'denied' }).eq('id', id); if (r.error) { alert('Deny failed: ' + r.error.message); } loadIdeas(); }
-        });
         
         async function loadEqdbQueue() {
             var from = (eqdbQueuePage - 1) * 100;
