@@ -78,5 +78,40 @@
         }
         function logout() { sessionStorage.removeItem('editor_logged_in'); location.reload(); }
     </script>
+<style>
+#bug-btn-container{text-align:center;padding:10px 0;margin-top:20px;}
+#bug-btn{background:#ff4444;color:white;border:none;border-radius:3px;padding:8px 16px;cursor:pointer;font-size:13px;}
+#bug-btn:hover{background:#cc0000;}
+#bug-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:none;align-items:center;justify-content:center;}
+#bug-modal-content{background:#1a1a1a;border:2px solid #555;border-radius:10px;padding:20px;width:90%;max-width:500px;color:#ccc;}
+#bug-modal-content h3{margin:0 0 10px;color:#ff4444;}
+#bug-modal-content textarea{width:100%;height:120px;padding:8px;background:#333;color:#ccc;border:1px solid #555;border-radius:3px;box-sizing:border-box;margin:10px 0;font-family:Arial,sans-serif;}
+#bug-modal-content .bug-url{color:#888;font-size:12px;word-break:break-all;}
+#bug-modal-content .btn-row{display:flex;gap:10px;justify-content:flex-end;}
+#bug-modal-content .btn-submit{background:#ff4444;color:white;border:none;border-radius:3px;padding:8px 16px;cursor:pointer;}
+#bug-modal-content .btn-cancel{background:#666;color:white;border:none;border-radius:3px;padding:8px 16px;cursor:pointer;}
+#bug-modal-content .btn-submit:disabled{opacity:0.5;cursor:not-allowed;}
+#bug-modal-content .bug-msg{margin:10px 0 0;font-size:13px;}
+</style>
+<div id="bug-btn-container"><button id="bug-btn" onclick="openBugReport()">Report Bug</button></div>
+<div id="bug-modal" onclick="if(event.target===this)closeBugReport()">
+  <div id="bug-modal-content">
+    <h3>Report Bug</h3>
+    <p class="bug-url">Page: <span id="bug-page-url"></span></p>
+    <textarea id="bug-description" placeholder="Describe what went wrong..."></textarea>
+    <div class="btn-row">
+      <button class="btn-cancel" onclick="closeBugReport()">Cancel</button>
+      <button class="btn-submit" id="bug-submit-btn" onclick="submitBugReport()">Submit</button>
+    </div>
+    <p class="bug-msg" id="bug-msg"></p>
+  </div>
+</div>
+<script>
+function openBugReport(){document.getElementById('bug-page-url').textContent=window.location.href;document.getElementById('bug-description').value='';document.getElementById('bug-msg').textContent='';document.getElementById('bug-modal').style.display='flex';document.getElementById('bug-submit-btn').disabled=false;}
+function closeBugReport(){document.getElementById('bug-modal').style.display='none';}
+function submitBugReport(){var d=document.getElementById('bug-description').value.trim();if(!d){document.getElementById('bug-msg').innerHTML='<span style="color:#ff4444;">Please describe the bug.</span>';return;}
+var b=document.getElementById('bug-submit-btn');b.disabled=true;document.getElementById('bug-msg').innerHTML='<span style="color:#888;">Submitting...</span>';
+fetch('https://fpvwpxtsrmrmdvnswrzx.supabase.co/rest/v1/bug_reports',{method:'POST',headers:{'apikey':'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY','Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY','Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({page_url:window.location.href,description:d})}).then(function(r){if(r.ok||r.status===201){document.getElementById('bug-msg').innerHTML='<span style="color:#44aa44;">Bug reported! Thank you.</span>';document.getElementById('bug-description').value='';setTimeout(closeBugReport,2000);}else{document.getElementById('bug-msg').innerHTML='<span style="color:#ff4444;">Error submitting. Try again later.</span>';b.disabled=false;}}).catch(function(){document.getElementById('bug-msg').innerHTML='<span style="color:#ff4444;">Network error. Try again later.</span>';b.disabled=false;});}
+</script>
 </body>
 </html>
