@@ -10,11 +10,8 @@
         h1 { color: #C0C0C0; }
         nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; }
         nav a { margin-right: 15px; }
-        .tabs { margin: 15px 0; }
-        .tab { display: inline-block; padding: 8px 16px; cursor: pointer; background: #333; border-radius: 5px 5px 0 0; margin-right: 4px; color: #888; }
-        .tab.active { background: #555; color: white; }
-        .section { display: none; }
-        .section.active { display: block; }
+        .section { margin: 30px 0; }
+        .section h2 { color: #C0C0C0; border-bottom: 1px solid #444; padding-bottom: 5px; }
         table { width: 100%; border-collapse: collapse; margin: 10px 0; }
         th { color: #888; text-align: left; padding: 8px; border-bottom: 2px solid #444; font-size: 12px; }
         td { padding: 8px; border-bottom: 1px solid #333; font-size: 13px; }
@@ -47,28 +44,25 @@
     </nav>
     <hr>
 
-    <div class="tabs">
-        <span class="tab active" id="tab-equipment">Equipment</span>
-        <span class="tab" id="tab-ideas">Bug Reports</span>
-        <span class="tab" id="tab-comments">Comments</span>
-    </div>
-
-    <div id="equipment-section" class="section active">
-        <p style="font-size:13px;color:#888;">Players who contributed the most equipment data.</p>
-        <p class="disclaimer">Counts only reflect the last uploaded version of each item. Earlier personal submissions later overwritten by EQDB are not included until future submissions re-track them.</p>
+    <div class="section">
+        <h2>Equipment Contributions</h2>
+        <p style="font-size:13px;color:#888;">Players who contributed the most equipment data. Huko (the site owner) is excluded.</p>
+        <p class="disclaimer">Counts only reflect the last uploaded version of each item.</p>
         <table><thead><tr><th></th><th>Contributor</th><th>Total</th><th class="count-eqdb">EQDB</th><th class="count-personal">Personal</th><th>First</th><th>Last</th></tr></thead>
             <tbody id="equipment-body"><tr><td colspan="7" class="loading">Loading...</td></tr></tbody>
         </table>
     </div>
 
-    <div id="ideas-section" class="section">
+    <div class="section">
+        <h2>Bug Reports</h2>
         <p style="font-size:13px;color:#888;">Players who submitted bug reports and feature requests (approved by admin).</p>
         <table><thead><tr><th></th><th>Reporter</th><th>Approved</th><th>Denied</th><th>Pending</th><th>Total</th><th>First</th><th>Last</th></tr></thead>
             <tbody id="ideas-body"><tr><td colspan="8" class="loading">Loading...</td></tr></tbody>
         </table>
     </div>
 
-    <div id="comments-section" class="section">
+    <div class="section">
+        <h2>Comments</h2>
         <p style="font-size:13px;color:#888;">Players who posted comments on items (approved by admin).</p>
         <table><thead><tr><th></th><th>Commenter</th><th>Approved</th><th>Pending</th><th>Total</th><th>First</th><th>Last</th></tr></thead>
             <tbody id="comments-body"><tr><td colspan="7" class="loading">Loading...</td></tr></tbody>
@@ -95,16 +89,7 @@
             return all;
         }
 
-        function switchTab(tab) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-            document.getElementById('tab-' + tab).classList.add('active');
-            document.getElementById(tab + '-section').classList.add('active');
-        }
-
-        document.getElementById('tab-equipment').addEventListener('click', () => { switchTab('equipment'); loadEquipment(); });
-        document.getElementById('tab-ideas').addEventListener('click', () => { switchTab('ideas'); loadIdeas(); });
-        document.getElementById('tab-comments').addEventListener('click', () => { switchTab('comments'); loadComments(); });
+        var ignoreNames = ['huko'];
 
         // ========== EQUIPMENT ==========
         async function loadEquipment() {
@@ -115,6 +100,7 @@
                 var contribs = {};
                 for (var s of data) {
                     var n = s.submitter || 'anonymous';
+                    if (ignoreNames.indexOf(n.toLowerCase()) !== -1) continue;
                     if (!contribs[n]) contribs[n] = { name: n, total: 0, eqdb: 0, personal: 0, first: s.created_at, last: s.created_at };
                     contribs[n].total++; if (s.is_eqdb) contribs[n].eqdb++; else contribs[n].personal++;
                     if (s.created_at < contribs[n].first) contribs[n].first = s.created_at;
@@ -142,6 +128,7 @@
                 var contribs = {};
                 for (var s of data) {
                     var n = s.submitted_by || 'anonymous';
+                    if (ignoreNames.indexOf(n.toLowerCase()) !== -1) continue;
                     if (!contribs[n]) contribs[n] = { name: n, approved: 0, denied: 0, pending: 0, total: 0, first: s.created_at, last: s.created_at };
                     contribs[n].total++;
                     if (s.status === 'approved') contribs[n].approved++;
@@ -172,6 +159,7 @@
                 var contribs = {};
                 for (var s of data) {
                     var n = s.display_name || 'anonymous';
+                    if (ignoreNames.indexOf(n.toLowerCase()) !== -1) continue;
                     if (!contribs[n]) contribs[n] = { name: n, approved: 0, pending: 0, total: 0, first: s.created_at, last: s.created_at };
                     contribs[n].total++;
                     if (s.status === 'approved') contribs[n].approved++;
