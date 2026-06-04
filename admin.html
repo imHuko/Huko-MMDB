@@ -313,9 +313,6 @@
                 }
                 tbody.innerHTML = rows.join('');
             }
-            document.querySelectorAll('#comments-table .btn-delete').forEach(function(b) { b.addEventListener('click', async function() { if (!confirm('Delete?')) return; var r = await supabase.from('comments').delete().eq('id', this.getAttribute('data-id')); if (r.error) { alert('Delete failed: ' + r.error.message); return; } loadComments(); }); });
-            document.querySelectorAll('#comments-table .btn-approve-c').forEach(function(b) { b.addEventListener('click', async function() { var r = await supabase.from('comments').update({ status: 'approved' }).eq('id', this.getAttribute('data-id')); if (r.error) { alert('Approve failed: ' + r.error.message); return; } loadComments(); }); });
-            document.querySelectorAll('#comments-table .btn-reject-c').forEach(function(b) { b.addEventListener('click', async function() { var r = await supabase.from('comments').update({ status: 'denied' }).eq('id', this.getAttribute('data-id')); if (r.error) { alert('Deny failed: ' + r.error.message); return; } loadComments(); }); });
             renderPagination('comments', commentsPage, Math.ceil(commentsTotal / PER_PAGE));
         }
         
@@ -343,16 +340,24 @@
                 }
                 tbody.innerHTML = rows.join('');
             }
-            document.querySelectorAll('#ideas-table .btn-delete-idea').forEach(function(b) {
-                b.addEventListener('click', async function() { if (!confirm('Delete?')) return; var r = await supabase.from('ideas').delete().eq('id', this.getAttribute('data-id')); if (r.error) { alert('Delete failed: ' + r.error.message); return; } loadIdeas(); });
-            });
-            document.querySelectorAll('#ideas-table .btn-approve-idea').forEach(function(b) {
-                b.addEventListener('click', async function() { var r = await supabase.from('ideas').update({ status: 'approved' }).eq('id', this.getAttribute('data-id')); if (r.error) { alert('Approve failed: ' + r.error.message); return; } loadIdeas(); });
-            });
-            document.querySelectorAll('#ideas-table .btn-reject-idea').forEach(function(b) {
-                b.addEventListener('click', async function() { var r = await supabase.from('ideas').update({ status: 'denied' }).eq('id', this.getAttribute('data-id')); if (r.error) { alert('Deny failed: ' + r.error.message); return; } loadIdeas(); });
-            });
         }
+        
+        // Event delegation for ideas table
+        document.getElementById('ideas-table').addEventListener('click', async function(e) {
+            var btn = e.target.closest('button'); if (!btn) return;
+            var id = btn.getAttribute('data-id'); if (!id) return;
+            if (btn.classList.contains('btn-delete-idea')) { if (!confirm('Delete?')) return; var r = await supabase.from('ideas').delete().eq('id', id); if (r.error) { alert('Delete failed: ' + r.error.message); } loadIdeas(); }
+            else if (btn.classList.contains('btn-approve-idea')) { var r = await supabase.from('ideas').update({ status: 'approved' }).eq('id', id); if (r.error) { alert('Approve failed: ' + r.error.message); } loadIdeas(); }
+            else if (btn.classList.contains('btn-reject-idea')) { var r = await supabase.from('ideas').update({ status: 'denied' }).eq('id', id); if (r.error) { alert('Deny failed: ' + r.error.message); } loadIdeas(); }
+        });
+        // Event delegation for comments table
+        document.getElementById('comments-table').addEventListener('click', async function(e) {
+            var btn = e.target.closest('button'); if (!btn) return;
+            var id = btn.getAttribute('data-id'); if (!id) return;
+            if (btn.classList.contains('btn-delete')) { if (!confirm('Delete?')) return; var r = await supabase.from('comments').delete().eq('id', id); if (r.error) { alert('Delete failed: ' + r.error.message); } loadComments(); }
+            else if (btn.classList.contains('btn-approve-c')) { var r = await supabase.from('comments').update({ status: 'approved' }).eq('id', id); if (r.error) { alert('Approve failed: ' + r.error.message); } loadComments(); }
+            else if (btn.classList.contains('btn-reject-c')) { var r = await supabase.from('comments').update({ status: 'denied' }).eq('id', id); if (r.error) { alert('Deny failed: ' + r.error.message); } loadComments(); }
+        });
         
         async function loadEqdbQueue() {
             var from = (eqdbQueuePage - 1) * 100;
