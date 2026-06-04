@@ -6,9 +6,21 @@
     <title>Sign Up - MUD Equipment DB</title>
 </head>
 <body>
-    <a href="admin.html">Admin</a> | 
+    <nav>
+        <a href="index.html">Search</a>
+        <a href="info.html">About</a>
+        <a href="ideas.html">Ideas</a>
+        <a href="leaderboard.html">Leaderboard</a>
+        <span id="editor-links" style="display:none;">
+            <a href="import.html">Add Equipment</a>
+            <a href="batch.html">Batch Import</a>
+            <a href="import-db.html">Import Database</a>
+            <a href="admin.html">Admin</a>
+        </span>
+        <span id="login-link"><a href="login.html">Editor Login</a></span>
+        <span id="logout-link" style="display:none;"><a href="#" onclick="logout()">Logout</a></span>
+    </nav>
 	<h1>Create Account</h1>
-    <a href="index.html">← Back to search</a>
     <hr>
     
     <form id="signup-form">
@@ -46,17 +58,14 @@
             }
         });
     </script>
-<script>
-    if (sessionStorage.getItem('editor_logged_in') === 'true') {
-        document.getElementById('editor-links').style.display = 'inline';
-        document.getElementById('logout-link').style.display = 'inline';
-        document.getElementById('login-link').style.display = 'none';
-    }
-    function logout() {
-        sessionStorage.removeItem('editor_logged_in');
-        location.reload();
-    }
-</script>
+    <script>
+        if (sessionStorage.getItem('editor_logged_in') === 'true') {
+            document.getElementById('editor-links').style.display = 'inline';
+            document.getElementById('logout-link').style.display = 'inline';
+            document.getElementById('login-link').style.display = 'none';
+        }
+        function logout() { sessionStorage.removeItem('editor_logged_in'); location.reload(); }
+    </script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"131579fcdf914a0f9aa2fb16db7f327e","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
