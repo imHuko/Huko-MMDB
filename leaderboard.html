@@ -56,16 +56,16 @@
     <div class="section">
         <h2>Bug Reports</h2>
         <p style="font-size:13px;color:#888;">Players who submitted bug reports and feature requests (approved by admin).</p>
-        <table><thead><tr><th></th><th>Reporter</th><th>Approved</th><th>Denied</th><th>Pending</th><th>Total</th><th>First</th><th>Last</th></tr></thead>
-            <tbody id="ideas-body"><tr><td colspan="8" class="loading">Loading...</td></tr></tbody>
+        <table><thead><tr><th></th><th>Reporter</th><th>Approved</th><th>First</th><th>Last</th></tr></thead>
+            <tbody id="ideas-body"><tr><td colspan="5" class="loading">Loading...</td></tr></tbody>
         </table>
     </div>
 
     <div class="section">
         <h2>Comments</h2>
         <p style="font-size:13px;color:#888;">Players who posted comments on items (approved by admin).</p>
-        <table><thead><tr><th></th><th>Commenter</th><th>Approved</th><th>Pending</th><th>Total</th><th>First</th><th>Last</th></tr></thead>
-            <tbody id="comments-body"><tr><td colspan="7" class="loading">Loading...</td></tr></tbody>
+        <table><thead><tr><th></th><th>Commenter</th><th>Approved</th><th>First</th><th>Last</th></tr></thead>
+            <tbody id="comments-body"><tr><td colspan="5" class="loading">Loading...</td></tr></tbody>
         </table>
     </div>
 
@@ -124,30 +124,28 @@
             var tbody = document.getElementById('ideas-body');
             try {
                 var data = await fetchAll('ideas');
-                if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:#888;">No ideas submitted yet.</td></tr>'; return; }
+                if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:#888;">No ideas submitted yet.</td></tr>'; return; }
                 var contribs = {};
                 for (var s of data) {
+                    if (s.status !== 'approved') continue;
                     var n = s.submitted_by || 'anonymous';
                     if (ignoreNames.indexOf(n.toLowerCase()) !== -1) continue;
-                    if (!contribs[n]) contribs[n] = { name: n, approved: 0, denied: 0, pending: 0, total: 0, first: s.created_at, last: s.created_at };
-                    contribs[n].total++;
-                    if (s.status === 'approved') contribs[n].approved++;
-                    else if (s.status === 'denied') contribs[n].denied++;
-                    else contribs[n].pending++;
+                    if (!contribs[n]) contribs[n] = { name: n, approved: 0, first: s.created_at, last: s.created_at };
+                    contribs[n].approved++;
                     if (s.created_at < contribs[n].first) contribs[n].first = s.created_at;
                     if (s.created_at > contribs[n].last) contribs[n].last = s.created_at;
                 }
-                var sorted = Object.values(contribs).sort((a, b) => b.total - a.total);
+                var sorted = Object.values(contribs).sort((a, b) => b.approved - a.approved);
                 var html = '';
                 for (var r = 0; r < sorted.length; r++) {
                     var c = sorted[r];
                     var medal = r === 0 ? '🥇' : r === 1 ? '🥈' : r === 2 ? '🥉' : '';
                     var rd = medal || '<span style="color:#666;">' + (r + 1) + '</span>';
-                    var bw = Math.round(c.total / sorted[0].total * 100);
-                    html += '<tr><td class="medal">' + rd + '</td><td><strong>' + escapeHtml(c.name) + '</strong><div class="bar"><div class="bar-fill" style="width:' + bw + '%;"></div></div></td><td style="color:#44aa44;">' + c.approved + '</td><td style="color:#ff4444;">' + c.denied + '</td><td style="color:#ffaa00;">' + c.pending + '</td><td>' + c.total + '</td><td style="color:#888;font-size:11px;">' + new Date(c.first).toLocaleDateString() + '</td><td style="color:#888;font-size:11px;">' + new Date(c.last).toLocaleDateString() + '</td></tr>';
+                    var bw = Math.round(c.approved / sorted[0].approved * 100);
+                    html += '<tr><td class="medal">' + rd + '</td><td><strong>' + escapeHtml(c.name) + '</strong><div class="bar"><div class="bar-fill" style="width:' + bw + '%;"></div></div></td><td style="color:#44aa44;">' + c.approved + '</td><td style="color:#888;font-size:11px;">' + new Date(c.first).toLocaleDateString() + '</td><td style="color:#888;font-size:11px;">' + new Date(c.last).toLocaleDateString() + '</td></tr>';
                 }
                 tbody.innerHTML = html;
-            } catch (e) { tbody.innerHTML = '<tr><td colspan="8" class="error">Error: ' + e.message + '</td></tr>'; }
+            } catch (e) { tbody.innerHTML = '<tr><td colspan="5" class="error">Error: ' + e.message + '</td></tr>'; }
         }
 
         // ========== COMMENTS ==========
@@ -155,29 +153,28 @@
             var tbody = document.getElementById('comments-body');
             try {
                 var data = await fetchAll('comments');
-                if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:#888;">No comments yet.</td></tr>'; return; }
+                if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:#888;">No comments yet.</td></tr>'; return; }
                 var contribs = {};
                 for (var s of data) {
+                    if (s.status !== 'approved') continue;
                     var n = s.display_name || 'anonymous';
                     if (ignoreNames.indexOf(n.toLowerCase()) !== -1) continue;
-                    if (!contribs[n]) contribs[n] = { name: n, approved: 0, pending: 0, total: 0, first: s.created_at, last: s.created_at };
-                    contribs[n].total++;
-                    if (s.status === 'approved') contribs[n].approved++;
-                    else contribs[n].pending++;
+                    if (!contribs[n]) contribs[n] = { name: n, approved: 0, first: s.created_at, last: s.created_at };
+                    contribs[n].approved++;
                     if (s.created_at < contribs[n].first) contribs[n].first = s.created_at;
                     if (s.created_at > contribs[n].last) contribs[n].last = s.created_at;
                 }
-                var sorted = Object.values(contribs).sort((a, b) => b.total - a.total);
+                var sorted = Object.values(contribs).sort((a, b) => b.approved - a.approved);
                 var html = '';
                 for (var r = 0; r < sorted.length; r++) {
                     var c = sorted[r];
                     var medal = r === 0 ? '🥇' : r === 1 ? '🥈' : r === 2 ? '🥉' : '';
                     var rd = medal || '<span style="color:#666;">' + (r + 1) + '</span>';
-                    var bw = Math.round(c.total / sorted[0].total * 100);
-                    html += '<tr><td class="medal">' + rd + '</td><td><strong>' + escapeHtml(c.name) + '</strong><div class="bar"><div class="bar-fill" style="width:' + bw + '%;"></div></div></td><td style="color:#44aa44;">' + c.approved + '</td><td style="color:#ffaa00;">' + c.pending + '</td><td>' + c.total + '</td><td style="color:#888;font-size:11px;">' + new Date(c.first).toLocaleDateString() + '</td><td style="color:#888;font-size:11px;">' + new Date(c.last).toLocaleDateString() + '</td></tr>';
+                    var bw = Math.round(c.approved / sorted[0].approved * 100);
+                    html += '<tr><td class="medal">' + rd + '</td><td><strong>' + escapeHtml(c.name) + '</strong><div class="bar"><div class="bar-fill" style="width:' + bw + '%;"></div></div></td><td style="color:#44aa44;">' + c.approved + '</td><td style="color:#888;font-size:11px;">' + new Date(c.first).toLocaleDateString() + '</td><td style="color:#888;font-size:11px;">' + new Date(c.last).toLocaleDateString() + '</td></tr>';
                 }
                 tbody.innerHTML = html;
-            } catch (e) { tbody.innerHTML = '<tr><td colspan="7" class="error">Error: ' + e.message + '</td></tr>'; }
+            } catch (e) { tbody.innerHTML = '<tr><td colspan="5" class="error">Error: ' + e.message + '</td></tr>'; }
         }
 
         loadEquipment();
