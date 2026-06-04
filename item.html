@@ -104,13 +104,15 @@
         var itemName = params.get('name');
 
         async function loadItem() {
+            try {
             if (!itemId && !itemName) { document.getElementById('item-name').textContent = 'No item specified'; return; }
             var q = supabase.from('equipment').select('*');
             if (itemId) q = q.eq('id', itemId);
             else q = q.eq('name', itemName);
-            var r = await q.single();
-            if (r.error || !r.data) { document.getElementById('item-name').textContent = 'Item not found'; return; }
+            var r = await q.maybeSingle();
+            if (r.error || !r.data) { document.getElementById('item-name').textContent = 'Item not found: ' + (r.error ? r.error.message : 'no data'); return; }
             var item = r.data;
+            itemId = item.id;
             document.getElementById('item-name').textContent = item.name || 'Unknown';
 
             var metaEl = document.getElementById('item-meta');
@@ -156,6 +158,7 @@
             }
 
             loadComments();
+            } catch(e) { document.getElementById('item-name').textContent = 'Error: ' + e.message; console.error(e); }
         }
 
         // Comments
