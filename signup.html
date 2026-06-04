@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editor Signup - MUD Equipment DB</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 400px; margin: 100px auto; padding: 20px; background: #1a1a1a; color: #ccc; text-align: center; }
+        a { color: #8787FF; }
+        h1 { color: #C0C0C0; }
+        input { padding: 8px; width: 250px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; margin: 5px; }
+        button { padding: 8px 16px; background: #8787FF; color: #000; border: none; border-radius: 3px; cursor: pointer; margin: 5px; }
+        .error { color: #ff4444; }
+        .success { color: #44aa44; }
+    </style>
+</head>
+<body>
+    <h1>Editor Signup</h1>
+    <p>Create an editor account.</p>
+    <input type="text" id="username" placeholder="Username"><br>
+    <input type="password" id="password" placeholder="Password"><br>
+    <button id="signup-btn">Sign Up</button>
+    <p id="message"></p>
+    <p><a href="login.html">Already have an account? Login</a></p>
+    <p><a href="index.html">← Back to search</a></p>
+
+    <script type="module">
+        var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
+        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+        var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        document.getElementById('signup-btn').addEventListener('click', async function() {
+            var user = document.getElementById('username').value.trim();
+            var pw = document.getElementById('password').value;
+            if (!user || !pw) { document.getElementById('message').innerHTML = '<span class="error">Fill in all fields.</span>'; return; }
+            var result = await supabase.from('admins').insert({ username: user, password: pw });
+            if (result.error) { document.getElementById('message').innerHTML = '<span class="error">' + result.error.message + '</span>'; return; }
+            document.getElementById('message').innerHTML = '<span class="success">Account created! <a href="login.html">Login</a></span>';
+        });
+    </script>
+</body>
+</html>

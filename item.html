@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Item - MUD Equipment DB</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+        a { color: #8787FF; }
+        h1 { color: #C0C0C0; margin-bottom: 5px; }
+        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        nav a { margin-right: 15px; }
+        .meta { font-size: 12px; color: #888; margin: 5px 0; }
+        .section { background: #222; padding: 15px; margin: 15px 0; border-radius: 5px; }
+        .section h2 { margin-top: 0; font-size: 16px; color: #888; }
+        .prop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 20px; }
+        .prop-label { color: #888; font-size: 12px; }
+        .prop-value { font-size: 13px; }
+        textarea { width: 100%; height: 80px; background: #111; color: #0f0; border: 1px solid #333; padding: 10px; font-family: monospace; }
+        button { padding: 8px 16px; background: #8787FF; color: #000; border: none; border-radius: 3px; cursor: pointer; margin: 5px 0; }
+        .comment { background: #1a1a1a; padding: 10px; margin: 8px 0; border-radius: 5px; border-left: 3px solid #444; }
+        .comment-meta { font-size: 12px; color: #888; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 6px 8px; text-align: left; border-bottom: 1px solid #333; font-size: 12px; }
+        th { color: #888; font-size: 11px; }
+        .submitter-credit { font-size: 13px; color: #ffaa00; margin: 10px 0; padding: 8px; background: #1a1a1a; border-radius: 5px; }
+        .submitter-credit .label { color: #888; }
+        .history-toggle { color: #8787FF; cursor: pointer; font-size: 13px; margin: 5px 0; display: inline-block; }
+        .history-toggle:hover { text-decoration: underline; }
+        .eqdb-label { color: #44aa44; font-weight: bold; }
+        .personal-label { color: #ffaa00; }
+    </style>
+</head>
+<body>
+    <h1 id="item-name">Loading...</h1>
+    <div class="meta" id="item-meta"></div>
+    <nav>
+        <a href="index.html">Search</a>
+        <a href="info.html">About</a>
+        <a href="ideas.html">Ideas</a>
+        <a href="leaderboard.html">Leaderboards</a>
+        <span id="editor-links" style="display:none;">
+            <a href="import.html">Add Equipment</a>
+            <a href="batch.html">Batch Import</a>
+            <a href="import-db.html">Import Database</a>
+            <a href="admin.html">Admin</a>
+        </span>
+        <span id="login-link"><a href="login.html">Editor Login</a></span>
+        <span id="logout-link" style="display:none;"><a href="#" onclick="logout()">Logout</a></span>
+    </nav>
+    <hr>
+
+    <div id="submitter-credit" class="submitter-credit" style="display:none;"></div>
+
+    <div id="content">
+        <div class="section" id="properties-section">
+            <h2>Properties</h2>
+            <div class="prop-grid" id="prop-grid"></div>
+        </div>
+        <div class="section" id="desc-section" style="display:none;">
+            <h2>Description</h2>
+            <p id="item-description" style="font-style:italic;color:#aaa;"></p>
+        </div>
+        <div class="section" id="history-section">
+            <h2>Version History <span class="history-toggle" id="history-toggle" onclick="toggleHistory()">(show)</span></h2>
+            <div id="history-content" style="display:none;">
+                <table><thead><tr><th>Submitter</th><th>Source</th><th>Date</th><th>Overwritten</th></tr></thead>
+                    <tbody id="history-body"><tr><td colspan="4" style="color:#888;">Loading...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="section" id="comments-section">
+            <h2>Comments</h2>
+            <div id="comments"></div>
+            <div id="comment-form" style="margin-top:10px;">
+                <input type="text" id="comment-name" placeholder="Your name" style="width:200px;padding:6px;background:#333;color:#ccc;border:1px solid #555;border-radius:3px;"><br>
+                <textarea id="comment-text" placeholder="Write a comment..."></textarea><br>
+                <button id="comment-btn">Post Comment</button>
+                <span id="comment-message"></span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleHistory() {
+            var c = document.getElementById('history-content');
+            var t = document.getElementById('history-toggle');
+            if (c.style.display === 'none') { c.style.display = 'block'; t.textContent = '(hide)'; }
+            else { c.style.display = 'none'; t.textContent = '(show)'; }
+        }
+        function logout() { sessionStorage.removeItem('editor_logged_in'); location.reload(); }
+    </script>
+
+    <script type="module">
+        var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
+        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+        var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        function escapeHtml(t) { if (!t) return ''; var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+
+        var params = new URLSearchParams(window.location.search);
+        var itemId = params.get('id');
+
+        async function loadItem() {
+            if (!itemId) { document.getElementById('item-name').textContent = 'No item specified'; return; }
+            var r = await supabase.from('equipment').select('*').eq('id', itemId).single();
+            if (r.error || !r.data) { document.getElementById('item-name').textContent = 'Item not found'; return; }
+            var item = r.data;
+            document.getElementById('item-name').textContent = item.name || 'Unknown';
+
+            var metaEl = document.getElementById('item-meta');
+            var uploadInfo = '';
+            if (item.properties && item.properties.uploaded_by) { uploadInfo = 'Submitted by: ' + escapeHtml(item.properties.uploaded_by) + ' &middot; '; }
+            metaEl.innerHTML = uploadInfo + 'Type: ' + (item.type || '?') + ' &middot; Slot: ' + (item.slot || '?') + ' &middot; ' + (item.is_eqdb ? '<span class="eqdb-label">EQDB</span>' : '<span class="personal-label">Personal</span>');
+
+            // Properties
+            var grid = document.getElementById('prop-grid');
+            var props = item.properties || {};
+            var html = '';
+            var skipKeys = ['description', 'uploaded_by'];
+            for (var key in props) {
+                if (skipKeys.indexOf(key) !== -1) continue;
+                html += '<div class="prop-label">' + escapeHtml(key.replace(/_/g, ' ')) + '</div><div class="prop-value">' + escapeHtml(String(props[key])) + '</div>';
+            }
+            grid.innerHTML = html;
+
+            // Description
+            if (props.description) {
+                document.getElementById('desc-section').style.display = 'block';
+                document.getElementById('item-description').textContent = props.description;
+            }
+
+            // Submitter credit from history
+            var hist = await supabase.from('submission_history').select('*').eq('item_name', item.name).order('created_at', { ascending: true });
+            var creditEl = document.getElementById('submitter-credit');
+            if (hist.data && hist.data.length > 0) {
+                var first = hist.data[0];
+                var last = hist.data[hist.data.length - 1];
+                creditEl.style.display = 'block';
+                creditEl.innerHTML = '<span class="label">Originally submitted by</span> <strong>' + escapeHtml(first.submitter) + '</strong> on ' + new Date(first.created_at).toLocaleDateString() + ' &middot; <span class="label">Last updated by</span> <strong>' + escapeHtml(last.submitter) + '</strong> on ' + new Date(last.created_at).toLocaleDateString();
+
+                // Version history table
+                var tbody = document.getElementById('history-body');
+                tbody.innerHTML = hist.data.map(function(h) {
+                    return '<tr><td>' + escapeHtml(h.submitter) + '</td><td>' + escapeHtml(h.source || 'unknown') + '</td><td>' + new Date(h.created_at).toLocaleDateString() + '</td><td>' + (h.overwritten_at ? new Date(h.overwritten_at).toLocaleDateString() : '-') + '</td></tr>';
+                }).join('');
+            } else {
+                creditEl.style.display = 'block';
+                creditEl.innerHTML = '<span class="label">Submitter info not available in history.</span>';
+                document.getElementById('history-body').innerHTML = '<tr><td colspan="4" style="color:#888;">No version history available.</td></tr>';
+            }
+
+            loadComments();
+        }
+
+        // Comments
+        async function loadComments() {
+            var el = document.getElementById('comments');
+            if (!itemId) { el.innerHTML = ''; return; }
+            var r = await supabase.from('comments').select('*').eq('equipment_id', itemId).order('created_at', { ascending: true });
+            if (r.error || !r.data) { el.innerHTML = '<span style="color:#888;">Error loading comments.</span>'; return; }
+            if (r.data.length === 0) { el.innerHTML = '<p style="color:#888;">No comments yet.</p>'; return; }
+            var html = '';
+            for (var c of r.data) {
+                if (c.status === 'denied') continue;
+                html += '<div class="comment"><div>' + escapeHtml(c.comment_text) + '</div><div class="comment-meta">By ' + escapeHtml(c.display_name) + ' &middot; ' + new Date(c.created_at).toLocaleDateString();
+                if (c.status === 'pending') html += ' &middot; <span style="color:#ffaa00;">awaiting approval</span>';
+                html += '</div></div>';
+            }
+            el.innerHTML = html || '<p style="color:#888;">No approved comments yet.</p>';
+        }
+
+        document.getElementById('comment-btn').addEventListener('click', async function() {
+            var text = document.getElementById('comment-text').value.trim();
+            var name = document.getElementById('comment-name').value.trim() || 'anonymous';
+            if (!text || !itemId) { document.getElementById('comment-message').textContent = 'Write something.'; return; }
+            var r = await supabase.from('comments').insert({ equipment_id: parseInt(itemId), comment_text: text, display_name: name, status: 'pending' });
+            if (r.error) { document.getElementById('comment-message').innerHTML = '<span style="color:#ff4444;">' + r.error.message + '</span>'; return; }
+            document.getElementById('comment-text').value = '';
+            document.getElementById('comment-message').innerHTML = '<span style="color:#44aa44;">Posted! Awaiting approval.</span>';
+            loadComments();
+        });
+
+        loadItem();
+
+        if (sessionStorage.getItem('editor_logged_in') !== 'true') { document.getElementById('editor-links').style.display = 'none'; document.getElementById('login-link').style.display = 'inline'; document.getElementById('logout-link').style.display = 'none'; }
+        else { document.getElementById('editor-links').style.display = 'inline'; document.getElementById('login-link').style.display = 'none'; document.getElementById('logout-link').style.display = 'inline'; }
+    </script>
+</body>
+</html>

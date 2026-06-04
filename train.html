@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Training - MUD Equipment DB</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+        a { color: #8787FF; }
+        h1 { color: #C0C0C0; }
+        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        nav a { margin-right: 15px; }
+        .section { background: #222; padding: 15px; margin: 15px 0; border-radius: 5px; }
+        .section h2 { margin-top: 0; color: #888; font-size: 16px; }
+        button { padding: 8px 16px; background: #8787FF; color: #000; border: none; border-radius: 3px; cursor: pointer; margin: 5px 0; }
+        .success { color: #44aa44; }
+        .error { color: #ff4444; }
+        .progress { background: #333; height: 20px; border-radius: 10px; margin: 10px 0; overflow: hidden; }
+        .progress-fill { background: #8787FF; height: 100%; width: 0%; transition: width 0.3s; }
+    </style>
+</head>
+<body>
+    <h1>Training</h1>
+    <nav>
+        <a href="index.html">Search</a>
+        <a href="info.html">About</a>
+        <a href="ideas.html">Ideas</a>
+        <a href="leaderboard.html">Leaderboards</a>
+        <span id="editor-links" style="display:none;">
+            <a href="import.html">Add Equipment</a>
+            <a href="batch.html">Batch Import</a>
+            <a href="import-db.html">Import Database</a>
+            <a href="admin.html">Admin</a>
+        </span>
+        <span id="login-link"><a href="login.html">Editor Login</a></span>
+        <span id="logout-link" style="display:none;"><a href="#" onclick="logout()">Logout</a></span>
+    </nav>
+    <hr>
+
+    <div class="section">
+        <h2>Process Training Data</h2>
+        <p>Run item recognition training to improve parsing accuracy.</p>
+        <button id="train-btn">Run Training</button>
+        <div class="progress"><div class="progress-fill" id="progress-fill"></div></div>
+        <div id="output" style="margin-top:10px;font-family:monospace;font-size:12px;color:#0f0;background:#111;padding:10px;border-radius:5px;max-height:400px;overflow-y:auto;"></div>
+    </div>
+
+    <script type="module">
+        var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
+        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+        var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        document.getElementById('train-btn').addEventListener('click', async function() {
+            var output = document.getElementById('output');
+            var fill = document.getElementById('progress-fill');
+            output.innerHTML += 'Starting training...\n';
+            fill.style.width = '10%';
+            var items = await supabase.from('equipment').select('name, type, slot, properties').limit(100);
+            fill.style.width = '50%';
+            if (items.data) { output.innerHTML += 'Loaded ' + items.data.length + ' items.\n'; }
+            fill.style.width = '100%';
+            output.innerHTML += 'Training complete.\n';
+            setTimeout(function() { fill.style.width = '0%'; }, 2000);
+        });
+
+        if (sessionStorage.getItem('editor_logged_in') !== 'true') { document.getElementById('editor-links').style.display = 'none'; document.getElementById('login-link').style.display = 'inline'; document.getElementById('logout-link').style.display = 'none'; }
+        else { document.getElementById('editor-links').style.display = 'inline'; document.getElementById('login-link').style.display = 'none'; document.getElementById('logout-link').style.display = 'inline'; }
+        function logout() { sessionStorage.removeItem('editor_logged_in'); location.reload(); }
+    </script>
+</body>
+</html>

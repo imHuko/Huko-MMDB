@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Import Locations - MUD Equipment DB</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+        a { color: #8787FF; }
+        h1 { color: #C0C0C0; }
+        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        nav a { margin-right: 15px; }
+        textarea { width: 100%; height: 200px; background: #111; color: #0f0; border: 1px solid #333; padding: 10px; font-family: monospace; font-size: 12px; }
+        button { padding: 8px 16px; background: #8787FF; color: #000; border: none; border-radius: 3px; cursor: pointer; margin: 5px 0; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background: #1a3a1a; color: #4a4; }
+        .error { background: #3a1a1a; color: #f44; }
+    </style>
+</head>
+<body>
+    <h1>Import Locations</h1>
+    <nav>
+        <a href="index.html">Search</a>
+        <a href="info.html">About</a>
+        <a href="ideas.html">Ideas</a>
+        <a href="leaderboard.html">Leaderboards</a>
+        <span id="editor-links" style="display:none;">
+            <a href="import.html">Add Equipment</a>
+            <a href="batch.html">Batch Import</a>
+            <a href="import-db.html">Import Database</a>
+            <a href="admin.html">Admin</a>
+        </span>
+        <span id="login-link"><a href="login.html">Editor Login</a></span>
+        <span id="logout-link" style="display:none;"><a href="#" onclick="logout()">Logout</a></span>
+    </nav>
+    <hr>
+    <p>Paste location data to import (room name, area, coordinates).</p>
+    <textarea id="input" placeholder="Paste location data here..."></textarea>
+    <br>
+    <label><input type="checkbox" id="overwrite"> Overwrite existing</label>
+    <br>
+    <button id="import-btn">Import</button>
+    <div id="results"></div>
+
+    <script type="module">
+        var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
+        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+        var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        document.getElementById('import-btn').addEventListener('click', async function() {
+            var text = document.getElementById('input').value.trim();
+            if (!text) { document.getElementById('results').innerHTML = '<div class="error">Paste location data first.</div>'; return; }
+            var results = document.getElementById('results');
+            results.innerHTML = 'Importing...';
+            var lines = text.split('\n').filter(Boolean);
+            var html = '';
+            for (var line of lines) {
+                var parts = line.split('|');
+                var loc = { room_name: parts[0] ? parts[0].trim() : '', area: parts[1] ? parts[1].trim() : '', x: parts[2] ? parts[2].trim() : '', y: parts[3] ? parts[3].trim() : '', z: parts[4] ? parts[4].trim() : '' };
+                if (!loc.room_name) { html += '<div class="error">Invalid line: ' + line + '</div>'; continue; }
+                if (document.getElementById('overwrite').checked) {
+                    var existing = await supabase.from('rooms').select('id').eq('room_name', loc.room_name).limit(1);
+                    if (existing.data && existing.data.length) { await supabase.from('rooms').update(loc).eq('id', existing.data[0].id); }
+                    else { await supabase.from('rooms').insert(loc); }
+                } else { await supabase.from('rooms').insert(loc); }
+                html += '<div class="success">Imported: ' + loc.room_name + '</div>';
+            }
+            results.innerHTML = html;
+        });
+
+        if (sessionStorage.getItem('editor_logged_in') !== 'true') { document.getElementById('editor-links').style.display = 'none'; document.getElementById('login-link').style.display = 'inline'; document.getElementById('logout-link').style.display = 'none'; }
+        else { document.getElementById('editor-links').style.display = 'inline'; document.getElementById('login-link').style.display = 'none'; document.getElementById('logout-link').style.display = 'inline'; }
+        function logout() { sessionStorage.removeItem('editor_logged_in'); location.reload(); }
+    </script>
+</body>
+</html>

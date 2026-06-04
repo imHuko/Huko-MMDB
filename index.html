@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MUD Equipment Database</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+        a { color: #8787FF; }
+        h1 { color: #C0C0C0; }
+        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        nav a { margin-right: 15px; }
+        .item-card { border: 1px solid #444; margin: 10px 0; padding: 15px; border-radius: 5px; background: #1a1a1a; }
+        .item-card h3 { margin: 0 0 5px 0; }
+        .item-card h3 a { color: #C0C0C0; text-decoration: none; }
+        .item-card h3 a:hover { text-decoration: underline; }
+        .item-meta { color: #888; font-size: 14px; margin-bottom: 10px; }
+        .search-bar { margin: 15px 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .search-bar input, .search-bar select, .search-bar button { padding: 8px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; }
+        .search-bar button { cursor: pointer; background: #8787FF; color: #000; border: none; }
+        #advanced-filters { margin: 10px 0; padding: 10px; background: #222; border-radius: 5px; }
+        #advanced-filters select, #advanced-filters input { padding: 6px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; margin: 3px; }
+        .leaderboard { margin: 30px 0; }
+        .leaderboard table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .leaderboard th { color: #888; text-align: left; padding: 8px; border-bottom: 2px solid #444; font-size: 12px; }
+        .leaderboard td { padding: 8px; border-bottom: 1px solid #333; }
+        .leaderboard tr:hover td { background: #222; }
+        .leaderboard .medal { font-size: 18px; }
+        .leaderboard .count-eqdb { color: #44aa44; }
+        .leaderboard .count-personal { color: #ffaa00; }
+        .leaderboard-loading { color: #888; padding: 20px; text-align: center; }
+        .leaderboard-error { color: #ff4444; padding: 20px; text-align: center; }
+    </style>
+</head>
+<body>
+    <h1>MUD Equipment Database</h1>
+    <nav>
+        <a href="index.html">Search</a>
+        <a href="info.html">About</a>
+        <a href="ideas.html">Ideas</a>
+        <a href="#" onclick="scrollToLeaderboard();return false;">Leaderboard</a>
+        <span id="editor-links" style="display:none;">
+            <a href="import.html">Add Equipment</a>
+            <a href="batch.html">Batch Import</a>
+            <a href="import-db.html">Import Database</a>
+            <a href="admin.html">Admin</a>
+        </span>
+        <span id="login-link">
+            <a href="login.html">Editor Login</a>
+        </span>
+        <span id="logout-link" style="display:none;">
+            <a href="#" onclick="logout()">Logout</a>
+        </span>
+    </nav>
+
+    <div class="search-bar">
+        <input type="text" id="search-input" placeholder="Search equipment..." style="width:250px;">
+        <button id="search-btn">Search</button>
+		<input type="text" id="mob-search-input" placeholder="Search mobs..." style="width:200px;">
+<button id="mob-search-btn">Mobs</button>
+        <button id="reset-btn">Reset</button>
+        <button id="toggle-filters-btn" style="background:#555;">+ Filters</button>
+    </div>
+    
+    <div id="advanced-filters" style="display:none;">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <select id="filter-type">
+                <option value="">Item Type</option>
+                <option value="weapon">Weapon</option>
+                <option value="armor">Armor</option>
+                <option value="jewelry">Jewelry</option>
+                <option value="scroll">Scroll</option>
+                <option value="potion">Potion</option>
+                <option value="wand">Wand</option>
+                <option value="food">Food</option>
+                <option value="drink">Drink</option>
+                <option value="herb">Herb</option>
+                <option value="pill">Pill</option>
+                <option value="clothing">Clothing</option>
+                <option value="treasure">Treasure</option>
+                <option value="key">Key</option>
+                <option value="book">Book</option>
+                <option value="other">Other</option>
+            </select>
+            
+            <select id="filter-weapon-type" style="display:none;">
+                <option value="">Weapon Type</option>
+                <option value="sword">Sword</option><option value="axe">Axe</option>
+                <option value="dagger">Dagger</option><option value="mace">Mace</option>
+                <option value="spear">Spear</option><option value="staff">Staff</option>
+                <option value="bow">Bow</option><option value="flail">Flail</option>
+                <option value="whip">Whip</option><option value="halberd">Halberd</option>
+                <option value="scythe">Scythe</option><option value="polearm">Polearm</option>
+                <option value="lance">Lance</option><option value="exotic">Exotic</option>
+                <option value="magical-wand">Magical Wand</option>
+                <option value="two-handed-axe">Two-Handed Axe</option>
+                <option value="two-handed-sword">Two-Handed Sword</option>
+                <option value="hand-cannon">Hand Cannon</option>
+                <option value="crossbow">Crossbow</option>
+                <option value="chakram">Chakram</option><option value="boomerang">Boomerang</option>
+                <option value="bola">Bola</option><option value="throwing-axe">Throwing Axe</option>
+                <option value="throwing-knife">Throwing Knife</option>
+                <option value="throwing-spear">Throwing Spear</option>
+                <option value="throwing-star">Throwing Star</option>
+                <option value="maul">Maul</option><option value="nunchaku">Nunchaku</option>
+                <option value="yo-yo">Yo-Yo</option><option value="pike">Pike</option>
+                <option value="hook">Hook</option><option value="dart">Dart</option>
+                <option value="sling">Sling</option><option value="slug-thrower">Slug Thrower</option>
+            </select>
+            
+            <select id="filter-wear-slot">
+                <option value="">Wear Slot</option>
+                <option value="head">Head</option><option value="face">Face</option>
+                <option value="neck">Neck</option><option value="shoulders">Shoulders</option>
+                <option value="torso">Torso</option><option value="arms">Arms</option>
+                <option value="hands">Hands</option><option value="wrist">Wrist</option>
+                <option value="finger">Finger</option><option value="waist">Waist</option>
+                <option value="legs">Legs</option><option value="feet">Feet</option>
+                <option value="shield">Shield</option><option value="hold">Hold</option>
+                <option value="wield">Wield</option><option value="back">Back</option>
+            </select>
+            
+            <select id="filter-material">
+                <option value="">Material</option>
+                <option value="mithril">Mithril</option><option value="admantite">Admantite</option>
+                <option value="steel">Steel</option><option value="silver">Silver</option>
+                <option value="gold">Gold</option><option value="bronze">Bronze</option>
+                <option value="iron">Iron</option><option value="wood">Wood</option>
+                <option value="leather">Leather</option><option value="cloth">Cloth</option>
+                <option value="bone">Bone</option><option value="scales">Scales</option>
+                <option value="energy">Energy</option><option value="organic">Organic</option>
+                <option value="crystal">Crystal</option><option value="glass">Glass</option>
+                <option value="stone">Stone</option>
+            </select>
+            
+            <input type="number" id="filter-min-level" placeholder="Min Level" style="width:80px;">
+            <input type="number" id="filter-max-level" placeholder="Max Level" style="width:80px;">
+            
+            <select id="filter-source">
+                <option value="">Any Source</option>
+                <option value="eqdb">EQDB Only</option>
+                <option value="personal">Personal Only</option>
+            </select>
+			<input type="text" id="filter-affect" placeholder="Affect (e.g. hp-regen)" style="width:150px;" list="affect-list">
+<datalist id="affect-list"></datalist>
+        </div>
+    </div>
+
+    <p style="color:#888;text-align:center;">Thanks for visiting the UNOFFICIAL Materia Magica Equipment Database!</p>
+    <hr>
+
+    <div id="results">
+        <p style="color:#888;">Use the search bar above or click Search to browse all items.</p>
+    </div>
+
+    <hr>
+    <div class="leaderboard" id="leaderboard-section">
+        <h2 style="color:#C0C0C0;">Top Contributors</h2>
+        <p style="font-size:13px;color:#888;">Players who have submitted the most equipment data.</p>
+        <p style="font-size:11px;color:#666;margin-top:-8px;">Note: Counts only reflect the last uploaded version of each item. Earlier personal submissions that were later overwritten by EQDB are not included until future submissions re-track them.</p>
+        <table><thead><tr><th></th><th>Contributor</th><th>Total</th><th class="count-eqdb">EQDB</th><th class="count-personal">Personal</th><th>First</th><th>Last</th></tr></thead>
+            <tbody id="leaderboard-body"><tr><td colspan="7" class="leaderboard-loading">Loading...</td></tr></tbody>
+        </table>
+    </div>
+
+	    <script type="module">
+        var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
+        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+        var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                var affectList = [
+            "accuracy","damage","damage-prcnt","age","sp-regen","stamina-regen","hp-regen","align",
+            "mount-speed","resilience","auction-momentum","running-speed","healing-others-prcnt",
+            "healed-by-others-prcnt","conduit-prcnt","combat-inconspicuousness","fistfighting",
+            "ar-mitigation","transport-speed","spells-learned","proficiencies-learned",
+            "damage-kick","damage-bash","damage-feed","hp-regen-prcnt","sp-regen-prcnt",
+            "stamina-regen-prcnt","search","strength","wisdom","intelligence","dexterity",
+            "constitution","charisma","personality","luck","hp","sp","stamina","ar",
+            "saving-spell","saving-rod","saving-breath",
+            "summon-res","charm-res","bash-res","pierce-res","slash-res","fire-res",
+            "cold-res","lightning-res","acid-res","sound-res","poison-res",
+            "negative-res","energy-res","mental-res","disease-res","drowning-res",
+            "water-res","earth-res","air-res","necromantic-res","iron-res","wood-res",
+            "silver-res","metal-res","holy-res","lightbeam-res","moonlight-res","sunlight-res",
+            "bash-damage","pierce-damage","slash-damage","fire-damage","cold-damage",
+            "lightning-damage","acid-damage","sound-damage","poison-damage",
+            "negative-damage","energy-damage","mental-damage","disease-damage",
+            "drowning-damage","water-damage","earth-damage","air-damage","necromantic-damage",
+            "iron-damage","wood-damage","silver-damage","holy-damage","lightbeam-damage",
+            "charm-damage","moonlight-damage","sunlight-damage","damage-throw","damage-backstab",
+            "damage-fire-breath","damage-gas-breath","damage-ice-breath","damage-acid-breath",
+            "damage-lightning-breath","dig","damage-sweep","damage-charge","damage-grapple",
+            "damage-splash-prcnt","heal-splash-prcnt","reflected-spell-prcnt","damage-splash",
+            "musical-ability","PCC","SCC","spellcasting-priority","height",
+            "damage-to-evil-prcnt","damage-to-good-prcnt","damage-boss-cat1","damage-boss-cat2",
+            "damage-boss-cat3","damage-boss-cat4","damage-boss-cat5","damage-boss-cat6",
+            "damage-boss-cat7","hp-regen-max","sp-regen-max","st-regen-max",
+            "weight-modifier-prcnt","spellbook-capacity","melee-vamp-prcnt","skill-vamp-prcnt",
+            "melee-vamp-res","skill-vamp-res","spellbook-complexity","crit-damage",
+            "weight-modifier","attack-speed","defense-speed","extra-defense-speed",
+            "summon-damage","orienteering","spell-accuracy",
+            "flaming-weapon-activation-damage","frost-weapon-activation-damage",
+            "vampiric-weapon-activation-damage","sharp-weapon-activation-damage",
+            "vorpal-weapon-activation-damage","poisoned-weapon-activation-damage",
+            "shocking-weapon-activation-damage","dispelling-weapon-activation-damage",
+            "parry-magic-weapon-activation-damage","battle-rage-activation-damage",
+            "acid-weapon-activation-damage","battering-weapon-activation-damage",
+            "echoing-strike-weapon-activation-damage","grappling-weapon-activation-damage",
+            "aqueous-weapon-activation-damage","leech-conduit-activation-damage",
+            "ether-scar-activation-damage","serrated-weapon-activation-damage",
+            "overloading-weapon-activation-damage","temporal-flux-weapon-activation-damage",
+            "range","distance","crit-chance","corruption-res","corruption-damage",
+            "time-paradox-res","time-paradox-damage","emotional-res","emotional-damage",
+            "pain-res","pain-dam","surprise-res","surprise-damage","fear-res","fear-damage",
+            "inventory-capacity","harm-res","harm-damage","spell-damage","spell-damage-prcnt",
+            "spell-ward","vitality","courage","sanity","knowledge"
+        ];
+
+        var datalist = document.getElementById('affect-list');
+        affectList.forEach(function(a) {
+            var opt = document.createElement('option');
+            opt.value = a;
+            datalist.appendChild(opt);
+        });
+        document.getElementById('search-btn').addEventListener('click', searchEquipment);
+		document.getElementById('mob-search-btn').addEventListener('click', searchMobs);
+document.getElementById('mob-search-input').addEventListener('keyup', function(e) { if (e.key === 'Enter') searchMobs(); });
+        document.getElementById('search-input').addEventListener('keyup', function(e) { if (e.key === 'Enter') searchEquipment(); });
+        
+        function saveSearchState() {
+            sessionStorage.setItem('eqdb_search', JSON.stringify({
+                search: document.getElementById('search-input').value,
+                mobSearch: document.getElementById('mob-search-input').value,
+                filterType: document.getElementById('filter-type').value,
+                filterWeaponType: document.getElementById('filter-weapon-type').value,
+                filterWearSlot: document.getElementById('filter-wear-slot').value,
+                filterMaterial: document.getElementById('filter-material').value,
+                filterMinLevel: document.getElementById('filter-min-level').value,
+                filterMaxLevel: document.getElementById('filter-max-level').value,
+                filterSource: document.getElementById('filter-source').value,
+                filterAffect: document.getElementById('filter-affect').value,
+                filtersVisible: document.getElementById('advanced-filters').style.display !== 'none',
+                lastSearch: document.getElementById('results').querySelector('.item-card') ? 'equipment' : 'mobs'
+            }));
+        }
+        
+        function restoreSearchState() {
+            var saved = sessionStorage.getItem('eqdb_search');
+            if (!saved) return false;
+            try {
+                var state = JSON.parse(saved);
+                document.getElementById('search-input').value = state.search || '';
+                document.getElementById('mob-search-input').value = state.mobSearch || '';
+                document.getElementById('filter-type').value = state.filterType || '';
+                document.getElementById('filter-weapon-type').value = state.filterWeaponType || '';
+                document.getElementById('filter-wear-slot').value = state.filterWearSlot || '';
+                document.getElementById('filter-material').value = state.filterMaterial || '';
+                document.getElementById('filter-min-level').value = state.filterMinLevel || '';
+                document.getElementById('filter-max-level').value = state.filterMaxLevel || '';
+                document.getElementById('filter-source').value = state.filterSource || '';
+                document.getElementById('filter-affect').value = state.filterAffect || '';
+                var filters = document.getElementById('advanced-filters');
+                if (state.filtersVisible) {
+                    filters.style.display = 'block';
+                    document.getElementById('toggle-filters-btn').textContent = '- Filters';
+                }
+                if (state.filterType === 'weapon') {
+                    document.getElementById('filter-weapon-type').style.display = 'inline';
+                }
+                return state.search || state.mobSearch || state.filterType || state.filterWearSlot || state.filterMaterial || state.filterMinLevel || state.filterMaxLevel || state.filterAffect;
+            } catch(e) { return false; }
+        }
+        
+        document.getElementById('reset-btn').addEventListener('click', function() {
+            document.getElementById('search-input').value = '';
+            document.getElementById('filter-type').value = '';
+            document.getElementById('filter-weapon-type').value = '';
+            document.getElementById('filter-wear-slot').value = '';
+            document.getElementById('filter-material').value = '';
+            document.getElementById('filter-min-level').value = '';
+            document.getElementById('filter-max-level').value = '';
+            document.getElementById('filter-source').value = '';
+            sessionStorage.removeItem('eqdb_search');
+            searchEquipment();
+        });
+        
+        document.getElementById('toggle-filters-btn').addEventListener('click', function() {
+            var filters = document.getElementById('advanced-filters');
+            if (filters.style.display === 'none') {
+                filters.style.display = 'block';
+                this.textContent = '- Filters';
+            } else {
+                filters.style.display = 'none';
+                this.textContent = '+ Filters';
+            }
+        });
+        
+        document.getElementById('filter-type').addEventListener('change', function() {
+            var weaponSelect = document.getElementById('filter-weapon-type');
+            weaponSelect.style.display = (this.value === 'weapon') ? 'inline' : 'none';
+        });
+        
+        async function searchEquipment() {
+            var searchTerm = document.getElementById('search-input').value.toLowerCase();
+            var resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<p>Searching...</p>';
+            
+            let query = supabase.from('equipment').select('*', { count: 'exact' }).order('name', { ascending: true }).limit(100);
+            
+            if (searchTerm) query = query.ilike('name', '%' + searchTerm + '%');
+            
+            var itemType = document.getElementById('filter-type').value;
+            var weaponType = document.getElementById('filter-weapon-type').value;
+            var wearSlot = document.getElementById('filter-wear-slot').value;
+            var material = document.getElementById('filter-material').value;
+            var minLevel = document.getElementById('filter-min-level').value;
+            var maxLevel = document.getElementById('filter-max-level').value;
+            var source = document.getElementById('filter-source').value;
+            
+            if (itemType) query = query.ilike('description', '%is type ' + itemType + '%');
+            if (weaponType) query = query.ilike('description', '%type weapon ' + weaponType + '%');
+if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
+            if (material) query = query.ilike('description', '%made of ' + material + '%');
+			            var affectFilter = document.getElementById('filter-affect').value.toLowerCase();
+            if (affectFilter) query = query.ilike('description', '%' + affectFilter + '%');
+            if (minLevel) query = query.gte('level_req', minLevel);
+            if (maxLevel) query = query.lte('level_req', maxLevel);
+            if (source === 'eqdb') query = query.eq('verified', true);
+            if (source === 'personal') query = query.eq('verified', false);
+            
+            var result = await query;
+            var data = result.data;
+            var error = result.error;
+            var count = result.count;
+            
+            if (error) { resultsDiv.innerHTML = '<p>Error: ' + error.message + '</p>'; return; }
+            
+            if (!data || data.length === 0) {
+                if (searchTerm) {
+                    var dbFallback = await supabase.from('items_db').select('name, itemid').ilike('name', '%' + searchTerm + '%').limit(100);
+                    if (dbFallback.data && dbFallback.data.length > 0) {
+                        var fallbackHtml = '';
+                        for (var f = 0; f < dbFallback.data.length; f++) {
+                            var fb = dbFallback.data[f];
+                            fallbackHtml += '<div class="item-card">';
+                            fallbackHtml += '<h3><a href="item.html?name=' + encodeURIComponent(fb.name) + '">' + escapeHtml(fb.name) + '</a></h3>';
+                            fallbackHtml += '<div class="item-meta"><span style="color:#ffaa00;">Locations available — stats pending</span></div>';
+                            fallbackHtml += '</div>';
+                        }
+                        resultsDiv.innerHTML = fallbackHtml;
+                        return;
+                    }
+                }
+                resultsDiv.innerHTML = '<p>No items found. Try different filters.</p>';
+                return;
+            }
+            
+            var html = '';
+            for (var i = 0; i < data.length; i++) {
+                var item = data[i];
+                html += '<div class="item-card">';
+                html += '<h3><a href="item.html?name=' + encodeURIComponent(item.name) + '">' + escapeHtml(item.name) + '</a></h3>';
+                html += '<div class="item-meta">';
+                html += '[' + escapeHtml(item.type) + '] ';
+                if (item.slot) html += 'Slot: ' + escapeHtml(item.slot) + ' ';
+                if (item.level_req > 0) html += 'Level: ' + item.level_req + ' ';
+                if (item.value > 0) html += 'Value: ' + item.value + ' gold ';
+                html += item.verified ? '<span style="color:#44aa44;">EQDB</span>' : '<span style="color:#ffaa00;">Personal</span>';
+                html += '</div>';
+                html += '</div>';
+            }
+            
+            html += '<p style="color:#888;margin-top:20px;">Found ' + count + ' items</p>';
+            resultsDiv.innerHTML = html;
+            saveSearchState();
+        }
+                async function searchMobs() {
+            var searchTerm = document.getElementById('mob-search-input').value.toLowerCase();
+            if (!searchTerm) return;
+            
+            var result = await supabase.from('mobs_db').select('mobid, name').ilike('name', '%' + searchTerm + '%').limit(50);
+            var data = result.data;
+            var resultsDiv = document.getElementById('results');
+            
+            if (!data || data.length === 0) {
+                resultsDiv.innerHTML = '<p>No mobs found.</p>';
+                return;
+            }
+            
+            var html = '<h2 style="color:#C0C0C0;">Mobs Found (' + data.length + ')</h2>';
+            for (var i = 0; i < data.length; i++) {
+                var mob = data[i];
+                html += '<div class="item-card">';
+                html += '<h3><a href="mob.html?mobid=' + escapeHtml(String(mob.mobid)) + '">' + escapeHtml(mob.name) + '</a></h3>';
+                html += '</div>';
+            }
+            
+            resultsDiv.innerHTML = html;
+            saveSearchState();
+        }
+        function escapeHtml(text) {
+            if (!text) return '';
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // ============================================
+        // LEADERBOARD
+        // ============================================
+        async function fetchAllHistory() {
+            var allData = [];
+            var page = 0;
+            var pageSize = 1000;
+            var hasMore = true;
+            while (hasMore) {
+                var from = page * pageSize;
+                var to = from + pageSize - 1;
+                var result = await supabase.from('submission_history').select('*').range(from, to);
+                if (result.error) throw result.error;
+                if (result.data && result.data.length > 0) allData = allData.concat(result.data);
+                hasMore = result.data && result.data.length === pageSize;
+                page++;
+            }
+            return allData;
+        }
+
+        async function loadLeaderboard() {
+            var tbody = document.getElementById('leaderboard-body');
+            try {
+                var data = await fetchAllHistory();
+                if (!data || data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px;">No submissions yet. Be the first!</td></tr>';
+                    return;
+                }
+                var contributors = {};
+                for (var i = 0; i < data.length; i++) {
+                    var s = data[i];
+                    var name = s.submitter || 'anonymous';
+                    if (!contributors[name]) contributors[name] = { name: name, total: 0, eqdb: 0, personal: 0, first: s.created_at, last: s.created_at };
+                    contributors[name].total++;
+                    if (s.is_eqdb) contributors[name].eqdb++; else contributors[name].personal++;
+                    if (s.created_at < contributors[name].first) contributors[name].first = s.created_at;
+                    if (s.created_at > contributors[name].last) contributors[name].last = s.created_at;
+                }
+                var sorted = Object.values(contributors).sort(function(a, b) { return b.total - a.total; });
+                var html = '';
+                for (var r = 0; r < Math.min(sorted.length, 25); r++) {
+                    var c = sorted[r];
+                    var medal = r === 0 ? '🥇' : r === 1 ? '🥈' : r === 2 ? '🥉' : '';
+                    var rankDisplay = medal || '<span style="color:#666;">' + (r + 1) + '</span>';
+                    var barWidth = Math.round(c.total / sorted[0].total * 100);
+                    html += '<tr>'
+                        + '<td class="medal">' + rankDisplay + '</td>'
+                        + '<td><strong>' + escapeHtml(c.name) + '</strong><div style="height:3px;background:#333;border-radius:2px;margin-top:3px;"><div style="height:100%;background:#8787FF;width:' + barWidth + '%;border-radius:2px;"></div></div></td>'
+                        + '<td>' + c.total + '</td>'
+                        + '<td class="count-eqdb">' + c.eqdb + '</td>'
+                        + '<td class="count-personal">' + c.personal + '</td>'
+                        + '<td style="color:#888;font-size:11px;">' + new Date(c.first).toLocaleDateString() + '</td>'
+                        + '<td style="color:#888;font-size:11px;">' + new Date(c.last).toLocaleDateString() + '</td>'
+                        + '</tr>';
+                }
+                if (sorted.length > 25) {
+                    html += '<tr><td colspan="7" style="text-align:center;color:#666;padding:10px;font-size:12px;">... and ' + (sorted.length - 25) + ' more contributors</td></tr>';
+                }
+                tbody.innerHTML = html;
+            } catch (e) {
+                tbody.innerHTML = '<tr><td colspan="7" class="leaderboard-error">Error: ' + e.message + '</td></tr>';
+            }
+        }
+        loadLeaderboard();
+
+        if (restoreSearchState()) {
+            var lastSearch = JSON.parse(sessionStorage.getItem('eqdb_search')).lastSearch;
+            if (lastSearch === 'mobs') {
+                searchMobs();
+            } else {
+                searchEquipment();
+            }
+        }
+    </script>
+    
+    <script>
+        if (sessionStorage.getItem('editor_logged_in') === 'true') {
+            document.getElementById('editor-links').style.display = 'inline';
+            document.getElementById('logout-link').style.display = 'inline';
+            document.getElementById('login-link').style.display = 'none';
+        }
+        function logout() {
+            sessionStorage.removeItem('editor_logged_in');
+            location.reload();
+        }
+        function scrollToLeaderboard() {
+            var el = document.getElementById('leaderboard-section');
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>

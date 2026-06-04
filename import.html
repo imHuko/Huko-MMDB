@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Equipment - MUD Equipment DB</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+        a { color: #8787FF; }
+        h1 { color: #C0C0C0; }
+        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        nav a { margin-right: 15px; }
+        textarea { width: 100%; height: 300px; background: #111; color: #0f0; border: 1px solid #333; padding: 10px; font-family: monospace; font-size: 12px; }
+        button { padding: 8px 16px; background: #8787FF; color: #000; border: none; border-radius: 3px; cursor: pointer; margin: 5px 0; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background: #1a3a1a; color: #4a4; }
+        .error { background: #3a1a1a; color: #f44; }
+        .skip { background: #3a3a1a; color: #aa0; }
+        label { display: block; margin: 8px 0; }
+        input { padding: 6px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; width: 300px; }
+    </style>
+</head>
+<body>
+    <h1>Add Equipment</h1>
+    <nav>
+        <a href="index.html">Search</a>
+        <a href="info.html">About</a>
+        <a href="ideas.html">Ideas</a>
+        <a href="leaderboard.html">Leaderboards</a>
+        <span id="editor-links" style="display:none;">
+            <a href="import.html">Add Equipment</a>
+            <a href="batch.html">Batch Import</a>
+            <a href="import-db.html">Import Database</a>
+            <a href="admin.html">Admin</a>
+        </span>
+        <span id="login-link"><a href="login.html">Editor Login</a></span>
+        <span id="logout-link" style="display:none;"><a href="#" onclick="logout()">Logout</a></span>
+    </nav>
+    <hr>
+
+    <p>Paste item data from MUD logs below.</p>
+    <textarea id="input" placeholder="Paste item data here..."></textarea>
+    <br>
+    <label><input type="checkbox" id="is_eqdb"> This is from EQDB (official database)</label>
+    <label><input type="checkbox" id="overwrite"> Overwrite existing items</label>
+    <button id="import-btn">Import</button>
+    <div id="results"></div>
+
+    <script type="module">
+        var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
+        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+        var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        async function logHistory(item) {
+            var submitter = sessionStorage.getItem('editor_name') || 'webimport';
+            await supabase.from('submission_history').insert({
+                item_name: item.name || item.item_name || 'unknown',
+                submitter: submitter,
+                source: 'web_import',
+                is_eqdb: item.is_eqdb || false,
+                description: item.description || item.properties?.description || ''
+            });
+        }
+
+        function parseItem(text) {
+            var lines = text.trim().split('\n');
+            var item = { properties: {} };
+            for (var line of lines) {
+                var m = line.match(/^(\w[\w\s]*?)\s*:\s*(.+)/);
+                if (m) {
+                    var key = m[1].trim().toLowerCase().replace(/\s+/g, '_');
+                    var val = m[2].trim();
+                    if (key === 'name') item.name = val;
+                    else if (key === 'type') item.type = val;
+                    else if (key === 'description') item.description = val;
+                    else if (key === 'slot') item.slot = val;
+                    else item.properties[key] = val;
+                }
+            }
+            return item;
+        }
+
+        document.getElementById('import-btn').addEventListener('click', async function() {
+            var text = document.getElementById('input').value;
+            if (!text.trim()) { document.getElementById('results').innerHTML = '<div class="error">Paste item data first.</div>'; return; }
+            var results = document.getElementById('results');
+            results.innerHTML = 'Importing...';
+            var items = text.split(/\n\s*\n/).filter(Boolean).map(parseItem);
+            var html = '';
+            for (var item of items) {
+                if (!item.name) { html += '<div class="skip">Skipped: no name found</div>'; continue; }
+                var eq = await supabase.from('equipment').select('id').eq('name', item.name).limit(1);
+                var existing = eq.data && eq.data.length > 0;
+                if (existing && !document.getElementById('overwrite').checked) { html += '<div class="skip">Skipped: "' + item.name + '" exists</div>'; continue; }
+                if (existing && document.getElementById('overwrite').checked) {
+                    var r = await supabase.from('equipment').update(item).eq('name', item.name);
+                    if (r.error) html += '<div class="error">Error updating "' + item.name + '": ' + r.error.message + '</div>';
+                    else { html += '<div class="success">Updated: ' + item.name + '</div>'; await logHistory(item); }
+                } else {
+                    item.is_eqdb = document.getElementById('is_eqdb').checked;
+                    var r = await supabase.from('equipment').insert(item);
+                    if (r.error) html += '<div class="error">Error inserting "' + item.name + '": ' + r.error.message + '</div>';
+                    else { html += '<div class="success">Added: ' + item.name + '</div>'; await logHistory(item); }
+                }
+            }
+            results.innerHTML = html;
+        });
+
+        if (sessionStorage.getItem('editor_logged_in') !== 'true') { document.getElementById('editor-links').style.display = 'none'; document.getElementById('login-link').style.display = 'inline'; document.getElementById('logout-link').style.display = 'none'; }
+        else { document.getElementById('editor-links').style.display = 'inline'; document.getElementById('login-link').style.display = 'none'; document.getElementById('logout-link').style.display = 'inline'; }
+        function logout() { sessionStorage.removeItem('editor_logged_in'); location.reload(); }
+    </script>
+</body>
+</html>

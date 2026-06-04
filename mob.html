@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mob - MUD Equipment DB</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+        a { color: #8787FF; }
+        h1 { color: #C0C0C0; }
+        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        nav a { margin-right: 15px; }
+        .section { background: #222; padding: 15px; margin: 15px 0; border-radius: 5px; }
+        .section h2 { margin-top: 0; font-size: 16px; color: #888; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 8px; text-align: left; border-bottom: 1px solid #333; font-size: 13px; }
+        th { color: #888; font-size: 12px; }
+        .item-link { color: #8787FF; text-decoration: none; }
+        .item-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <h1 id="mob-name">Loading...</h1>
+    <nav>
+        <a href="index.html">Search</a>
+        <a href="info.html">About</a>
+        <a href="ideas.html">Ideas</a>
+        <a href="leaderboard.html">Leaderboards</a>
+        <span id="editor-links" style="display:none;">
+            <a href="import.html">Add Equipment</a>
+            <a href="batch.html">Batch Import</a>
+            <a href="import-db.html">Import Database</a>
+            <a href="admin.html">Admin</a>
+        </span>
+        <span id="login-link"><a href="login.html">Editor Login</a></span>
+        <span id="logout-link" style="display:none;"><a href="#" onclick="logout()">Logout</a></span>
+    </nav>
+    <hr>
+
+    <div id="content">
+        <div class="section" id="info-section">
+            <h2>Information</h2>
+            <p id="mob-info">Loading mob data...</p>
+        </div>
+        <div class="section" id="locations-section">
+            <h2>Spawn Locations</h2>
+            <div id="locations">Loading...</div>
+        </div>
+        <div class="section" id="items-section">
+            <h2>Dropped Items</h2>
+            <table><thead><tr><th>Item</th><th>Type</th><th>Slot</th></tr></thead>
+                <tbody id="items-list"><tr><td colspan="3" style="color:#888;">Loading...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script type="module">
+        var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
+        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+        var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        function escapeHtml(t) { if (!t) return ''; var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+
+        var params = new URLSearchParams(window.location.search);
+        var mobId = params.get('id') || params.get('mob');
+
+        async function loadMob() {
+            if (!mobId) { document.getElementById('mob-name').textContent = 'No mob specified'; document.getElementById('content').innerHTML = '<p>Specify a mob ID: ?id=123</p>'; return; }
+            var r = await supabase.from('mobs').select('*').eq('id', mobId).single();
+            if (r.error || !r.data) { document.getElementById('mob-name').textContent = 'Mob not found'; document.getElementById('content').innerHTML = '<p>Mob not found.</p>'; return; }
+            var mob = r.data;
+            document.getElementById('mob-name').textContent = mob.name || 'Unknown Mob';
+            document.getElementById('mob-info').innerHTML = 'Level: ' + (mob.level || '?') + '<br>HP: ' + (mob.hp || '?') + '<br>Race: ' + (mob.race || '?');
+
+            var locs = await supabase.from('spawn_locations').select('*').eq('mob_id', mobId);
+            if (locs.data && locs.data.length) {
+                document.getElementById('locations').innerHTML = locs.data.map(function(l) { return escapeHtml(l.room_name || l.location || 'Unknown') + '<br>'; }).join('');
+            } else { document.getElementById('locations').innerHTML = '<span style="color:#888;">No spawn locations known.</span>'; }
+
+            var items = await supabase.from('equipment').select('id, name, type, slot').contains('properties', { mob: mob.name });
+            if (items.data && items.data.length) {
+                document.getElementById('items-list').innerHTML = items.data.map(function(i) { return '<tr><td><a class="item-link" href="item.html?id=' + i.id + '">' + escapeHtml(i.name) + '</a></td><td>' + escapeHtml(i.type || '') + '</td><td>' + escapeHtml(i.slot || '') + '</td></tr>'; }).join('');
+            } else { document.getElementById('items-list').innerHTML = '<tr><td colspan="3" style="color:#888;">No dropped items known.</td></tr>'; }
+        }
+        loadMob();
+
+        if (sessionStorage.getItem('editor_logged_in') !== 'true') { document.getElementById('editor-links').style.display = 'none'; document.getElementById('login-link').style.display = 'inline'; document.getElementById('logout-link').style.display = 'none'; }
+        else { document.getElementById('editor-links').style.display = 'inline'; document.getElementById('login-link').style.display = 'none'; document.getElementById('logout-link').style.display = 'inline'; }
+        function logout() { sessionStorage.removeItem('editor_logged_in'); location.reload(); }
+    </script>
+</body>
+</html>

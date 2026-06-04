@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - MUD Equipment DB</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+        a { color: #8787FF; }
+        h1, h2 { color: #C0C0C0; }
+        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        nav a { margin-right: 15px; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #444; padding: 8px; text-align: left; font-size: 13px; }
+        th { background: #333; cursor: pointer; }
+        th:hover { background: #444; }
+        tr:hover { background: #222; }
+        button { padding: 6px 12px; cursor: pointer; border: none; border-radius: 3px; margin: 2px; }
+        .btn-delete { background: #ff4444; color: white; }
+        .btn-edit { background: #4488ff; color: white; }
+        .btn-approve { background: #44aa44; color: white; }
+        .btn-review { background: #44aa44; color: white; }
+        .btn-save { background: #44aa44; color: white; }
+        .btn-cancel { background: #666; color: white; }
+        .btn-recolor { background: #ff8800; color: white; }
+        input, select, textarea { padding: 8px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; }
+        .hidden { display: none !important; }
+        .tabs { margin: 15px 0; }
+        .tab { display: inline-block; padding: 8px 16px; cursor: pointer; background: #333; border-radius: 5px 5px 0 0; margin-right: 4px; }
+        .tab.active { background: #555; color: white; }
+        .section { display: none; }
+        .section.active { display: block; }
+        .search-bar { margin: 10px 0; display: flex; gap: 8px; align-items: center; }
+        .search-bar input { flex: 1; }
+        .toolbar { margin: 10px 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .pagination { margin: 15px 0; display: flex; gap: 5px; align-items: center; }
+        .pagination button { background: #333; color: #ccc; }
+        .pagination button.active { background: #8787FF; color: #000; }
+        .pagination button:disabled { opacity: 0.3; cursor: not-allowed; }
+        .uploader-tag { color: #8787FF; font-size: 12px; }
+        .anon-tag { color: #888; font-size: 12px; font-style: italic; }
+        .eqdb-label { color: #44aa44; font-weight: bold; }
+        .personal-label { color: #ffaa00; }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; display: flex; justify-content: center; align-items: center; }
+        .modal { background: #1a1a1a; border: 2px solid #555; border-radius: 10px; padding: 20px; width: 90%; max-width: 1000px; max-height: 90vh; overflow-y: auto; }
+        .modal h2 { margin-top: 0; }
+        .modal .editor-row { display: flex; gap: 15px; margin: 15px 0; }
+        .modal .editor-pane { flex: 1; }
+        .modal .editor-pane h4 { margin: 0 0 8px 0; color: #888; }
+        .modal textarea { width: 100%; height: 400px; font-family: 'Courier New', monospace; font-size: 12px; background: #111; color: #ccc; border: 1px solid #555; padding: 10px; box-sizing: border-box; }
+        .modal .preview-box { background: #000; color: #C0C0C0; padding: 15px; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 12px; white-space: pre-wrap; height: 400px; overflow-y: auto; border: 1px solid #555; }
+        .modal .btn-row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 15px; }
+    </style>
+</head>
+<body>
+    <h1>Admin Panel</h1>
+    <nav>
+        <a href="index.html">Search</a>
+        <a href="import.html">Add Equipment</a>
+        <a href="batch.html">Hash Import</a>
+        <a href="leaderboard.html">Leaderboards</a>
+        <a href="admin.html">Admin</a>
+    </nav>
+    <hr>
+    
+    <div id="admin-content">
+        <div class="tabs">
+            <span class="tab active" id="tab-equipment">Equipment</span>
+            <span class="tab" id="tab-comments">Comments</span>
+            <span class="tab" id="tab-ideas">Ideas</span>
+            <span class="tab" id="tab-eqdb-queue">EQDB Queue</span>
+            <span class="tab" id="tab-scrying">Scrying</span>
+            <span class="tab" id="tab-contributors">Contributors</span>
+        </div>
+        
+        <div id="equipment-section" class="section active">
+            <div class="search-bar">
+                <input type="text" id="equipment-search" placeholder="Search by name, type, or uploader...">
+                <button id="equipment-search-btn">Search</button>
+                <button id="equipment-reset-btn">Reset</button>
+            </div>
+            <div class="toolbar">
+                <button class="btn-recolor" id="recolorize-all-btn">Update All Colors</button>
+                <span id="recolorize-status" style="font-size:13px;color:#888;"></span>
+            </div>
+            <table>
+                <thead><tr><th>Name</th><th>Type</th><th>Source</th><th>Uploader</th><th>Added Via</th><th>Added</th><th>Actions</th></tr></thead>
+                <tbody id="equipment-table"></tbody>
+            </table>
+            <div class="pagination" id="equipment-pagination"></div>
+        </div>
+        
+        <div id="comments-section" class="section">
+            <div class="search-bar">
+                <input type="text" id="comments-search" placeholder="Search by comment text, name, or item...">
+                <button id="comments-search-btn">Search</button>
+                <button id="comments-reset-btn">Reset</button>
+            </div>
+            <table>
+                <thead><tr><th>Comment</th><th>By</th><th>On Item</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody id="comments-table"></tbody>
+            </table>
+            <div class="pagination" id="comments-pagination"></div>
+        </div>
+        
+        <div id="ideas-section" class="section">
+            <table>
+                <thead><tr><th>Idea</th><th>By</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody id="ideas-table"></tbody>
+            </table>
+        </div>
+        
+        <div id="eqdb-queue-section" class="section">
+            <button id="copy-eqdb-btn" style="background:#ff8800;color:white;margin:5px 0;">Copy All EQDB Hashes</button>
+            <button id="delete-page-eqdb-btn" style="background:#ff4444;color:white;margin:5px 0;">Delete This Page</button>
+            <table>
+                <thead><tr><th>Hash</th><th>Submitted By</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody id="eqdb-queue-table"></tbody>
+            </table>
+            <div class="pagination" id="eqdb-queue-pagination"></div>
+        </div>
+        
+        <div id="scrying-section" class="section">
+            <button id="copy-scrying-btn" style="background:#ff8800;color:white;margin:5px 0;">Copy All Scrying Hashes</button>
+            <button id="delete-page-scrying-btn" style="background:#ff4444;color:white;margin:5px 0;">Delete This Page</button>
+            <table>
+                <thead><tr><th>Hash</th><th>Submitted By</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody id="scrying-table"></tbody>
+            </table>
+            <div class="pagination" id="scrying-pagination"></div>
+        </div>
+
+        <div id="contributors-section" class="section">
+            <div class="toolbar">
+                <button id="refresh-contributors-btn" style="background:#4488ff;color:white;">Refresh</button>
+                <button id="backfill-contributors-btn" style="background:#ff8800;color:white;">Backfill from Equipment</button>
+                <span id="contributor-status" style="font-size:13px;color:#888;"></span>
+            </div>
+            <table>
+                <thead><tr><th>Rank</th><th>Contributor</th><th>Total Submissions</th><th>EQDB</th><th>Personal</th><th>First Submission</th><th>Last Submission</th></tr></thead>
+                <tbody id="contributors-table"></tbody>
+            </table>
+            <p style="font-size:11px;color:#666;margin:8px 0;">Note: Counts only reflect the last uploaded version of each item. Earlier personal submissions that were later overwritten by EQDB are not included until future submissions re-track them.</p>
+        </div>
+    </div>
+    
+    <div class="modal-overlay hidden" id="edit-modal" style="display:none;">
+        <div class="modal">
+            <h2 id="edit-title">Edit Item Colors</h2>
+            <div class="editor-row">
+                <div class="editor-pane"><h4>HTML</h4><textarea id="edit-html"></textarea></div>
+                <div class="editor-pane"><h4>Preview</h4><div class="preview-box" id="edit-preview"></div></div>
+            </div>
+            <p style="font-size:12px; color:#888;">Colors: #8787FF(blue) #C0C0C0(white) #00FFFF(cyan) #FFFF00(yellow) #00FF00(green) #D78787(pink) #FF00FF(magenta) #808080(gray) #FF0000(red) #008000(darkgreen)</p>
+            <div class="btn-row"><button class="btn-cancel" id="btn-cancel-edit">Cancel</button><button class="btn-save" id="btn-save-edit">Save Changes</button></div>
+            <p id="edit-message" style="margin-top:10px;"></p>
+        </div>
+    </div>
+
+    <script>
+        (function() { var m = document.getElementById('edit-modal'); if (m) { m.style.display = 'none'; m.classList.add('hidden'); } })();
+    </script>
+
+    <script type="module">
+        var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
+        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+        var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        var PER_PAGE = 50, equipmentPage = 1, commentsPage = 1, equipmentTotal = 0, commentsTotal = 0, equipmentSearch = '', commentsSearch = '';
+        var eqdbQueuePage = 1, eqdbQueueTotal = 0, scryingPage = 1, scryingTotal = 0;
+        loadEquipment();
+        
+        document.getElementById('tab-equipment').addEventListener('click', function() { switchTab('equipment'); });
+        document.getElementById('tab-comments').addEventListener('click', function() { switchTab('comments'); });
+        document.getElementById('tab-ideas').addEventListener('click', function() { switchTab('ideas'); });
+        document.getElementById('tab-eqdb-queue').addEventListener('click', function() { switchTab('eqdb-queue'); });
+        document.getElementById('tab-scrying').addEventListener('click', function() { switchTab('scrying'); });
+        document.getElementById('tab-contributors').addEventListener('click', function() { switchTab('contributors'); });
+        
+        document.getElementById('copy-eqdb-btn').addEventListener('click', function() {
+            if (window.eqdbHashes && window.eqdbHashes.length > 0) {
+                navigator.clipboard.writeText(window.eqdbHashes.join('\n'));
+                alert('Copied ' + window.eqdbHashes.length + ' EQDB hashes!');
+            }
+        });
+        
+        document.getElementById('copy-scrying-btn').addEventListener('click', function() {
+            if (window.scryingHashes && window.scryingHashes.length > 0) {
+                navigator.clipboard.writeText(window.scryingHashes.join('\n'));
+                alert('Copied ' + window.scryingHashes.length + ' scrying hashes!');
+            }
+        });
+        
+        document.getElementById('delete-page-eqdb-btn').addEventListener('click', async function() {
+            if (!confirm('Delete all hashes on this page?')) return;
+            var rows = document.querySelectorAll('#eqdb-queue-table .btn-delete');
+            for (var i = 0; i < rows.length; i++) {
+                await supabase.from('eqdb_queue').delete().eq('id', rows[i].getAttribute('data-id'));
+            }
+            loadEqdbQueue();
+        });
+        
+        document.getElementById('delete-page-scrying-btn').addEventListener('click', async function() {
+            if (!confirm('Delete all hashes on this page?')) return;
+            var rows = document.querySelectorAll('#scrying-table .btn-delete');
+            for (var i = 0; i < rows.length; i++) {
+                await supabase.from('scrying_queue').delete().eq('id', rows[i].getAttribute('data-id'));
+            }
+            loadScrying();
+        });
+        
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.getElementById('tab-' + tab).classList.add('active');
+            document.getElementById(tab + '-section').classList.add('active');
+            if (tab === 'equipment') loadEquipment();
+            if (tab === 'comments') loadComments();
+            if (tab === 'ideas') loadIdeas();
+            if (tab === 'eqdb-queue') loadEqdbQueue();
+            if (tab === 'scrying') loadScrying();
+            if (tab === 'contributors') loadContributors();
+        }
+        
+        document.getElementById('equipment-search-btn').addEventListener('click', function() { equipmentSearch = document.getElementById('equipment-search').value.trim(); equipmentPage = 1; loadEquipment(); });
+        document.getElementById('equipment-reset-btn').addEventListener('click', function() { document.getElementById('equipment-search').value = ''; equipmentSearch = ''; equipmentPage = 1; loadEquipment(); });
+        document.getElementById('comments-search-btn').addEventListener('click', function() { commentsSearch = document.getElementById('comments-search').value.trim(); commentsPage = 1; loadComments(); });
+        document.getElementById('comments-reset-btn').addEventListener('click', function() { document.getElementById('comments-search').value = ''; commentsSearch = ''; commentsPage = 1; loadComments(); });
+        
+        function closeEditModal() { var m = document.getElementById('edit-modal'); m.style.display = 'none'; m.classList.add('hidden'); }
+        
+        document.getElementById('btn-cancel-edit').addEventListener('click', closeEditModal);
+        document.getElementById('btn-save-edit').addEventListener('click', saveEdit);
+        document.getElementById('edit-html').addEventListener('input', function() { updatePreview(this.value); });
+        
+        function updatePreview(html) {
+            document.getElementById('edit-preview').innerHTML = '<style>body{background:#000;font-family:Courier New,monospace;font-size:13px;white-space:pre-wrap;color:#C0C0C0}</style>' + html;
+        }
+        
+        document.getElementById('recolorize-all-btn').addEventListener('click', function() {
+            if (confirm('Re-run colorizer on all items with latest rules?')) { recolorizeAll(); }
+        });
+        
+        async function recolorizeAll() {
+            var status = document.getElementById('recolorize-status');
+            var btn = document.getElementById('recolorize-all-btn');
+            btn.disabled = true;
+            status.textContent = 'Fetching all items...';
+            var allItems = []; var page = 0; var pageSize = 1000; var hasMore = true;
+            while (hasMore) {
+                var from = page * pageSize; var to = from + pageSize - 1;
+                var result = await supabase.from('equipment').select('id,name,description').range(from, to);
+                if (result.data && result.data.length > 0) { allItems = allItems.concat(result.data); }
+                hasMore = result.data && result.data.length === pageSize; page++;
+            }
+            status.textContent = 'Processing ' + allItems.length + ' items...';
+            var updated = 0;
+            for (var i = 0; i < allItems.length; i++) {
+                var item = allItems[i];
+                var desc = item.description || '';
+                var plainText = desc.replace(/<[^>]+>/g, '');
+                var newDesc = colorizeMM(plainText);
+                if (newDesc !== desc) { await supabase.from('equipment').update({ description: newDesc }).eq('id', item.id); updated++; }
+                if (i % 50 === 0) { status.textContent = 'Processing... ' + i + '/' + allItems.length + ' (' + updated + ' updated)'; }
+            }
+            status.textContent = 'Done! ' + updated + ' items updated.';
+            btn.disabled = false;
+            loadEquipment();
+        }
+        
+        async function loadEquipment() {
+            var q = supabase.from('equipment').select('*', { count: 'exact' });
+            if (equipmentSearch) q = q.or('name.ilike.%' + equipmentSearch + '%,type.ilike.%' + equipmentSearch + '%');
+            var from = (equipmentPage - 1) * PER_PAGE, to = from + PER_PAGE - 1;
+            var r = await q.order('created_at', { ascending: false }).range(from, to);
+            var data = r.data; equipmentTotal = r.count || 0;
+            var tbody = document.getElementById('equipment-table');
+            if (r.error) { tbody.innerHTML = '<tr><td colspan="7">Error: ' + r.error.message + '</td></tr>'; return; }
+            if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="7">No equipment found.</td></tr>'; }
+            else {
+                var rows = [];
+                for (var i = 0; i < data.length; i++) {
+                    var item = data[i];
+                    var uploaderDisplay = (item.properties && item.properties.uploaded_by) ? '<span class="uploader-tag">' + escapeHtml(item.properties.uploaded_by) + '</span>' : '<span class="anon-tag">anonymous</span>';
+                    var sourceDisplay = item.verified ? '<span class="eqdb-label">EQDB</span>' : '<span class="personal-label">Personal</span>';
+                    var viaDisplay = (item.properties && item.properties.source) ? escapeHtml(item.properties.source) : '<span class="anon-tag">unknown</span>';
+                    rows.push('<tr><td><a href="item.html?name=' + encodeURIComponent(item.name) + '" target="_blank">' + escapeHtml(item.name) + '</a></td><td>' + escapeHtml(item.type) + '</td><td>' + sourceDisplay + '</td><td>' + uploaderDisplay + '</td><td>' + viaDisplay + '</td><td>' + new Date(item.created_at).toLocaleDateString() + '</td><td><button class="btn-delete" data-id="' + item.id + '">Delete</button> <button class="btn-edit" data-id="' + item.id + '">Edit</button></td></tr>');
+                }
+                tbody.innerHTML = rows.join('');
+            }
+            document.querySelectorAll('#equipment-table .btn-delete').forEach(function(b) { b.addEventListener('click', async function() { if (!confirm('Delete?')) return; await supabase.from('equipment').delete().eq('id', this.getAttribute('data-id')); loadEquipment(); }); });
+            document.querySelectorAll('#equipment-table .btn-edit').forEach(function(b) { b.addEventListener('click', function() { openEditModal(this.getAttribute('data-id')); }); });
+            renderPagination('equipment', equipmentPage, Math.ceil(equipmentTotal / PER_PAGE));
+        }
+        
+        async function loadComments() {
+            var q = supabase.from('comments').select('*', { count: 'exact' });
+            if (commentsSearch) q = q.or('comment_text.ilike.%' + commentsSearch + '%,display_name.ilike.%' + commentsSearch + '%');
+            var from = (commentsPage - 1) * PER_PAGE, to = from + PER_PAGE - 1;
+            var r = await q.order('created_at', { ascending: false }).range(from, to);
+            var data = r.data; commentsTotal = r.count || 0;
+            var tbody = document.getElementById('comments-table');
+            if (r.error) { tbody.innerHTML = '<tr><td colspan="6">Error: ' + r.error.message + '</td></tr>'; return; }
+            if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="6">No comments found.</td></tr>'; }
+            else {
+                var rows = [];
+                for (var c = 0; c < data.length; c++) {
+                    var comment = data[c], itemName = '(deleted)';
+                    if (comment.equipment_id) { var eq = await supabase.from('equipment').select('name').eq('id', comment.equipment_id).single(); if (eq.data) itemName = eq.data.name; }
+                    var status = comment.status || 'pending';
+                    var statusDisplay = status === 'approved' ? '<span style="color:#44aa44;">Approved</span>' : status === 'denied' ? '<span style="color:#ff4444;">Denied</span>' : '<span style="color:#ffaa00;">Pending</span>';
+                    rows.push('<tr><td>' + escapeHtml(comment.comment_text).substring(0, 80) + '</td><td>' + escapeHtml(comment.display_name) + '</td><td>' + escapeHtml(itemName) + '</td><td>' + new Date(comment.created_at).toLocaleDateString() + '</td><td>' + statusDisplay + '</td><td><button class="btn-delete" data-id="' + comment.id + '">Delete</button> <button class="btn-approve-c" data-id="' + comment.id + '"' + (status === 'approved' ? ' disabled' : '') + '>Approve</button> <button class="btn-reject-c" data-id="' + comment.id + '"' + (status === 'denied' ? ' disabled' : '') + '>Deny</button></td></tr>');
+                }
+                tbody.innerHTML = rows.join('');
+            }
+            document.querySelectorAll('#comments-table .btn-delete').forEach(function(b) { b.addEventListener('click', async function() { if (!confirm('Delete?')) return; await supabase.from('comments').delete().eq('id', this.getAttribute('data-id')); loadComments(); }); });
+            document.querySelectorAll('#comments-table .btn-approve-c').forEach(function(b) { b.addEventListener('click', async function() { await supabase.from('comments').update({ status: 'approved' }).eq('id', this.getAttribute('data-id')); loadComments(); }); });
+            document.querySelectorAll('#comments-table .btn-reject-c').forEach(function(b) { b.addEventListener('click', async function() { await supabase.from('comments').update({ status: 'denied' }).eq('id', this.getAttribute('data-id')); loadComments(); }); });
+            renderPagination('comments', commentsPage, Math.ceil(commentsTotal / PER_PAGE));
+        }
+        
+        async function loadIdeas() {
+            var result = await supabase.from('ideas').select('*').order('created_at', { ascending: false }).limit(50);
+            var data = result.data;
+            var tbody = document.getElementById('ideas-table');
+            if (result.error) { tbody.innerHTML = '<tr><td colspan="5">Error: ' + result.error.message + '</td></tr>'; return; }
+            if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="5">No ideas submitted yet.</td></tr>'; }
+            else {
+                var rows = [];
+                for (var i = 0; i < data.length; i++) {
+                    var idea = data[i];
+                    var status = idea.status || 'pending';
+                    var statusDisplay = status === 'approved' ? '<span style="color:#44aa44;">Approved</span>' : status === 'denied' ? '<span style="color:#ff4444;">Denied</span>' : '<span style="color:#ffaa00;">Pending</span>';
+                    rows.push('<tr>' +
+                        '<td>' + escapeHtml(idea.idea_text) + '</td>' +
+                        '<td>' + escapeHtml(idea.submitted_by) + '</td>' +
+                        '<td>' + new Date(idea.created_at).toLocaleDateString() + '</td>' +
+                        '<td>' + statusDisplay + '</td>' +
+                        '<td><button class="btn-delete" data-id="' + idea.id + '">Delete</button> ' +
+                        '<button class="btn-approve" data-id="' + idea.id + '"' + (status === 'approved' ? ' disabled' : '') + '>Approve</button> ' +
+                        '<button class="btn-reject" data-id="' + idea.id + '"' + (status === 'denied' ? ' disabled' : '') + '>Deny</button></td>' +
+                        '</tr>');
+                }
+                tbody.innerHTML = rows.join('');
+            }
+            document.querySelectorAll('#ideas-table .btn-delete').forEach(function(b) {
+                b.addEventListener('click', async function() { if (!confirm('Delete?')) return; await supabase.from('ideas').delete().eq('id', this.getAttribute('data-id')); loadIdeas(); });
+            });
+            document.querySelectorAll('#ideas-table .btn-approve').forEach(function(b) {
+                b.addEventListener('click', async function() { await supabase.from('ideas').update({ status: 'approved' }).eq('id', this.getAttribute('data-id')); loadIdeas(); });
+            });
+            document.querySelectorAll('#ideas-table .btn-reject').forEach(function(b) {
+                b.addEventListener('click', async function() { await supabase.from('ideas').update({ status: 'denied' }).eq('id', this.getAttribute('data-id')); loadIdeas(); });
+            });
+        }
+        
+        async function loadEqdbQueue() {
+            var from = (eqdbQueuePage - 1) * 100;
+            var to = from + 99;
+            var result = await supabase.from('eqdb_queue').select('*', { count: 'exact' }).order('created_at', { ascending: false }).range(from, to);
+            var data = result.data;
+            eqdbQueueTotal = result.count || 0;
+            var tbody = document.getElementById('eqdb-queue-table');
+            window.eqdbHashes = data ? data.map(function(s) { return 'check eqlookup ' + s.hash; }) : [];
+            
+            if (result.error) { tbody.innerHTML = '<tr><td colspan="5">Error: ' + result.error.message + '</td></tr>'; return; }
+            if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="5">No EQDB hashes queued.</td></tr>'; }
+            else {
+                var rows = [];
+                for (var i = 0; i < data.length; i++) {
+                    var s = data[i];
+                    rows.push('<tr>' +
+                        '<td style="font-family:monospace;font-size:11px;cursor:pointer;" onclick="navigator.clipboard.writeText(\'' + s.hash + '\')">' + s.hash.substring(0, 20) + '...</td>' +
+                        '<td>' + escapeHtml(s.submitted_by) + '</td>' +
+                        '<td>' + new Date(s.created_at).toLocaleDateString() + '</td>' +
+                        '<td>' + (s.processed ? '<span style="color:#44aa44;">Processed</span>' : '<span style="color:#ffaa00;">Pending</span>') + '</td>' +
+                        '<td><button class="btn-delete" data-id="' + s.id + '">Delete</button></td>' +
+                        '</tr>');
+                }
+                tbody.innerHTML = rows.join('');
+            }
+            document.querySelectorAll('#eqdb-queue-table .btn-delete').forEach(function(b) {
+                b.addEventListener('click', async function() { if (!confirm('Delete?')) return; await supabase.from('eqdb_queue').delete().eq('id', this.getAttribute('data-id')); loadEqdbQueue(); });
+            });
+            renderPagination('eqdb-queue', eqdbQueuePage, Math.ceil(eqdbQueueTotal / 100));
+        }
+        
+        async function loadScrying() {
+            var from = (scryingPage - 1) * 100;
+            var to = from + 99;
+            var result = await supabase.from('scrying_queue').select('*', { count: 'exact' }).order('created_at', { ascending: false }).range(from, to);
+            var data = result.data;
+            scryingTotal = result.count || 0;
+            var tbody = document.getElementById('scrying-table');
+            window.scryingHashes = data ? data.map(function(s) { return 'check equipment scrying ' + s.hash; }) : [];
+            
+            if (result.error) { tbody.innerHTML = '<tr><td colspan="5">Error: ' + result.error.message + '</td></tr>'; return; }
+            if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="5">No scrying hashes submitted yet.</td></tr>'; }
+            else {
+                var rows = [];
+                for (var i = 0; i < data.length; i++) {
+                    var s = data[i];
+                    rows.push('<tr>' +
+                        '<td style="font-family:monospace;font-size:11px;cursor:pointer;" onclick="navigator.clipboard.writeText(\'' + s.hash + '\')">' + s.hash.substring(0, 20) + '...</td>' +
+                        '<td>' + escapeHtml(s.submitted_by) + '</td>' +
+                        '<td>' + new Date(s.created_at).toLocaleDateString() + '</td>' +
+                        '<td>' + (s.approved ? '<span style="color:#44aa44;">Approved</span>' : (s.reviewed ? '<span style="color:#ffaa00;">Reviewed</span>' : '<span style="color:#888;">Pending</span>')) + '</td>' +
+                        '<td>' +
+                        '<button class="btn-approve" data-id="' + s.id + '"' + (s.approved ? ' disabled' : '') + '>Approve</button> ' +
+                        '<button class="btn-delete" data-id="' + s.id + '">Delete</button></td>' +
+                        '</tr>');
+                }
+                tbody.innerHTML = rows.join('');
+            }
+            document.querySelectorAll('#scrying-table .btn-delete').forEach(function(b) {
+                b.addEventListener('click', async function() { if (!confirm('Delete?')) return; await supabase.from('scrying_queue').delete().eq('id', this.getAttribute('data-id')); loadScrying(); });
+            });
+            document.querySelectorAll('#scrying-table .btn-approve').forEach(function(b) {
+                b.addEventListener('click', async function() {
+                    var id = this.getAttribute('data-id');
+                    var row = await supabase.from('scrying_queue').select('hash, submitted_by').eq('id', id).single();
+                    if (row.data) {
+                        await supabase.from('eqdb_queue').upsert({ hash: row.data.hash, source: 'admin_approved', submitted_by: row.data.submitted_by, processed: false }, { onConflict: 'hash' });
+                        await supabase.from('scrying_queue').update({ reviewed: true, approved: true }).eq('id', id);
+                    }
+                    loadScrying();
+                });
+            });
+            renderPagination('scrying', scryingPage, Math.ceil(scryingTotal / 100));
+        }
+        
+        function renderPagination(type, current, total) {
+            var div = document.getElementById(type + '-pagination');
+            if (total <= 1) { div.innerHTML = ''; return; }
+            var html = '<span style="color:#888;font-size:13px;">Page ' + current + ' of ' + total + '</span> ';
+            html += '<button ' + (current === 1 ? 'disabled' : '') + ' class="page-btn" data-page="1">First</button>';
+            html += '<button ' + (current === 1 ? 'disabled' : '') + ' class="page-btn" data-page="' + (current-1) + '">Prev</button>';
+            for (var i = Math.max(1, current-2); i <= Math.min(total, current+2); i++) { html += '<button class="page-btn' + (i === current ? ' active' : '') + '" data-page="' + i + '">' + i + '</button>'; }
+            html += '<button ' + (current === total ? 'disabled' : '') + ' class="page-btn" data-page="' + (current+1) + '">Next</button>';
+            html += '<button ' + (current === total ? 'disabled' : '') + ' class="page-btn" data-page="' + total + '">Last</button>';
+            div.innerHTML = html;
+            div.querySelectorAll('.page-btn').forEach(function(b) { b.addEventListener('click', function() { changePage(type, parseInt(this.getAttribute('data-page'))); }); });
+        }
+        
+        function changePage(type, page) {
+            if (type === 'equipment') { equipmentPage = page; loadEquipment(); }
+            else if (type === 'comments') { commentsPage = page; loadComments(); }
+            else if (type === 'eqdb-queue') { eqdbQueuePage = page; loadEqdbQueue(); }
+            else if (type === 'scrying') { scryingPage = page; loadScrying(); }
+        }
+        
+        async function openEditModal(id) {
+            var r = await supabase.from('equipment').select('*').eq('id', id).single();
+            if (r.error || !r.data) return;
+            var item = r.data;
+            var modal = document.getElementById('edit-modal');
+            modal.setAttribute('data-item-id', id);
+            document.getElementById('edit-title').textContent = 'Edit: ' + item.name;
+            var desc = item.description || '';
+            if (desc.indexOf('<font color=') < 0 && desc.indexOf('<span class=') < 0) { desc = colorizeMM(desc); }
+            document.getElementById('edit-html').value = desc;
+            updatePreview(desc);
+            document.getElementById('edit-message').textContent = '';
+            modal.style.display = 'flex'; modal.classList.remove('hidden');
+        }
+        
+        async function saveEdit() {
+            var id = document.getElementById('edit-modal').getAttribute('data-item-id');
+            if (!id) return;
+            var newDesc = document.getElementById('edit-html').value;
+            var r = await supabase.from('equipment').update({ description: newDesc }).eq('id', id);
+            var msg = document.getElementById('edit-message');
+            if (r.error) { msg.innerHTML = '<span style="color:#ff4444;">Error: ' + r.error.message + '</span>'; }
+            else { msg.innerHTML = '<span style="color:#44aa44;">Saved!</span>'; setTimeout(closeEditModal, 1500); loadEquipment(); }
+        }
+        
+        function escapeHtml(text) { if (!text) return ''; var div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+
+        // ============================================
+        // CONTRIBUTORS
+        // ============================================
+        async function fetchAllSubmissionHistory() {
+            var allData = [];
+            var page = 0;
+            var pageSize = 1000;
+            var hasMore = true;
+            while (hasMore) {
+                var from = page * pageSize;
+                var to = from + pageSize - 1;
+                var result = await supabase.from('submission_history').select('*').range(from, to);
+                if (result.error) throw result.error;
+                if (result.data && result.data.length > 0) allData = allData.concat(result.data);
+                hasMore = result.data && result.data.length === pageSize;
+                page++;
+            }
+            return allData;
+        }
+
+        async function loadContributors() {
+            var status = document.getElementById('contributor-status');
+            status.textContent = 'Loading...';
+            try {
+                var data = await fetchAllSubmissionHistory();
+                if (!data || data.length === 0) {
+                    document.getElementById('contributors-table').innerHTML = '<tr><td colspan="7">No submissions recorded yet.</td></tr>';
+                    status.textContent = '';
+                    return;
+                }
+                // Aggregate by submitter
+                var contributors = {};
+                for (var i = 0; i < data.length; i++) {
+                    var s = data[i];
+                    var name = s.submitter || 'anonymous';
+                    if (!contributors[name]) contributors[name] = { name: name, total: 0, eqdb: 0, personal: 0, first: s.created_at, last: s.created_at };
+                    contributors[name].total++;
+                    if (s.is_eqdb) contributors[name].eqdb++; else contributors[name].personal++;
+                    if (s.created_at < contributors[name].first) contributors[name].first = s.created_at;
+                    if (s.created_at > contributors[name].last) contributors[name].last = s.created_at;
+                }
+                var sorted = Object.values(contributors).sort(function(a, b) { return b.total - a.total; });
+                var tbody = document.getElementById('contributors-table');
+                var html = '';
+                for (var r = 0; r < sorted.length; r++) {
+                    var c = sorted[r];
+                    var medal = r === 0 ? '🥇' : r === 1 ? '🥈' : r === 2 ? '🥉' : (r + 1);
+                    html += '<tr>'
+                        + '<td style="padding:5px;border-bottom:1px solid #333;">' + medal + '</td>'
+                        + '<td style="padding:5px;border-bottom:1px solid #333;"><strong>' + escapeHtml(c.name) + '</strong></td>'
+                        + '<td style="padding:5px;border-bottom:1px solid #333;">' + c.total + '</td>'
+                        + '<td style="padding:5px;border-bottom:1px solid #333;color:#44aa44;">' + c.eqdb + '</td>'
+                        + '<td style="padding:5px;border-bottom:1px solid #333;color:#ffaa00;">' + c.personal + '</td>'
+                        + '<td style="padding:5px;border-bottom:1px solid #333;">' + new Date(c.first).toLocaleDateString() + '</td>'
+                        + '<td style="padding:5px;border-bottom:1px solid #333;">' + new Date(c.last).toLocaleDateString() + '</td>'
+                        + '</tr>';
+                }
+                tbody.innerHTML = html;
+                status.textContent = sorted.length + ' contributors, ' + data.length + ' total submissions';
+            } catch (e) {
+                document.getElementById('contributors-table').innerHTML = '<tr><td colspan="7">Error: ' + e.message + '</td></tr>';
+                status.textContent = '';
+            }
+        }
+        document.getElementById('refresh-contributors-btn').addEventListener('click', loadContributors);
+
+        document.getElementById('backfill-contributors-btn').addEventListener('click', async function() {
+            if (!confirm('This will import all existing equipment records into submission_history. Continue?')) return;
+            var btn = this;
+            btn.disabled = true;
+            var status = document.getElementById('contributor-status');
+
+            // Test table access first
+            status.textContent = 'Checking submission_history table...';
+            var testResult = await supabase.from('submission_history').select('id', { count: 'exact', head: true });
+            if (testResult.error) {
+                status.innerHTML = '<span style="color:#ff4444;">Error accessing submission_history: ' + testResult.error.message + '. Did you run the SQL in schema.sql?</span>';
+                btn.disabled = false;
+                return;
+            }
+            status.textContent = 'Table OK. Fetching equipment records...';
+
+            // Fetch all equipment
+            var allItems = [];
+            var page = 0, pageSize = 1000, hasMore = true;
+            while (hasMore) {
+                var from = page * pageSize, to = from + pageSize - 1;
+                var result = await supabase.from('equipment').select('id,name,verified,properties,created_at,description').range(from, to);
+                if (result.data && result.data.length > 0) allItems = allItems.concat(result.data);
+                hasMore = result.data && result.data.length === pageSize;
+                page++;
+            }
+
+            if (allItems.length === 0) {
+                status.innerHTML = '<span style="color:#ffaa00;">Equipment table is empty — nothing to backfill.</span>';
+                btn.disabled = false;
+                return;
+            }
+            status.textContent = 'Importing ' + allItems.length + ' records to history...';
+
+            // Disable the trigger temporarily to avoid conflicts during backfill
+            await supabase.rpc('set_trigger_enabled', { trigger_name: 'trg_mark_overwritten', enabled: false }).catch(function(){});
+
+            var imported = 0, errors = 0, lastError = '';
+            for (var i = 0; i < allItems.length; i++) {
+                var item = allItems[i];
+                var result = await supabase.from('submission_history').insert({
+                    item_name: item.name,
+                    submitter: (item.properties && item.properties.uploaded_by) || 'anonymous',
+                    source: (item.properties && item.properties.source) || 'unknown',
+                    is_eqdb: item.verified || false,
+                    description: item.description || '',
+                    created_at: item.created_at
+                });
+                if (result.error) { errors++; lastError = result.error.message; }
+                else imported++;
+                if (i % 100 === 0) status.textContent = 'Importing... ' + i + '/' + allItems.length + ' (done: ' + imported + ', errors: ' + errors + ')';
+            }
+
+            // Re-enable trigger
+            await supabase.rpc('set_trigger_enabled', { trigger_name: 'trg_mark_overwritten', enabled: true }).catch(function(){});
+
+            if (errors > 0 && imported === 0) {
+                status.innerHTML = '<span style="color:#ff4444;">All ' + errors + ' inserts failed. Last error: ' + escapeHtml(lastError) + '</span>';
+            } else if (errors > 0) {
+                status.innerHTML = '<span style="color:#44aa44;">✅ ' + imported + ' imported</span>, <span style="color:#ff4444;">' + errors + ' errors</span>. Last error: ' + escapeHtml(lastError);
+            } else {
+                status.innerHTML = '<span style="color:#44aa44;">✅ Success! ' + imported + ' records imported.</span>';
+            }
+            btn.disabled = false;
+
+            // Refresh the Contributors tab
+            switchTab('contributors');
+        });
+
+        // ============================================
+        // MM COLORIZER ENGINE
+        // ============================================
+        var C = { blue:'#8787FF', white:'#C0C0C0', cyan:'#00FFFF', yellow:'#FFFF00', green:'#00FF00', pink:'#D78787', magenta:'#FF00FF', gray:'#808080', olive:'#808000', red:'#FF0000', darkgreen:'#008000' };
+        function tag(color, text) { return '<font color="' + color + '">' + text + '</font>'; }
+        
+        function colorizeMM(text) {
+            if (!text) return '';
+            text = text.replace(/\n?.*\d+hp\s+\d+sp\s+\d+st[^\n]*\n?/g, '\n');
+            var lines = text.split('\n'), result = [], inRelic = false;
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i], t = line.trim();
+                if (t === '') { result.push(''); continue; }
+                if (/^\+\+\+/.test(t)) {
+                    result.push(tag(C.green, escapeHtml(line)));
+                    i++; while (i < lines.length) { var nl = lines[i]; if (nl.trim() === '' || /^\+\+\+/.test(nl) || /^Item\s+'/.test(nl) || /^\*/.test(nl)) { i--; break; } result.push(tag(C.green, escapeHtml(nl))); i++; }
+                    continue;
+                }
+                if (/^Relics:/.test(t)) { inRelic = true; result.push(tag(C.green, escapeHtml(line))); continue; }
+                if (inRelic && /^(Small|Medium|Large)\s*\(/.test(t)) { result.push(tag(C.green, escapeHtml(line))); continue; }
+                if (inRelic && /^\s*\(\d+\/\d+/.test(t)) { result.push(tag(C.green, escapeHtml(line))); inRelic = false; continue; }
+                if (/^\*/.test(t)) {
+                    if (/^\*\s*Item\s+'/.test(t)) { var si = t.match(/\*\s*(Item\s+')(.+)(')$/); if (si) result.push(tag(C.yellow, '* ') + tag(C.magenta, si[1]) + tag(C.white, si[2]) + tag(C.magenta, si[3])); else result.push(tag(C.yellow, escapeHtml(line))); continue; }
+                    if (/^\*This/.test(t)) { result.push(tag(C.yellow, '*') + tag(C.blue, ' ' + escapeHtml(t.substring(1).trim()).replace(/(\d[\d,]*)/g, '</font><font color="' + C.white + '">$1</font><font color="' + C.blue + '">') + '</font>')); continue; }
+                    result.push(tag(C.yellow, '*') + tag(C.cyan, colorizeReqLine(t.substring(1).trim()))); continue;
+                }
+                if (/^-\s*Item\s+'/.test(t)) { var di = t.match(/^(-\s*)(Item\s+')(.+)(')$/); if (di) result.push(tag(C.gray, di[1]) + tag(C.magenta, di[2]) + tag(C.white, di[3]) + tag(C.magenta, di[4])); continue; }
+                if (/^Affects/.test(t)) { result.push(colorizeAffectLine(t)); continue; }
+                if (/^Special weapon attributes:/.test(t)) { var swM = line.match(/^(Special weapon attributes:)\s+(.+)$/); if (swM) result.push(tag(C.blue, escapeHtml(swM[1])) + ' ' + tag(C.white, escapeHtml(swM[2]))); else result.push(tag(C.blue, escapeHtml(line))); continue; }
+                if (/^Your .+ will deal .+ damage with .+ accuracy, at .+ range, with a .+ chance to crit for .+ damage\.$/i.test(t)) {
+                    var wsM = line.match(/^(Your )(.+?)( will deal )(.+?)( damage with )(.+?)( accuracy, at )(.+?)( range, with a )(.+?)( chance to crit for )(.+?)( damage\.)$/i);
+                    if (wsM) result.push(tag(C.cyan, escapeHtml(wsM[1]))+tag(C.white, escapeHtml(wsM[2]))+tag(C.cyan, escapeHtml(wsM[3]))+tag(C.white, escapeHtml(wsM[4]))+tag(C.cyan, escapeHtml(wsM[5]))+tag(C.white, escapeHtml(wsM[6]))+tag(C.cyan, escapeHtml(wsM[7]))+tag(C.white, escapeHtml(wsM[8]))+tag(C.cyan, escapeHtml(wsM[9]))+tag(C.white, escapeHtml(wsM[10]))+tag(C.cyan, escapeHtml(wsM[11]))+tag(C.white, escapeHtml(wsM[12]))+tag(C.cyan, escapeHtml(wsM[13])));
+                    else result.push(tag(C.cyan, escapeHtml(line)));
+                    continue;
+                }
+                if (/^When/.test(t)) {
+                    var wM = line.match(/^(When\s+(casting|wielding|evoking|affected\s+by)\s+)(.+?)(,.+)$/i);
+                    if (wM) { var rc = escapeHtml(wM[4]).replace(/(\d[\d,]*\.?\d*%?)/g, '</font><font color="' + C.white + '">$1</font><font color="' + C.green + '">'); var h = tag(C.green, escapeHtml(wM[1])) + tag(C.white, escapeHtml(wM[3])) + '<font color="#00FF00">' + rc + '</font>'; h = h.replace(/<font color="#00FF00"><\/font>/g, ''); result.push(h); }
+                    else { var h2 = escapeHtml(line).replace(/(\d[\d,]*\.?\d*%?)/g, '</font><font color="' + C.white + '">$1</font><font color="' + C.green + '">'); result.push(tag(C.green, '') + h2 + '</font>'); }
+                    continue;
+                }
+                if (/^(Adds resistance|Decreases|Grants|Casts|Improves|Your weapon special|Alters|Increases)/.test(t)) { var cls = C.cyan; if (/^Adds resistance/.test(t) && /\(Requires/.test(t)) cls = C.magenta; result.push(tag(cls, escapeHtml(line).replace(/(\d[\d,]*\.?\d*%?)/g, '</font><font color="' + C.white + '">$1</font><font color="' + cls + '">') + '</font>')); continue; }
+                if (/^Item\s+'/.test(t)) { result.push(colorizeItemLine(t)); continue; }
+                if (/^Level\s+\d+\s+item\s+'/.test(t)) { var lm = t.match(/^(Level\s+\d+\s+item\s+')(.+?)('\s+is type)/); if (lm) result.push(tag(C.blue, lm[1]) + tag(C.white, escapeHtml(lm[2])) + tag(C.blue, lm[3])); else result.push(tag(C.blue, escapeHtml(line))); continue; }
+                if (/^has keywords/.test(t)) { result.push(colorizeKeywordLine(t)); continue; }
+                if (/^This level .+ item has the attributes:/.test(t)) { var aM = line.match(/^(This level \d+ item has the attributes:)(.+)$/); if (aM) result.push(tag(C.blue, escapeHtml(aM[1]).replace(/(\d+)/, '</font><font color="' + C.white + '">$1</font><font color="' + C.blue + '">') + '</font>') + tag(C.white, escapeHtml(aM[2]))); else result.push(tag(C.blue, escapeHtml(line))); continue; }
+                if (/^This item has a default lifespan/.test(t) || /^This item will lose its status/.test(t) || /^This item will vanish/.test(t)) { result.push(tag(C.blue, escapeHtml(line).replace(/(\d[\d,]*\.?\d*%?)/g, '</font><font color="' + C.white + '">$1</font><font color="' + C.blue + '">') + '</font>')); continue; }
+                if (/^(This item weighs|This level|This item has|This armor has|This item protects|This ward has|This relic|This item, when|This amulet|Your magical wand|This light source|Armor resistance|This item will have|This item is enchanted)/.test(t)) {
+                    var catM = line.match(/\{Cat\.\s*\d+\}/); var catText = catM ? catM[0] : ''; var wLine = line.replace(/\{Cat\.\s*\d+\}/g, '##CPH##');
+                    var colored = tag(C.blue, escapeHtml(wLine).replace(/(\d[\d,]*\.?\d*%?)/g, '</font><font color="' + C.white + '">$1</font><font color="' + C.blue + '">') + '</font>');
+                    if (catText) colored = colored.replace(/##CPH##/g, '</font><font color="' + C.red + '">' + escapeHtml(catText) + '</font><font color="' + C.blue + '">');
+                    colored = colored.replace(/<font color="#8787FF"><\/font>/g, ''); result.push(colored); continue;
+                }
+                if (/^(This is part of|You are currently)/.test(t)) { result.push(tag(C.magenta, escapeHtml(line).replace(/(\d[\d,]*)/g, '</font><font color="' + C.white + '">$1</font><font color="' + C.magenta + '">') + '</font>')); continue; }
+                if (/This item is beyond your power/.test(t)) { result.push(tag(C.magenta, escapeHtml(line))); continue; }
+                if (/^(Capacity:|Upon|Small )/.test(t)) { result.push(tag(C.cyan, escapeHtml(line).replace(/(\d[\d,]*\.?\d*%?)/g, '</font><font color="' + C.white + '">$1</font><font color="' + C.cyan + '">') + '</font>')); continue; }
+                result.push(tag(C.white, escapeHtml(line)));
+            }
+            return result.join('\n');
+        }
+        
+        function colorizeItemLine(line) {
+            var h = tag(C.blue, 'Item \''); var nm = line.match(/^Item\s+'(.+?)'\s+is type/); if (nm) h += tag(C.white, escapeHtml(nm[1])) + tag(C.blue, '\' is type ');
+            var tm = line.match(/is type\s+(\S+)/); if (tm) h += tag(C.white, escapeHtml(tm[1].replace(',',''))) + tag(C.blue, ',');
+            var am = line.match(/alignment\s+(-?\d+)/); if (am) h += tag(C.blue, ' alignment ') + tag(C.white, am[1]) + tag(C.blue, ',');
+            var mm = line.match(/made of\s+(\S+)/); if (mm) h += tag(C.blue, ' made of ') + tag(C.white, escapeHtml(mm[1]));
+            var cm = line.match(/\(in\s+\((.+?)\)\s+condition\)/); if (cm) h += tag(C.blue, ' (in ') + tag(C.white, '(' + escapeHtml(cm[1]) + ')') + tag(C.blue, ' condition)');
+            if (/\[EQDB\]/.test(line)) h += tag(C.white, '[EQDB]'); if (/\[Study\]/.test(line)) h += tag(C.white, '[Study]'); if (/\[LTB\]/.test(line)) h += tag(C.white, '[LTB]');
+            return h;
+        }
+        function colorizeKeywordLine(line) {
+            var h = tag(C.blue, 'has keywords \''); var km = line.match(/has keywords\s+'([^']+)'/); if (km) h += tag(C.white, escapeHtml(km[1])) + tag(C.blue, '\'');
+            var em = line.match(/, equipped\s+(.+?)\.?$/); if (em) h += tag(C.blue, ', equipped ') + tag(C.white, escapeHtml(em[1])) + tag(C.blue, '.');
+            return h;
+        }
+        function colorizeAffectLine(line) {
+            var isSet = /\(Requires\s+\d+\s+items?\)/.test(line); var lc = isSet ? C.magenta : C.cyan;
+            var m = line.match(/^Affects\s+(.+?)\s+by\s+(-?[\d.]+)\s*(\.?)\s*(\(Requires\s+\d+\s+items?\))?\.?\s*(\{[^}]+\})?/);
+            if (m) { var h = tag(lc, 'Affects') + ' ' + tag(C.white, m[1]) + ' ' + tag(lc, 'by') + ' ' + tag(C.white, m[2]); if (m[3]) h += tag(lc, m[3]); if (m[4]) { var rM = m[4].match(/\(Requires\s+(\d+)\s+items?\)/); if (rM) h += ' ' + tag(C.magenta, '(Requires ') + tag(C.white, rM[1]) + tag(C.magenta, ' items)'); else h += ' ' + tag(C.magenta, m[4]); } if (m[5]) h += ' ' + tag(C.pink, m[5]); return h; }
+            return tag(lc, escapeHtml(line));
+        }
+        function colorizeReqLine(content) {
+            var h = escapeHtml(content);
+            h = h.replace(/Your /, 'Your </font><font color="' + C.white + '">');
+            h = h.replace(/ must be /, '</font><font color="' + C.cyan + '"> must be </font><font color="' + C.white + '">');
+            h = h.replace(/ must not be /, '</font><font color="' + C.cyan + '"> must not be </font><font color="' + C.white + '">');
+            h = h.replace(/ to use this item/, '</font><font color="' + C.cyan + '"> to use this item');
+            return h;
+        }
+    </script>
+</body>
+</html>

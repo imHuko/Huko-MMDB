@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editor Login - MUD Equipment DB</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 400px; margin: 100px auto; padding: 20px; background: #1a1a1a; color: #ccc; text-align: center; }
+        a { color: #8787FF; }
+        h1 { color: #C0C0C0; }
+        input { padding: 8px; width: 250px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; margin: 5px; }
+        button { padding: 8px 16px; background: #8787FF; color: #000; border: none; border-radius: 3px; cursor: pointer; margin: 5px; }
+        .error { color: #ff4444; }
+        .success { color: #44aa44; }
+    </style>
+</head>
+<body>
+    <h1>Editor Login</h1>
+    <p>Enter the editor password to access admin features.</p>
+    <input type="text" id="editor-name" placeholder="Your name (optional)" style="width:250px;"><br>
+    <input type="password" id="password" placeholder="Editor password" onkeypress="if(event.key==='Enter')document.getElementById('login-btn').click()"><br>
+    <button id="login-btn">Login</button>
+    <p id="message"></p>
+    <p><a href="index.html">← Back to search</a></p>
+
+    <script type="module">
+        var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
+        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+        var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        document.getElementById('login-btn').addEventListener('click', async function() {
+            var pw = document.getElementById('password').value;
+            var name = document.getElementById('editor-name').value.trim() || 'editor';
+            
+            if (!pw) { document.getElementById('message').innerHTML = '<span class="error">Enter password.</span>'; return; }
+            
+            var result = await supabase.from('admins').select('*').eq('password', pw).limit(1);
+            if (result.error || !result.data || result.data.length === 0) {
+                document.getElementById('message').innerHTML = '<span class="error">Wrong password.</span>';
+                return;
+            }
+            
+            sessionStorage.setItem('editor_logged_in', 'true');
+            sessionStorage.setItem('editor_name', name);
+            document.getElementById('message').innerHTML = '<span class="success">Logged in as ' + name + '! <a href="index.html">Go to search</a></span>';
+        });
+    </script>
+</body>
+</html>

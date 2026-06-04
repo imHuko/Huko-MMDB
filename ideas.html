@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ideas - MUD Equipment DB</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+        a { color: #8787FF; }
+        h1 { color: #C0C0C0; }
+        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        nav a { margin-right: 15px; }
+        textarea { width: 100%; height: 100px; background: #111; color: #0f0; border: 1px solid #333; padding: 10px; font-family: monospace; }
+        button { padding: 8px 16px; background: #8787FF; color: #000; border: none; border-radius: 3px; cursor: pointer; margin: 5px 0; }
+        .idea { background: #222; padding: 10px; margin: 8px 0; border-radius: 5px; }
+        .idea-text { color: #ccc; }
+        .idea-meta { font-size: 12px; color: #888; }
+        .approved { border-left: 3px solid #44aa44; }
+        .denied { border-left: 3px solid #ff4444; }
+        .pending { border-left: 3px solid #ffaa00; }
+        .error { color: #ff4444; }
+        .success { color: #44aa44; }
+    </style>
+</head>
+<body>
+    <h1>Bug Reports & Ideas</h1>
+    <nav>
+        <a href="index.html">Search</a>
+        <a href="info.html">About</a>
+        <a href="ideas.html">Ideas</a>
+        <a href="leaderboard.html">Leaderboards</a>
+        <span id="editor-links" style="display:none;">
+            <a href="import.html">Add Equipment</a>
+            <a href="batch.html">Batch Import</a>
+            <a href="import-db.html">Import Database</a>
+            <a href="admin.html">Admin</a>
+        </span>
+        <span id="login-link"><a href="login.html">Editor Login</a></span>
+        <span id="logout-link" style="display:none;"><a href="#" onclick="logout()">Logout</a></span>
+    </nav>
+    <hr>
+
+    <h2>Submit an Idea or Bug Report</h2>
+    <input type="text" id="submitter" placeholder="Your name (optional)" style="width:300px;padding:6px;background:#333;color:#ccc;border:1px solid #555;border-radius:3px;">
+    <textarea id="idea-input" placeholder="Describe your idea or bug..."></textarea>
+    <br>
+    <button id="submit-btn">Submit</button>
+    <p id="submit-message"></p>
+    <hr>
+    <h2>Recent Ideas</h2>
+    <div id="ideas-list">Loading...</div>
+
+    <script type="module">
+        var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
+        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+        var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        function escapeHtml(t) { if (!t) return ''; var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+
+        document.getElementById('submit-btn').addEventListener('click', async function() {
+            var text = document.getElementById('idea-input').value.trim();
+            var submitter = document.getElementById('submitter').value.trim() || 'anonymous';
+            if (!text) { document.getElementById('submit-message').innerHTML = '<span class="error">Write something first.</span>'; return; }
+            var r = await supabase.from('ideas').insert({ idea_text: text, submitted_by: submitter, status: 'pending' });
+            if (r.error) { document.getElementById('submit-message').innerHTML = '<span class="error">' + r.error.message + '</span>'; return; }
+            document.getElementById('submit-message').innerHTML = '<span class="success">Submitted! Awaiting admin approval.</span>';
+            document.getElementById('idea-input').value = '';
+            loadIdeas();
+        });
+
+        async function loadIdeas() {
+            var el = document.getElementById('ideas-list');
+            var r = await supabase.from('ideas').select('*').order('created_at', { ascending: false }).limit(50);
+            if (r.error) { el.innerHTML = '<span class="error">Error loading ideas.</span>'; return; }
+            if (!r.data || !r.data.length) { el.innerHTML = '<p style="color:#888;">No ideas yet.</p>'; return; }
+            var html = '';
+            for (var idea of r.data) {
+                var s = (idea.status || 'pending');
+                var cls = s === 'approved' ? 'approved' : s === 'denied' ? 'denied' : 'pending';
+                html += '<div class="idea ' + cls + '"><div class="idea-text">' + escapeHtml(idea.idea_text) + '</div><div class="idea-meta">By ' + escapeHtml(idea.submitted_by) + ' &middot; ' + new Date(idea.created_at).toLocaleDateString() + ' &middot; ' + s + '</div></div>';
+            }
+            el.innerHTML = html;
+        }
+        loadIdeas();
+
+        if (sessionStorage.getItem('editor_logged_in') !== 'true') { document.getElementById('editor-links').style.display = 'none'; document.getElementById('login-link').style.display = 'inline'; document.getElementById('logout-link').style.display = 'none'; }
+        else { document.getElementById('editor-links').style.display = 'inline'; document.getElementById('login-link').style.display = 'none'; document.getElementById('logout-link').style.display = 'inline'; }
+        function logout() { sessionStorage.removeItem('editor_logged_in'); location.reload(); }
+    </script>
+</body>
+</html>

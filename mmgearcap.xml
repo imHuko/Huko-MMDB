@@ -1,0 +1,405 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE muclient>
+
+<muclient>
+
+<plugin
+   name="MM_Gear_Capture"
+   author="MUD Equipment DB"
+   id="d80b38e2f618fbda79a6440d"
+   language="Lua"
+   purpose="Captures gear data and sends it to the database"
+   save_state="y"
+   date_written="2026-05-17"
+   requires="4.71"
+   version="7.2"
+   >
+
+<description trim="y">
+<![CDATA[
+.------------------.
+ | MM Gear Capture |
+`------------------'
+
+Simple buffer-based gear capture. Records plain text, parses on 'mcg send'.
+EQDB items marked as verified. Overwrites existing items.
+
+Commands:
+  mcg name <yourname>   - REQUIRED first: Set your uploader name
+  mcg on                - start recording
+  mcg off               - stop recording
+  mcg send              - extract equipment and send to database
+  mcg show              - show captured items
+  mcg clear             - clear everything
+  mcg status            - show status
+  mcg update            - check for plugin update
+]]>
+</description>
+
+</plugin>
+
+<triggers>
+  <trigger enabled="y" match="^(?P&lt;fullline&gt;.*)$" regexp="y" send_to="12" sequence="100" script="recordLine"/>
+</triggers>
+
+<aliases>
+  <alias match="^mcg name (.*)$" enabled="y" regexp="y" send_to="12" sequence="107"><send>setUploaderName("%1")</send></alias>
+  <alias match="^mcg on$" enabled="y" regexp="y" send_to="12" sequence="100"><send>mcg_on()</send></alias>
+  <alias match="^mcg off$" enabled="y" regexp="y" send_to="12" sequence="101"><send>mcg_off()</send></alias>
+  <alias match="^mcg show$" enabled="y" regexp="y" send_to="12" sequence="102"><send>mcg_show()</send></alias>
+  <alias match="^mcg send$" enabled="y" regexp="y" send_to="12" sequence="103"><send>mcg_send()</send></alias>
+  <alias match="^mcg clear$" enabled="y" regexp="y" send_to="12" sequence="104"><send>mcg_clear()</send></alias>
+  <alias match="^mcg status$" enabled="y" regexp="y" send_to="12" sequence="105"><send>mcg_status()</send></alias>
+  <alias match="^mcg help$" enabled="y" regexp="y" send_to="12" sequence="106"><send>OnHelp()</send></alias>
+  <alias match="^mcg update$" enabled="y" regexp="y" send_to="12" sequence="108"><send>mcg_update()</send></alias>
+  <alias match="^mm_gear_capture(|(\:| )help)$" regexp="y" enabled="y" script="OnHelp"/>
+</aliases>
+
+<script>
+<![CDATA[
+
+require "wait"
+
+RELAY_URL = "https://mm-gear-relay.mm-gear.workers.dev"
+SUPABASE_URL = "https://fpvwpxtsrmrmdvnswrzx.supabase.co"
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY"
+UPDATE_URL = "https://hukodb.com/mmgearcap.xml"
+UPLOADER_NAME = ""
+
+recording = false
+raw_buffer = {}
+captured_items = {}
+captured_names = {}
+send_queue = {}
+sending = false
+
+json = require("json")
+http = require("socket.http")
+ltn12 = require("ltn12")
+
+
+function OnPluginInstall()
+  wait.make(function()
+    ColourNote("white", "black", "[GearCap] MM Gear Capture v" .. currentVersion() .. " loaded.")
+    ColourNote("white", "black", "[GearCap] REQUIRED: Set your name with |mcg name YourName| first!")
+    local saved = GetVariable("uploader_name")
+    if saved and saved ~= "" then UPLOADER_NAME = saved; ColourNote("lime", "black", "[GearCap] Uploader name: " .. UPLOADER_NAME) end
+    load_state()
+  end)
+end
+
+function OnPluginSaveState() SetVariable("captured_names", json.encode(captured_names)); SetVariable("uploader_name", UPLOADER_NAME) end
+function OnHelp() ColourNote("silver", "black", world.GetPluginInfo(world.GetPluginID(), 3)) end
+
+function load_state()
+  local saved = GetVariable("captured_names")
+  if saved and saved ~= "" then
+    local ok, data = pcall(function() return json.decode(saved) end)
+    if ok and type(data) == "table" then
+      for name, is_eqdb in pairs(data) do
+        captured_names[name] = is_eqdb
+      end
+    end
+  else
+    -- migrate from old full-item save
+    local old = GetVariable("captured_items")
+    if old and old ~= "" then
+      local ok, data = pcall(function() return json.decode(old) end)
+      if ok and type(data) == "table" then
+        for _, item in ipairs(data) do
+          captured_names[item.name] = item.is_eqdb == true
+        end
+        DeleteVariable("captured_items")
+      end
+    end
+  end
+end
+
+
+function setUploaderName(name)
+  name = Trim(name or "")
+  if name == "" then ColourNote("red", "black", "[GearCap] Usage: mcg name YourName"); return end
+  UPLOADER_NAME = name; SaveState(); ColourNote("lime", "black", "[GearCap] Name set: " .. name)
+end
+
+function mcg_on()
+  if UPLOADER_NAME == "" then ColourNote("red", "black", "[GearCap] Set name first! mcg name YourName"); return end
+  recording = true; raw_buffer = {}; ColourNote("lime", "black", "[GearCap] Recording ON")
+end
+
+function mcg_off() recording = false; ColourNote("yellow", "black", "[GearCap] Recording OFF. " .. #raw_buffer .. " lines.") end
+
+function mcg_show()
+  if #captured_items == 0 then ColourNote("white", "black", "[GearCap] No items. Use mcg send."); return end
+  for i, item in ipairs(captured_items) do ColourNote("white", "black", string.format("%d. %s%s", i, item.name, item.is_eqdb and " [EQDB]" or "")) end
+end
+
+function mcg_send()
+  if UPLOADER_NAME == "" then ColourNote("red", "black", "[GearCap] Set name first!"); return end
+  parseBuffer(); processQueue()
+end
+
+function mcg_clear() raw_buffer = {}; captured_items = {}; captured_names = {}; send_queue = {}; SaveState(); ColourNote("yellow", "black", "[GearCap] Cleared") end
+
+function mcg_status()
+  local s = recording and "ON" or "OFF"; local sent = 0
+  for _, item in ipairs(captured_items) do if item.sent then sent = sent + 1 end end
+  ColourNote("white", "black", string.format("[GearCap] %s | Buffer: %d | Items: %d | Sent: %d", s, #raw_buffer, #captured_items, sent))
+end
+
+
+
+------------------
+-- recording
+------------------
+
+function recordLine(name, line, wildcards)
+  if not recording then return end
+  local plainText = wildcards["fullline"] or ""
+  if plainText == "" then return end
+  table.insert(raw_buffer, plainText)
+end
+
+
+
+------------------
+-- parse buffer
+------------------
+
+function parseBuffer()
+  if #raw_buffer == 0 then ColourNote("white", "black", "[GearCap] Buffer empty."); return end
+  
+  local found = 0; local i = 1
+  while i <= #raw_buffer do
+    local line = raw_buffer[i]
+    if string.find(line, "^Item '") or string.find(line, "^Level %d+ item '") then
+      local blockLines = {line}; i = i + 1
+      while i <= #raw_buffer do
+        local nextLine = raw_buffer[i]
+        if nextLine == "" then i = i + 1; break end
+        if string.find(nextLine, "%d+hp %d+sp %d+st") then break end
+        if string.find(nextLine, "^You focus") then break end
+        if string.find(nextLine, "^check eqlookup") then break end
+        if string.find(nextLine, "^check equipment") then break end
+        if string.find(nextLine, "^You are using:") then break end
+        if string.find(nextLine, "^Current Armor") then break end
+        if string.find(nextLine, "^Equipped weapon") then break end
+        if string.find(nextLine, "^<") and string.find(nextLine, ">") then break end
+        if not (string.find(nextLine, "^%d+ Damage:") or string.find(nextLine, "^%d+ Accuracy:") or string.find(nextLine, "^%d+ Range:") or string.find(nextLine, "^%d+%% Critical")) then
+          table.insert(blockLines, nextLine)
+        end
+        i = i + 1
+      end
+      local item = buildItem(blockLines)
+      if item then found = found + 1 end
+    else
+      i = i + 1
+    end
+  end
+  ColourNote("lime", "black", "[GearCap] Found " .. found .. " items.")
+  raw_buffer = {}
+end
+
+
+
+------------------
+-- build item
+------------------
+
+function buildItem(lines)
+  if #lines == 0 then return nil end
+  local text = table.concat(lines, "\n")
+  local name = string.match(text, "^Item '(.+)' is type") or string.match(text, "^Level %d+ item '(.-)' is type")
+  if not name then return nil end
+  
+  -- EQDB detection (standard and NO-CLICKABLE-LINKS format)
+  local is_eqdb = string.find(text, "%[EQDB%]") ~= nil 
+      or string.find(text, "%[Enable GMCP in Mushclient for EQDB%]") ~= nil
+  
+  -- Dedup: skip if already captured
+  local existing = captured_names[name]
+  if existing ~= nil then
+    if existing == true then
+      ColourNote("silver", "black", "[GearCap] Skipped " .. name .. " (EQDB already captured)")
+      return nil
+    end
+    if not is_eqdb then
+      ColourNote("silver", "black", "[GearCap] Skipped " .. name .. " (already captured)")
+      return nil
+    end
+    -- existing is personal and this is EQDB: upgrade!
+    ColourNote("yellow", "black", "[GearCap] Upgrading " .. name .. " personal -> EQDB")
+    captured_names[name] = true
+    local itemtype = classifyItem(text)
+    local item = { name = name, text = text, itemtype = itemtype, is_eqdb = true, sent = false }
+    table.insert(captured_items, item); table.insert(send_queue, #captured_items); SaveState()
+    ColourNote("lime", "black", "[GearCap] " .. name .. " [EQDB] (" .. #lines .. " lines)")
+    return item
+  end
+  
+  local itemtype = classifyItem(text)
+  captured_names[name] = is_eqdb
+  local item = { name = name, text = text, itemtype = itemtype, is_eqdb = is_eqdb, sent = false }
+  table.insert(captured_items, item); table.insert(send_queue, #captured_items); SaveState()
+  ColourNote("lime", "black", "[GearCap] " .. name .. (is_eqdb and " [EQDB]" or "") .. " (" .. #lines .. " lines)")
+  return item
+end
+
+function classifyItem(text)
+  local itemtype = "other"
+  local tm = string.match(text, "is type ([%w%-]+)")
+  if tm then
+    itemtype = tm:gsub(",", "")
+    if itemtype == "jewelry" then itemtype = "ring"
+    elseif itemtype == "esoteric" or itemtype == "relic" then itemtype = "other"
+    elseif itemtype == "armor" then itemtype = "armor"
+    elseif itemtype == "weapon" then itemtype = "weapon"
+    elseif itemtype == "ward" then itemtype = "other"
+    end
+  end
+  return itemtype
+end
+
+
+
+------------------
+-- send
+------------------
+
+function logSubmissionHistory(item)
+  if not item or not item.name then return end
+  local body = json.encode({
+    item_name = item.name,
+    submitter = UPLOADER_NAME ~= "" and UPLOADER_NAME or "anonymous",
+    source = "plugin_import",
+    is_eqdb = item.is_eqdb or false,
+    description = item.text or ""
+  })
+  local headers = {
+    ["Content-Type"] = "application/json",
+    ["apikey"] = SUPABASE_ANON_KEY,
+    ["Authorization"] = "Bearer " .. SUPABASE_ANON_KEY
+  }
+  local ok, status = http.request({
+    url = SUPABASE_URL .. "/rest/v1/submission_history",
+    method = "POST",
+    headers = headers,
+    source = ltn12.source.string(body),
+    sink = ltn12.sink.table({})
+  })
+end
+
+function processQueue()
+  if sending then return end
+  if #send_queue == 0 then ColourNote("white", "black", "[GearCap] No items to send."); return end
+  sending = true
+  wait.make(function()
+    while #send_queue > 0 do
+      local item = captured_items[table.remove(send_queue, 1)]
+      if item and not item.sent then doSendItem(item); wait.time(1) end
+    end
+    sending = false
+    captured_items = {}
+    SaveState()
+    ColourNote("white", "black", "[GearCap] Send complete. Items cleared.")
+  end)
+end
+
+function doSendItem(item)
+  if item.sent then return end
+  
+  -- skip personal items if EQDB version already exists in DB
+  if not item.is_eqdb then
+    local check_url = RELAY_URL .. "/rest/v1/equipment?name=eq." .. urlEncode(item.name) .. "&verified=eq.true&select=name"
+    local check_resp = {}
+    local c_ok, c_status = http.request({ url = check_url, sink = ltn12.sink.table(check_resp) })
+    if c_ok and c_status == 200 then
+      local data = table.concat(check_resp)
+      if data and data ~= "[]" then
+        captured_names[item.name] = true
+        item.sent = true
+        SaveState()
+        ColourNote("yellow", "black", "  Skipped (EQDB version in DB)")
+        return
+      end
+    end
+  end
+  
+  local props = { source = "plugin_import" }; if UPLOADER_NAME ~= "" then props.uploaded_by = UPLOADER_NAME end
+  local body = json.encode({ name = item.name, type = item.itemtype, description = item.text, verified = item.is_eqdb, properties = props })
+  local resp = {}; local ok, status = http.request({ url = RELAY_URL .. "/rest/v1/equipment", method = "POST", headers = { ["Content-Type"] = "application/json", ["Content-Length"] = tostring(string.len(body)), ["Prefer"] = "resolution=merge-duplicates" }, source = ltn12.source.string(body), sink = ltn12.sink.table(resp) })
+  if status == 201 or status == 200 then item.sent = true; ColourNote("lime", "black", "  Sent!"); logSubmissionHistory(item)
+  elseif status == 409 then
+    ColourNote("yellow", "black", "  Overwriting...")
+    logSubmissionHistory(item) -- log BEFORE overwrite so history shows original submitter
+    local del_url = RELAY_URL .. "/rest/v1/equipment?name=eq." .. urlEncode(item.name)
+    http.request({ url = del_url, method = "DELETE", headers = { ["apikey"] = SUPABASE_ANON_KEY }, sink = ltn12.sink.table({}) })
+    local resp2 = {}; local ok2, status2 = http.request({ url = RELAY_URL .. "/rest/v1/equipment", method = "POST", headers = { ["Content-Type"] = "application/json", ["Content-Length"] = tostring(string.len(body)) }, source = ltn12.source.string(body), sink = ltn12.sink.table(resp2) })
+    if status2 == 201 or status2 == 200 then item.sent = true; ColourNote("lime", "black", "  Overwritten!")
+    else ColourNote("red", "black", "  Overwrite failed: " .. tostring(status2)); table.insert(send_queue, 1, item) end
+  else
+    ColourNote("red", "black", "  Failed: " .. tostring(status)); table.insert(send_queue, 1, item)
+  end
+  SaveState()
+end
+
+function urlEncode(s)
+  if not s then return "" end
+  s = string.gsub(s, "([^%w])", function(c) return string.format("%%%02X", string.byte(c)) end)
+  return s
+end
+
+
+
+------------------
+-- update check
+------------------
+
+function currentVersion()
+  local ver = GetPluginInfo(GetPluginID(), 19)
+  return ver or "0.0"
+end
+
+function mcg_update()
+  local cur = currentVersion()
+  ColourNote("yellow", "black", "[GearCap] Checking for update (current: v" .. cur .. ")...")
+  wait.make(function()
+    local resp = {}
+    local ok, status = http.request({ url = UPDATE_URL, sink = ltn12.sink.table(resp) })
+    if not ok or (status ~= 200) then
+      ColourNote("red", "black", "[GearCap] Update check failed: " .. tostring(status))
+      return
+    end
+    local xml = table.concat(resp)
+    local remote_ver = string.match(xml, '<plugin[^>]-version="([%d%.]+)"')
+    if not remote_ver then
+      ColourNote("red", "black", "[GearCap] Could not parse version from remote file.")
+      return
+    end
+    if compareVersions(remote_ver, cur) <= 0 then
+      ColourNote("lime", "black", "[GearCap] You have the latest version (v" .. cur .. ").")
+      return
+    end
+    ColourNote("yellow", "black", "[GearCap] New version available: v" .. remote_ver .. " (current: v" .. cur .. ")")
+    ColourNote("yellow", "black", "[GearCap] Downloading and installing...")
+    InstallPlugin(UPDATE_URL)
+  end)
+end
+
+function compareVersions(a, b)
+  local a_parts = {}; for part in string.gmatch(a, "%d+") do table.insert(a_parts, tonumber(part)) end
+  local b_parts = {}; for part in string.gmatch(b, "%d+") do table.insert(b_parts, tonumber(part)) end
+  for i = 1, math.max(#a_parts, #b_parts) do
+    local av = a_parts[i] or 0
+    local bv = b_parts[i] or 0
+    if av > bv then return 1 end
+    if av < bv then return -1 end
+  end
+  return 0
+end
+
+
+]]>
+</script>
+
+</muclient>
