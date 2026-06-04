@@ -19,10 +19,12 @@
         .btn-delete { background: #ff4444; color: white; }
         .btn-edit { background: #4488ff; color: white; }
         .btn-approve { background: #44aa44; color: white; }
+        .btn-approve:disabled, .btn-reject:disabled { opacity: 0.4; cursor: not-allowed; }
         .btn-review { background: #44aa44; color: white; }
         .btn-save { background: #44aa44; color: white; }
         .btn-cancel { background: #666; color: white; }
         .btn-recolor { background: #ff8800; color: white; }
+        .btn-reject { background: #ff4444; color: white; }
         input, select, textarea { padding: 8px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; }
         .hidden { display: none !important; }
         .tabs { margin: 15px 0; }
@@ -58,7 +60,6 @@
         <a href="index.html">Search</a>
         <a href="import.html">Add Equipment</a>
         <a href="batch.html">Hash Import</a>
-        <a href="leaderboard.html">Leaderboards</a>
         <a href="admin.html">Admin</a>
     </nav>
     <hr>
@@ -97,7 +98,7 @@
                 <button id="comments-reset-btn">Reset</button>
             </div>
             <table>
-                <thead><tr><th>Comment</th><th>By</th><th>On Item</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
+                <thead><tr><th>Comment</th><th>By</th><th>On Item</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
                 <tbody id="comments-table"></tbody>
             </table>
             <div class="pagination" id="comments-pagination"></div>
@@ -105,7 +106,7 @@
         
         <div id="ideas-section" class="section">
             <table>
-                <thead><tr><th>Idea</th><th>By</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
+                <thead><tr><th>Idea</th><th>By</th><th>Date</th><th>Reviewed</th><th>Actions</th></tr></thead>
                 <tbody id="ideas-table"></tbody>
             </table>
         </div>
@@ -140,7 +141,6 @@
                 <thead><tr><th>Rank</th><th>Contributor</th><th>Total Submissions</th><th>EQDB</th><th>Personal</th><th>First Submission</th><th>Last Submission</th></tr></thead>
                 <tbody id="contributors-table"></tbody>
             </table>
-            <p style="font-size:11px;color:#666;margin:8px 0;">Note: Counts only reflect the last uploaded version of each item. Earlier personal submissions that were later overwritten by EQDB are not included until future submissions re-track them.</p>
         </div>
     </div>
     
@@ -293,6 +293,12 @@
             renderPagination('equipment', equipmentPage, Math.ceil(equipmentTotal / PER_PAGE));
         }
         
+        function statusIcon(status) {
+            if (status === 'approved') return '<span style="color:#44aa44;">Approved</span>';
+            if (status === 'denied') return '<span style="color:#ff4444;">Denied</span>';
+            return '<span style="color:#ffaa00;">Pending</span>';
+        }
+        
         async function loadComments() {
             var q = supabase.from('comments').select('*', { count: 'exact' });
             if (commentsSearch) q = q.or('comment_text.ilike.%' + commentsSearch + '%,display_name.ilike.%' + commentsSearch + '%');
@@ -307,14 +313,21 @@
                 for (var c = 0; c < data.length; c++) {
                     var comment = data[c], itemName = '(deleted)';
                     if (comment.equipment_id) { var eq = await supabase.from('equipment').select('name').eq('id', comment.equipment_id).single(); if (eq.data) itemName = eq.data.name; }
-                    var status = comment.status || 'pending';
-                    var statusDisplay = status === 'approved' ? '<span style="color:#44aa44;">Approved</span>' : status === 'denied' ? '<span style="color:#ff4444;">Denied</span>' : '<span style="color:#ffaa00;">Pending</span>';
-                    rows.push('<tr><td>' + escapeHtml(comment.comment_text).substring(0, 80) + '</td><td>' + escapeHtml(comment.display_name) + '</td><td>' + escapeHtml(itemName) + '</td><td>' + new Date(comment.created_at).toLocaleDateString() + '</td><td>' + statusDisplay + '</td><td><button class="btn-delete" data-id="' + comment.id + '">Delete</button> <button class="btn-approve-c" data-id="' + comment.id + '"' + (status === 'approved' ? ' disabled' : '') + '>Approve</button> <button class="btn-reject-c" data-id="' + comment.id + '"' + (status === 'denied' ? ' disabled' : '') + '>Deny</button></td></tr>');
+                    var s = comment.status || 'pending';
+                    rows.push('<tr><td>' + escapeHtml(comment.comment_text).substring(0, 80) + '</td><td>' + escapeHtml(comment.display_name) + '</td><td>' + escapeHtml(itemName) + '</td><td>' + statusIcon(s) + '</td><td>' + new Date(comment.created_at).toLocaleDateString() + '</td><td><button class="btn-delete" data-id="' + comment.id + '">Delete</button> <button class="btn-approve" data-id="' + comment.id + '"' + (s === 'approved' ? ' disabled' : '') + '>Approve</button> <button class="btn-reject" data-id="' + comment.id + '"' + (s === 'denied' ? ' disabled' : '') + '>Deny</button></td></tr>');
                 }
                 tbody.innerHTML = rows.join('');
             }
             renderPagination('comments', commentsPage, Math.ceil(commentsTotal / PER_PAGE));
         }
+        
+        document.getElementById('comments-table').addEventListener('click', async function(e) {
+            var btn = e.target.closest('button'); if (!btn) return;
+            var id = btn.getAttribute('data-id'); if (!id) return;
+            if (btn.classList.contains('btn-delete')) { if (!confirm('Delete?')) return; var r = await supabase.from('comments').delete().eq('id', id); if (r.error) alert('Delete failed: ' + r.error.message); loadComments(); }
+            else if (btn.classList.contains('btn-approve')) { var r = await supabase.from('comments').update({ status: 'approved' }).eq('id', id); if (r.error) alert('Approve failed: ' + r.error.message); loadComments(); }
+            else if (btn.classList.contains('btn-reject')) { var r = await supabase.from('comments').update({ status: 'denied' }).eq('id', id); if (r.error) alert('Deny failed: ' + r.error.message); loadComments(); }
+        });
         
         async function loadIdeas() {
             var result = await supabase.from('ideas').select('*').order('created_at', { ascending: false }).limit(50);
@@ -333,30 +346,21 @@
                         '<td>' + escapeHtml(idea.submitted_by) + '</td>' +
                         '<td>' + new Date(idea.created_at).toLocaleDateString() + '</td>' +
                         '<td>' + statusDisplay + '</td>' +
-                        '<td><button class="btn-delete-idea" data-id="' + idea.id + '">Delete</button> ' +
-                        '<button class="btn-approve-idea" data-id="' + idea.id + '"' + (status === 'approved' ? ' disabled' : '') + '>Approve</button> ' +
-                        '<button class="btn-reject-idea" data-id="' + idea.id + '"' + (status === 'denied' ? ' disabled' : '') + '>Deny</button></td>' +
+                        '<td><button class="btn-delete" data-id="' + idea.id + '">Delete</button> ' +
+                        '<button class="btn-approve" data-id="' + idea.id + '"' + (status === 'approved' ? ' disabled' : '') + '>Approve</button> ' +
+                        '<button class="btn-reject" data-id="' + idea.id + '"' + (status === 'denied' ? ' disabled' : '') + '>Deny</button></td>' +
                         '</tr>');
                 }
                 tbody.innerHTML = rows.join('');
             }
         }
         
-        // Event delegation for ideas table
         document.getElementById('ideas-table').addEventListener('click', async function(e) {
             var btn = e.target.closest('button'); if (!btn) return;
             var id = btn.getAttribute('data-id'); if (!id) return;
-            if (btn.classList.contains('btn-delete-idea')) { if (!confirm('Delete?')) return; var r = await supabase.from('ideas').delete().eq('id', id); if (r.error) { alert('Delete failed: ' + r.error.message); } loadIdeas(); }
-            else if (btn.classList.contains('btn-approve-idea')) { var r = await supabase.from('ideas').update({ status: 'approved' }).eq('id', id); if (r.error) { alert('Approve failed: ' + r.error.message); } loadIdeas(); }
-            else if (btn.classList.contains('btn-reject-idea')) { var r = await supabase.from('ideas').update({ status: 'denied' }).eq('id', id); if (r.error) { alert('Deny failed: ' + r.error.message); } loadIdeas(); }
-        });
-        // Event delegation for comments table
-        document.getElementById('comments-table').addEventListener('click', async function(e) {
-            var btn = e.target.closest('button'); if (!btn) return;
-            var id = btn.getAttribute('data-id'); if (!id) return;
-            if (btn.classList.contains('btn-delete')) { if (!confirm('Delete?')) return; var r = await supabase.from('comments').delete().eq('id', id); if (r.error) { alert('Delete failed: ' + r.error.message); } loadComments(); }
-            else if (btn.classList.contains('btn-approve-c')) { var r = await supabase.from('comments').update({ status: 'approved' }).eq('id', id); if (r.error) { alert('Approve failed: ' + r.error.message); } loadComments(); }
-            else if (btn.classList.contains('btn-reject-c')) { var r = await supabase.from('comments').update({ status: 'denied' }).eq('id', id); if (r.error) { alert('Deny failed: ' + r.error.message); } loadComments(); }
+            if (btn.classList.contains('btn-delete')) { if (!confirm('Delete?')) return; var r = await supabase.from('ideas').delete().eq('id', id); if (r.error) { alert('Delete failed: ' + r.error.message); } loadIdeas(); }
+            else if (btn.classList.contains('btn-approve')) { var r = await supabase.from('ideas').update({ status: 'approved' }).eq('id', id); if (r.error) { alert('Approve failed: ' + r.error.message); } loadIdeas(); }
+            else if (btn.classList.contains('btn-reject')) { var r = await supabase.from('ideas').update({ status: 'denied' }).eq('id', id); if (r.error) { alert('Deny failed: ' + r.error.message); } loadIdeas(); }
         });
         
         async function loadEqdbQueue() {
@@ -484,66 +488,50 @@
         // ============================================
         // CONTRIBUTORS
         // ============================================
-        async function fetchAllSubmissionHistory() {
-            var allData = [];
-            var page = 0;
-            var pageSize = 1000;
-            var hasMore = true;
-            while (hasMore) {
-                var from = page * pageSize;
-                var to = from + pageSize - 1;
-                var result = await supabase.from('submission_history').select('*').range(from, to);
-                if (result.error) throw result.error;
-                if (result.data && result.data.length > 0) allData = allData.concat(result.data);
-                hasMore = result.data && result.data.length === pageSize;
-                page++;
-            }
-            return allData;
-        }
-
         async function loadContributors() {
             var status = document.getElementById('contributor-status');
             status.textContent = 'Loading...';
-            try {
-                var data = await fetchAllSubmissionHistory();
-                if (!data || data.length === 0) {
-                    document.getElementById('contributors-table').innerHTML = '<tr><td colspan="7">No submissions recorded yet.</td></tr>';
-                    status.textContent = '';
-                    return;
-                }
-                // Aggregate by submitter
-                var contributors = {};
-                for (var i = 0; i < data.length; i++) {
-                    var s = data[i];
-                    var name = s.submitter || 'anonymous';
-                    if (!contributors[name]) contributors[name] = { name: name, total: 0, eqdb: 0, personal: 0, first: s.created_at, last: s.created_at };
-                    contributors[name].total++;
-                    if (s.is_eqdb) contributors[name].eqdb++; else contributors[name].personal++;
-                    if (s.created_at < contributors[name].first) contributors[name].first = s.created_at;
-                    if (s.created_at > contributors[name].last) contributors[name].last = s.created_at;
-                }
-                var sorted = Object.values(contributors).sort(function(a, b) { return b.total - a.total; });
-                var tbody = document.getElementById('contributors-table');
-                var html = '';
-                for (var r = 0; r < sorted.length; r++) {
-                    var c = sorted[r];
-                    var medal = r === 0 ? '🥇' : r === 1 ? '🥈' : r === 2 ? '🥉' : (r + 1);
-                    html += '<tr>'
-                        + '<td style="padding:5px;border-bottom:1px solid #333;">' + medal + '</td>'
-                        + '<td style="padding:5px;border-bottom:1px solid #333;"><strong>' + escapeHtml(c.name) + '</strong></td>'
-                        + '<td style="padding:5px;border-bottom:1px solid #333;">' + c.total + '</td>'
-                        + '<td style="padding:5px;border-bottom:1px solid #333;color:#44aa44;">' + c.eqdb + '</td>'
-                        + '<td style="padding:5px;border-bottom:1px solid #333;color:#ffaa00;">' + c.personal + '</td>'
-                        + '<td style="padding:5px;border-bottom:1px solid #333;">' + new Date(c.first).toLocaleDateString() + '</td>'
-                        + '<td style="padding:5px;border-bottom:1px solid #333;">' + new Date(c.last).toLocaleDateString() + '</td>'
-                        + '</tr>';
-                }
-                tbody.innerHTML = html;
-                status.textContent = sorted.length + ' contributors, ' + data.length + ' total submissions';
-            } catch (e) {
-                document.getElementById('contributors-table').innerHTML = '<tr><td colspan="7">Error: ' + e.message + '</td></tr>';
+            var result = await supabase.from('submission_history').select('*');
+            if (result.error) {
+                document.getElementById('contributors-table').innerHTML = '<tr><td colspan="7">Error: ' + result.error.message + '</td></tr>';
                 status.textContent = '';
+                return;
             }
+            var data = result.data;
+            if (!data || data.length === 0) {
+                document.getElementById('contributors-table').innerHTML = '<tr><td colspan="7">No submissions recorded yet.</td></tr>';
+                status.textContent = '';
+                return;
+            }
+            // Aggregate by submitter
+            var contributors = {};
+            for (var i = 0; i < data.length; i++) {
+                var s = data[i];
+                var name = s.submitter || 'anonymous';
+                if (!contributors[name]) contributors[name] = { name: name, total: 0, eqdb: 0, personal: 0, first: s.created_at, last: s.created_at };
+                contributors[name].total++;
+                if (s.is_eqdb) contributors[name].eqdb++; else contributors[name].personal++;
+                if (s.created_at < contributors[name].first) contributors[name].first = s.created_at;
+                if (s.created_at > contributors[name].last) contributors[name].last = s.created_at;
+            }
+            var sorted = Object.values(contributors).sort(function(a, b) { return b.total - a.total; });
+            var tbody = document.getElementById('contributors-table');
+            var html = '';
+            for (var r = 0; r < sorted.length; r++) {
+                var c = sorted[r];
+                var medal = r === 0 ? '🥇' : r === 1 ? '🥈' : r === 2 ? '🥉' : (r + 1);
+                html += '<tr>'
+                    + '<td style="padding:5px;border-bottom:1px solid #333;">' + medal + '</td>'
+                    + '<td style="padding:5px;border-bottom:1px solid #333;"><strong>' + escapeHtml(c.name) + '</strong></td>'
+                    + '<td style="padding:5px;border-bottom:1px solid #333;">' + c.total + '</td>'
+                    + '<td style="padding:5px;border-bottom:1px solid #333;color:#44aa44;">' + c.eqdb + '</td>'
+                    + '<td style="padding:5px;border-bottom:1px solid #333;color:#ffaa00;">' + c.personal + '</td>'
+                    + '<td style="padding:5px;border-bottom:1px solid #333;">' + new Date(c.first).toLocaleDateString() + '</td>'
+                    + '<td style="padding:5px;border-bottom:1px solid #333;">' + new Date(c.last).toLocaleDateString() + '</td>'
+                    + '</tr>';
+            }
+            tbody.innerHTML = html;
+            status.textContent = sorted.length + ' contributors, ' + data.length + ' total submissions';
         }
         document.getElementById('refresh-contributors-btn').addEventListener('click', loadContributors);
 
@@ -552,16 +540,7 @@
             var btn = this;
             btn.disabled = true;
             var status = document.getElementById('contributor-status');
-
-            // Test table access first
-            status.textContent = 'Checking submission_history table...';
-            var testResult = await supabase.from('submission_history').select('id', { count: 'exact', head: true });
-            if (testResult.error) {
-                status.innerHTML = '<span style="color:#ff4444;">Error accessing submission_history: ' + testResult.error.message + '. Did you run the SQL in schema.sql?</span>';
-                btn.disabled = false;
-                return;
-            }
-            status.textContent = 'Table OK. Fetching equipment records...';
+            status.textContent = 'Fetching equipment records...';
 
             // Fetch all equipment
             var allItems = [];
@@ -573,18 +552,9 @@
                 hasMore = result.data && result.data.length === pageSize;
                 page++;
             }
-
-            if (allItems.length === 0) {
-                status.innerHTML = '<span style="color:#ffaa00;">Equipment table is empty — nothing to backfill.</span>';
-                btn.disabled = false;
-                return;
-            }
             status.textContent = 'Importing ' + allItems.length + ' records to history...';
 
-            // Disable the trigger temporarily to avoid conflicts during backfill
-            await supabase.rpc('set_trigger_enabled', { trigger_name: 'trg_mark_overwritten', enabled: false }).catch(function(){});
-
-            var imported = 0, errors = 0, lastError = '';
+            var imported = 0, errors = 0;
             for (var i = 0; i < allItems.length; i++) {
                 var item = allItems[i];
                 var result = await supabase.from('submission_history').insert({
@@ -595,25 +565,12 @@
                     description: item.description || '',
                     created_at: item.created_at
                 });
-                if (result.error) { errors++; lastError = result.error.message; }
-                else imported++;
-                if (i % 100 === 0) status.textContent = 'Importing... ' + i + '/' + allItems.length + ' (done: ' + imported + ', errors: ' + errors + ')';
+                if (result.error) errors++; else imported++;
+                if (i % 100 === 0) status.textContent = 'Importing... ' + i + '/' + allItems.length + ' (' + imported + ' done)';
             }
-
-            // Re-enable trigger
-            await supabase.rpc('set_trigger_enabled', { trigger_name: 'trg_mark_overwritten', enabled: true }).catch(function(){});
-
-            if (errors > 0 && imported === 0) {
-                status.innerHTML = '<span style="color:#ff4444;">All ' + errors + ' inserts failed. Last error: ' + escapeHtml(lastError) + '</span>';
-            } else if (errors > 0) {
-                status.innerHTML = '<span style="color:#44aa44;">✅ ' + imported + ' imported</span>, <span style="color:#ff4444;">' + errors + ' errors</span>. Last error: ' + escapeHtml(lastError);
-            } else {
-                status.innerHTML = '<span style="color:#44aa44;">✅ Success! ' + imported + ' records imported.</span>';
-            }
+            status.textContent = 'Done! ' + imported + ' imported, ' + errors + ' errors.';
             btn.disabled = false;
-
-            // Refresh the Contributors tab
-            switchTab('contributors');
+            loadContributors();
         });
 
         // ============================================
@@ -706,5 +663,6 @@
             return h;
         }
     </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"131579fcdf914a0f9aa2fb16db7f327e","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>

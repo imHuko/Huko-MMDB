@@ -3,41 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Editor Signup - MUD Equipment DB</title>
-    <style>
-        body { font-family: Arial, sans-serif; max-width: 400px; margin: 100px auto; padding: 20px; background: #1a1a1a; color: #ccc; text-align: center; }
-        a { color: #8787FF; }
-        h1 { color: #C0C0C0; }
-        input { padding: 8px; width: 250px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; margin: 5px; }
-        button { padding: 8px 16px; background: #8787FF; color: #000; border: none; border-radius: 3px; cursor: pointer; margin: 5px; }
-        .error { color: #ff4444; }
-        .success { color: #44aa44; }
-    </style>
+    <title>Sign Up - MUD Equipment DB</title>
 </head>
 <body>
-    <h1>Editor Signup</h1>
-    <p>Create an editor account.</p>
-    <input type="text" id="username" placeholder="Username"><br>
-    <input type="password" id="password" placeholder="Password"><br>
-    <button id="signup-btn">Sign Up</button>
+    <a href="admin.html">Admin</a> | 
+	<h1>Create Account</h1>
+    <a href="index.html">← Back to search</a>
+    <hr>
+    
+    <form id="signup-form">
+        <label>Email:</label><br>
+        <input type="email" id="email" required><br><br>
+        <label>Password:</label><br>
+        <input type="password" id="password" required minlength="6"><br><br>
+        <button type="submit">Sign Up</button>
+    </form>
+    
     <p id="message"></p>
-    <p><a href="login.html">Already have an account? Login</a></p>
-    <p><a href="index.html">← Back to search</a></p>
+    <p>Already have an account? <a href="login.html">Login here</a></p>
 
     <script type="module">
-        var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
-        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
+        const SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
+        
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-        var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-        document.getElementById('signup-btn').addEventListener('click', async function() {
-            var user = document.getElementById('username').value.trim();
-            var pw = document.getElementById('password').value;
-            if (!user || !pw) { document.getElementById('message').innerHTML = '<span class="error">Fill in all fields.</span>'; return; }
-            var result = await supabase.from('admins').insert({ username: user, password: pw });
-            if (result.error) { document.getElementById('message').innerHTML = '<span class="error">' + result.error.message + '</span>'; return; }
-            document.getElementById('message').innerHTML = '<span class="success">Account created! <a href="login.html">Login</a></span>';
+        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        document.getElementById('signup-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            const { error } = await supabase.auth.signUp({
+                email: email,
+                password: password
+            });
+            
+            if (error) {
+                document.getElementById('message').textContent = 'Error: ' + error.message;
+            } else {
+                document.getElementById('message').textContent = 'Account created! Check your email for confirmation, then you can login.';
+            }
         });
     </script>
+<script>
+    if (sessionStorage.getItem('editor_logged_in') === 'true') {
+        document.getElementById('editor-links').style.display = 'inline';
+        document.getElementById('logout-link').style.display = 'inline';
+        document.getElementById('login-link').style.display = 'none';
+    }
+    function logout() {
+        sessionStorage.removeItem('editor_logged_in');
+        location.reload();
+    }
+</script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"131579fcdf914a0f9aa2fb16db7f327e","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>

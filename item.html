@@ -3,196 +3,731 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Item - MUD Equipment DB</title>
+    <title>Item Details - MUD Equipment DB</title>
     <style>
         body { font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
         a { color: #8787FF; }
-        h1 { color: #C0C0C0; margin-bottom: 5px; }
-        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; }
-        nav a { margin-right: 15px; }
-        .meta { font-size: 12px; color: #888; margin: 5px 0; }
-        .section { background: #222; padding: 15px; margin: 15px 0; border-radius: 5px; }
-        .section h2 { margin-top: 0; font-size: 16px; color: #888; }
-        .prop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 20px; }
-        .prop-label { color: #888; font-size: 12px; }
-        .prop-value { font-size: 13px; }
-        textarea { width: 100%; height: 80px; background: #111; color: #0f0; border: 1px solid #333; padding: 10px; font-family: monospace; }
-        button { padding: 8px 16px; background: #8787FF; color: #000; border: none; border-radius: 3px; cursor: pointer; margin: 5px 0; }
-        .comment { background: #1a1a1a; padding: 10px; margin: 8px 0; border-radius: 5px; border-left: 3px solid #444; }
-        .comment-meta { font-size: 12px; color: #888; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 6px 8px; text-align: left; border-bottom: 1px solid #333; font-size: 12px; }
-        th { color: #888; font-size: 11px; }
-        .submitter-credit { font-size: 13px; color: #ffaa00; margin: 10px 0; padding: 8px; background: #1a1a1a; border-radius: 5px; }
-        .submitter-credit .label { color: #888; }
-        .history-toggle { color: #8787FF; cursor: pointer; font-size: 13px; margin: 5px 0; display: inline-block; }
-        .history-toggle:hover { text-decoration: underline; }
-        .eqdb-label { color: #44aa44; font-weight: bold; }
-        .personal-label { color: #ffaa00; }
+        h1, h2 { color: #C0C0C0; }
+        .mm-output { background: #000; color: #C0C0C0; padding: 15px; margin: 15px 0; border-radius: 5px;
+                     font-family: 'Courier New', monospace; font-size: 13px; white-space: pre-wrap; line-height: 1.5; word-wrap: break-word; }
+        .comment { border: 1px solid #444; padding: 10px; margin: 10px 0; border-radius: 5px; background: #222; }
+        .comment-header { color: #888; font-size: 13px; margin-bottom: 5px; }
+        .comment-header strong { color: #C0C0C0; }
+        input, textarea { width: 100%; padding: 8px; margin: 5px 0; box-sizing: border-box;
+                          background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; }
+        button { padding: 8px 16px; cursor: pointer; background: #8787FF; color: #000; border: none; border-radius: 3px; }
+        .meta { color: #888; margin-bottom: 15px; }
+        .meta strong { color: #C0C0C0; }
     </style>
 </head>
 <body>
-    <h1 id="item-name">Loading...</h1>
-    <div class="meta" id="item-meta"></div>
-    <nav>
-        <a href="index.html">Search</a>
-        <a href="info.html">About</a>
-        <a href="ideas.html">Ideas</a>
-        <a href="leaderboard.html">Leaderboards</a>
-        <span id="editor-links" style="display:none;">
-            <a href="import.html">Add Equipment</a>
-            <a href="batch.html">Batch Import</a>
-            <a href="import-db.html">Import Database</a>
-            <a href="admin.html">Admin</a>
-        </span>
-        <span id="login-link"><a href="login.html">Editor Login</a></span>
-        <span id="logout-link" style="display:none;"><a href="#" onclick="logout()">Logout</a></span>
-    </nav>
-    <hr>
 
-    <div id="submitter-credit" class="submitter-credit" style="display:none;"></div>
+<nav style="background:#222;padding:10px;margin:10px 0;border-radius:5px;">
+    <a href="index.html">Search</a>
+    <span id="editor-links" style="display:none;">
+        <a href="import.html">Add Equipment</a>
+        <a href="batch.html">Batch Import</a>
+        <a href="import-db.html">Import Database</a>
+        <a href="admin.html">Admin</a>
+    </span>
+    <span id="login-link">
+        <a href="login.html">Editor Login</a>
+    </span>
+    <span id="logout-link" style="display:none;">
+        <a href="#" onclick="logout()">Logout</a>
+    </span>
+</nav>
+<hr>
 
-    <div id="content">
-        <div class="section" id="properties-section">
-            <h2>Properties</h2>
-            <div class="prop-grid" id="prop-grid"></div>
-        </div>
-        <div class="section" id="desc-section" style="display:none;">
-            <h2>Description</h2>
-            <p id="item-description" style="font-style:italic;color:#aaa;"></p>
-        </div>
-        <div class="section" id="history-section">
-            <h2>Version History <span class="history-toggle" id="history-toggle" onclick="toggleHistory()">(show)</span></h2>
-            <div id="history-content" style="display:none;">
-                <table><thead><tr><th>Submitter</th><th>Source</th><th>Date</th><th>Overwritten</th></tr></thead>
-                    <tbody id="history-body"><tr><td colspan="4" style="color:#888;">Loading...</td></tr></tbody>
-                </table>
-            </div>
-        </div>
-        <div class="section" id="comments-section">
-            <h2>Comments</h2>
-            <div id="comments"></div>
-            <div id="comment-form" style="margin-top:10px;">
-                <input type="text" id="comment-name" placeholder="Your name" style="width:200px;padding:6px;background:#333;color:#ccc;border:1px solid #555;border-radius:3px;"><br>
-                <textarea id="comment-text" placeholder="Write a comment..."></textarea><br>
-                <button id="comment-btn">Post Comment</button>
-                <span id="comment-message"></span>
-            </div>
-        </div>
+<div id="item-details">Loading...</div>
+
+<div id="add-location-section" style="display:none;background:#222;padding:15px;border-radius:5px;margin:15px 0;">
+    <h3 style="color:#C0C0C0;margin-top:0;">Add Location</h3>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <input type="text" id="new-zone" placeholder="Zone" style="width:200px;">
+        <input type="text" id="new-room" placeholder="Room # (optional)" style="width:120px;">
+        <input type="text" id="new-mob" placeholder="Mob name (optional)" style="width:200px;">
+        <button id="submit-location-btn" style="background:#44aa44;color:white;">Add Location</button>
     </div>
+    <p id="location-message" style="margin-top:8px;font-size:13px;"></p>
+</div>
 
-    <script>
-        function toggleHistory() {
-            var c = document.getElementById('history-content');
-            var t = document.getElementById('history-toggle');
-            if (c.style.display === 'none') { c.style.display = 'block'; t.textContent = '(hide)'; }
-            else { c.style.display = 'none'; t.textContent = '(show)'; }
+<h2 style="color:#C0C0C0;">Comments</h2>
+<div id="comments-section">Loading comments...</div>
+
+<h3 style="color:#C0C0C0;">Add a comment</h3>
+<input type="text" id="display-name" placeholder="Your name" maxlength="50">
+<textarea id="comment-text" rows="3" placeholder="Add notes, drop locations, tips..."></textarea>
+<button id="submit-comment">Post Comment</button>
+<p id="comment-message" style="color:#00FF00;"></p>
+
+<script>
+    // ============================================
+    // AUTH UI (plain script — runs before module)
+    // ============================================
+    function isEditor() {
+        return sessionStorage.getItem('editor_logged_in') === 'true';
+    }
+    function logout() {
+        sessionStorage.removeItem('editor_logged_in');
+        location.reload();
+    }
+    if (isEditor()) {
+        document.getElementById('editor-links').style.display = 'inline';
+        document.getElementById('logout-link').style.display = 'inline';
+        document.getElementById('login-link').style.display = 'none';
+    }
+    function toggleHistory() {
+        const el = document.getElementById('version-history');
+        const btn = document.getElementById('toggle-history-btn');
+        if (el) {
+            el.style.display = el.style.display === 'none' ? 'block' : 'none';
+            if (btn) btn.textContent = el.style.display === 'block' ? 'Hide Version History' : 'Show Version History';
         }
-        function logout() { sessionStorage.removeItem('editor_logged_in'); location.reload(); }
-    </script>
+    }
+</script>
 
-    <script type="module">
-        var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
-        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
-        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-        var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+<script type="module">
+    // ============================================
+    // SUPABASE CONFIG
+    // ============================================
+    const SUPABASE_URL     = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        function escapeHtml(t) { if (!t) return ''; var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+    // ============================================
+    // URL PARAMS
+    // ============================================
+    const params   = new URLSearchParams(window.location.search);
+    let   itemId   = params.get('id');
+    const itemName = params.get('name');
 
-        var params = new URLSearchParams(window.location.search);
-        var itemId = params.get('id');
-        var itemName = params.get('name');
+    // ============================================
+    // HELPERS
+    // ============================================
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
 
-        async function loadItem() {
-            try {
-            if (!itemId && !itemName) { document.getElementById('item-name').textContent = 'No item specified'; return; }
-            var q = supabase.from('equipment').select('*');
-            if (itemId) q = q.eq('id', itemId);
-            else q = q.eq('name', itemName);
-            var r = await q.maybeSingle();
-            if (r.error || !r.data) { document.getElementById('item-name').textContent = 'Item not found: ' + (r.error ? r.error.message : 'no data'); return; }
-            var item = r.data;
-            itemId = item.id;
-            document.getElementById('item-name').textContent = item.name || 'Unknown';
+    function hitBadge(hits) {
+        const n = hits ? parseInt(hits) : 1;
+        if (n >= 5) return '<span style="color:#44aa44;font-weight:bold;">' + n + '</span>';
+        if (n >= 2) return '<span style="color:#ffaa00;">'                  + n + '</span>';
+        return             '<span style="color:#ff4444;">'                  + n + '</span>';
+    }
 
-            var metaEl = document.getElementById('item-meta');
-            var uploadInfo = '';
-            if (item.properties && item.properties.uploaded_by) { uploadInfo = 'Submitted by: ' + escapeHtml(item.properties.uploaded_by) + ' &middot; '; }
-            metaEl.innerHTML = uploadInfo + 'Type: ' + (item.type || '?') + ' &middot; Slot: ' + (item.slot || '?') + ' &middot; ' + (item.is_eqdb ? '<span class="eqdb-label">EQDB</span>' : '<span class="personal-label">Personal</span>');
+    // ============================================
+    // LOAD ITEM
+    // ============================================
+    async function loadItem() {
+        let item = null;
 
-            // Properties
-            var grid = document.getElementById('prop-grid');
-            var props = item.properties || {};
-            var html = '';
-            var skipKeys = ['description', 'uploaded_by'];
-            for (var key in props) {
-                if (skipKeys.indexOf(key) !== -1) continue;
-                html += '<div class="prop-label">' + escapeHtml(key.replace(/_/g, ' ')) + '</div><div class="prop-value">' + escapeHtml(String(props[key])) + '</div>';
+        if (itemId) {
+            const { data } = await supabase.from('equipment').select('*').eq('id', itemId).single();
+            item = data;
+        } else if (itemName) {
+            const { data } = await supabase.from('equipment').select('*').eq('name', itemName).order('created_at', { ascending: false });
+            if (data && data.length === 1) {
+                item = data[0];
+            } else if (data && data.length > 1) {
+                // Multiple versions — show picker and stop
+                let html = '<h1>' + escapeHtml(itemName) + '</h1>';
+                html += '<p style="color:#ffaa00;">Multiple versions found:</p>';
+                data.forEach((dup, d) => {
+                    const sourceLabel = (dup.properties && dup.properties.source) ? escapeHtml(dup.properties.source) : 'unknown';
+                    const dateStr     = new Date(dup.created_at).toLocaleDateString();
+                    html += '<div style="background:#222;padding:10px;margin:5px 0;border-radius:5px;">';
+                    html += '<a href="item.html?id=' + dup.id + '" style="font-size:16px;">Version #' + (d + 1) + '</a>';
+                    html += '<br><span style="color:#888;">Added: ' + dateStr + ' | Via: ' + sourceLabel + '</span>';
+                    html += '</div>';
+                });
+                document.getElementById('item-details').innerHTML = html;
+                return false;
             }
-            grid.innerHTML = html;
-
-            // Description
-            if (props.description) {
-                document.getElementById('desc-section').style.display = 'block';
-                document.getElementById('item-description').textContent = props.description;
-            }
-
-            // Submitter credit from history
-            var hist = await supabase.from('submission_history').select('*').eq('item_name', item.name).order('created_at', { ascending: true });
-            var creditEl = document.getElementById('submitter-credit');
-            if (hist.data && hist.data.length > 0) {
-                var first = hist.data[0];
-                var last = hist.data[hist.data.length - 1];
-                creditEl.style.display = 'block';
-                creditEl.innerHTML = '<span class="label">Originally submitted by</span> <strong>' + escapeHtml(first.submitter) + '</strong> on ' + new Date(first.created_at).toLocaleDateString() + ' &middot; <span class="label">Last updated by</span> <strong>' + escapeHtml(last.submitter) + '</strong> on ' + new Date(last.created_at).toLocaleDateString();
-
-                // Version history table
-                var tbody = document.getElementById('history-body');
-                tbody.innerHTML = hist.data.map(function(h) {
-                    return '<tr><td>' + escapeHtml(h.submitter) + '</td><td>' + escapeHtml(h.source || 'unknown') + '</td><td>' + new Date(h.created_at).toLocaleDateString() + '</td><td>' + (h.overwritten_at ? new Date(h.overwritten_at).toLocaleDateString() : '-') + '</td></tr>';
-                }).join('');
-            } else {
-                creditEl.style.display = 'block';
-                creditEl.innerHTML = '<span class="label">Submitter info not available in history.</span>';
-                document.getElementById('history-body').innerHTML = '<tr><td colspan="4" style="color:#888;">No version history available.</td></tr>';
-            }
-
-            loadComments();
-            } catch(e) { document.getElementById('item-name').textContent = 'Error: ' + e.message; console.error(e); }
         }
 
-        // Comments
-        async function loadComments() {
-            var el = document.getElementById('comments');
-            if (!itemId) { el.innerHTML = ''; return; }
-            var r = await supabase.from('comments').select('*').eq('equipment_id', itemId).order('created_at', { ascending: true });
-            if (r.error || !r.data) { el.innerHTML = '<span style="color:#888;">Error loading comments.</span>'; return; }
-            if (r.data.length === 0) { el.innerHTML = '<p style="color:#888;">No comments yet.</p>'; return; }
-            var html = '';
-            for (var c of r.data) {
-                if (c.status === 'denied') continue;
-                html += '<div class="comment"><div>' + escapeHtml(c.comment_text) + '</div><div class="comment-meta">By ' + escapeHtml(c.display_name) + ' &middot; ' + new Date(c.created_at).toLocaleDateString();
-                if (c.status === 'pending') html += ' &middot; <span style="color:#ffaa00;">awaiting approval</span>';
-                html += '</div></div>';
+        // Fallback: look up stub in items_db (only when we have a name)
+        if (!item && itemName) {
+            const { data } = await supabase.from('items_db').select('*').ilike('name', itemName).limit(1);
+            if (data && data.length > 0) {
+                item = { name: data[0].name, type: 'unknown', verified: false, description: '', _dbItem: data[0] };
             }
-            el.innerHTML = html || '<p style="color:#888;">No approved comments yet.</p>';
         }
 
-        document.getElementById('comment-btn').addEventListener('click', async function() {
-            var text = document.getElementById('comment-text').value.trim();
-            var name = document.getElementById('comment-name').value.trim() || 'anonymous';
-            if (!text || !itemId) { document.getElementById('comment-message').textContent = 'Write something.'; return; }
-            var r = await supabase.from('comments').insert({ equipment_id: parseInt(itemId), comment_text: text, display_name: name, status: 'pending' });
-            if (r.error) { document.getElementById('comment-message').innerHTML = '<span style="color:#ff4444;">' + r.error.message + '</span>'; return; }
-            document.getElementById('comment-text').value = '';
-            document.getElementById('comment-message').innerHTML = '<span style="color:#44aa44;">Posted! Awaiting approval.</span>';
-            loadComments();
+        if (!item) {
+            document.getElementById('item-details').innerHTML = '<p>Item not found. <a href="index.html">Search here</a>.</p>';
+            return false;
+        }
+
+        itemId = item.id;
+
+        // --- Header ---
+        let html = '<h1>' + escapeHtml(item.name) + '</h1>';
+        html += '<div class="meta">';
+        html += '<strong>Type:</strong> ' + escapeHtml(item.type || 'unknown');
+        if (item.slot)          html += ' | <strong>Slot:</strong> '   + escapeHtml(item.slot);
+        if (item.level_req > 0) html += ' | <strong>Level:</strong> '  + item.level_req;
+        if (item.weight > 0)    html += ' | <strong>Weight:</strong> ' + item.weight;
+        if (item.value > 0)     html += ' | <strong>Value:</strong> '  + item.value + ' gold';
+        html += ' | ' + (item.verified
+            ? '<span style="color:#44aa44;">EQDB</span>'
+            : '<span style="color:#ffaa00;">Personal</span>');
+        html += '</div>';
+
+        if (item.mud_zone)   html += '<p><strong>Zone:</strong> '       + escapeHtml(item.mud_zone)   + '</p>';
+        if (item.mob_source) html += '<p><strong>Dropped by:</strong> ' + escapeHtml(item.mob_source) + '</p>';
+        if (item.properties && item.properties.uploaded_by) {
+            html += '<p style="font-size:13px;color:#888;"><strong>Submitted by:</strong> ' + escapeHtml(item.properties.uploaded_by) + '</p>';
+        }
+
+        // --- Stats block ---
+        if (item.description) {
+            const alreadyColored = item.description.includes('<font color=') || item.description.includes('<span class=');
+            html += '<div class="mm-output">' + (alreadyColored ? item.description : colorizeMM(item.description)) + '</div>';
+        } else if (!item.verified && (item.type === 'unknown' || !item.type)) {
+            html += '<p style="color:#ffaa00;margin-top:10px;">Stats not yet available — awaiting capture from the MUD.</p>';
+        }
+
+        // --- Submitter credit ---
+        html += await buildSubmitterCredit(item.name);
+
+        // --- Locations ---
+        html += await buildLocationsHtml(item.name);
+
+        document.getElementById('item-details').innerHTML = html;
+
+        // Show editor controls only after item is rendered (and pass name to avoid closure issues)
+        if (isEditor()) {
+            document.getElementById('add-location-section').style.display = 'block';
+            setupLocationSubmit(item.name);
+        }
+
+        return true;
+    }
+
+    // ============================================
+    // LOCATIONS
+    // ============================================
+    async function buildLocationsHtml(name) {
+        const { data: dbItems } = await supabase
+            .from('items_db')
+            .select('id, name, itemid')
+            .ilike('name', '%' + name.replace(/'/g, "''") + '%')
+            .limit(10);
+
+        if (!dbItems || dbItems.length === 0) return '';
+
+        // Fetch all location rows in parallel
+        const locArrays = await Promise.all(
+            dbItems.map(dbItem =>
+                supabase.from('itemsloc_db')
+                    .select('area, room, mobid, hits')
+                    .eq('itemid', String(dbItem.itemid))
+                    .order('hits', { ascending: false, nullsLast: true })
+                    .limit(100)
+                    .then(r => r.data || [])
+            )
+        );
+
+        // Deduplicate by area+room+mobid
+        const seen = new Set();
+        const uniqueLocations = locArrays.flat().filter(loc => {
+            const key = (loc.area || '') + '|' + (loc.room || '') + '|' + (loc.mobid || '0');
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
         });
 
-        loadItem();
+        uniqueLocations.sort((a, b) => (b.hits || 0) - (a.hits || 0));
+        if (uniqueLocations.length === 0) return '';
 
-        if (sessionStorage.getItem('editor_logged_in') !== 'true') { document.getElementById('editor-links').style.display = 'none'; document.getElementById('login-link').style.display = 'inline'; document.getElementById('logout-link').style.display = 'none'; }
-        else { document.getElementById('editor-links').style.display = 'inline'; document.getElementById('login-link').style.display = 'none'; document.getElementById('logout-link').style.display = 'inline'; }
-    </script>
+        // Resolve room names and mob names — all locations in parallel
+        const resolved = await Promise.all(uniqueLocations.map(async loc => {
+            let roomNum = '', roomName = '';
+
+            if (loc.room) {
+                roomName = String(loc.room);
+                const { data: rr } = await supabase.from('rooms_db').select('uid').ilike('name', '%' + roomName.trim() + '%').limit(1);
+                if (rr && rr.length > 0) roomNum = '#' + rr[0].uid;
+            } else if (loc.mobid) {
+                const { data: ml } = await supabase.from('mobsloc_db').select('room').eq('mobid', String(loc.mobid)).limit(1);
+                if (ml && ml.length > 0 && ml[0].room) {
+                    roomName = String(ml[0].room);
+                    const { data: rr } = await supabase.from('rooms_db').select('uid').ilike('name', '%' + roomName.trim() + '%').limit(1);
+                    if (rr && rr.length > 0) roomNum = '#' + rr[0].uid;
+                }
+            }
+
+            let mobName = '';
+            if (loc.mobid) {
+                const { data: mob } = await supabase.from('mobs_db').select('name').eq('mobid', String(loc.mobid)).limit(1);
+                if (mob && mob.length > 0) mobName = mob[0].name;
+            }
+
+            return { loc, roomNum, roomName, mobName };
+        }));
+
+        let html = '<h2 style="color:#C0C0C0;margin-top:20px;">Known Locations (' + uniqueLocations.length + ')</h2>';
+        html += '<p style="font-size:12px;color:#888;">🟢 5+ hits = confirmed | 🟡 2-4 hits = likely | 🔴 1 hit = possible player drop</p>';
+        html += '<table style="width:100%;border-collapse:collapse;">'
+            + '<tr>'
+            + '<th style="color:#888;text-align:left;padding:5px;border-bottom:1px solid #444;">Zone</th>'
+            + '<th style="color:#888;text-align:left;padding:5px;border-bottom:1px solid #444;">Room #</th>'
+            + '<th style="color:#888;text-align:left;padding:5px;border-bottom:1px solid #444;">Room Name</th>'
+            + '<th style="color:#888;text-align:left;padding:5px;border-bottom:1px solid #444;">Mob</th>'
+            + '<th style="color:#888;text-align:left;padding:5px;border-bottom:1px solid #444;">Hits</th>'
+            + '</tr>';
+
+        for (const { loc, roomNum, roomName, mobName } of resolved) {
+            const mobCell = loc.mobid
+                ? '<a href="mob.html?mobid=' + escapeHtml(String(loc.mobid)) + '">' + escapeHtml(mobName) + '</a>'
+                : '-';
+            html += '<tr>'
+                + '<td style="padding:5px;border-bottom:1px solid #333;">' + escapeHtml(loc.area || '') + '</td>'
+                + '<td style="padding:5px;border-bottom:1px solid #333;">' + (roomNum  || '-') + '</td>'
+                + '<td style="padding:5px;border-bottom:1px solid #333;">' + (roomName || '-') + '</td>'
+                + '<td style="padding:5px;border-bottom:1px solid #333;">' + mobCell           + '</td>'
+                + '<td style="padding:5px;border-bottom:1px solid #333;">' + hitBadge(loc.hits) + '</td>'
+                + '</tr>';
+        }
+        html += '</table>';
+        return html;
+    }
+
+    // ============================================
+    // SUBMITTER CREDIT + VERSION HISTORY
+    // ============================================
+    async function buildSubmitterCredit(itemName) {
+        const { data: history } = await supabase
+            .from('submission_history')
+            .select('*')
+            .eq('item_name', itemName)
+            .order('created_at', { ascending: true });
+
+        if (!history || history.length === 0) return '';
+
+        let html = '<div style="background:#1a2a1a;border:1px solid #3a5a3a;padding:12px;border-radius:5px;margin:15px 0;">';
+
+        // Earliest submission = original credit
+        const original = history[0];
+        const originalDate = new Date(original.created_at).toLocaleDateString();
+        const sourceLabel = original.is_eqdb ? '<span style="color:#44aa44;">EQDB</span>' : '<span style="color:#ffaa00;">Personal</span>';
+        html += '<p style="margin:0 0 4px 0;font-size:13px;">'
+             + '<span style="color:#888;">Originally submitted by</span> '
+             + '<strong style="color:#C0C0C0;">' + escapeHtml(original.submitter) + '</strong>'
+             + ' <span style="color:#888;">on</span> ' + originalDate
+             + ' (' + sourceLabel + ')'
+             + '</p>';
+
+        // Latest submission = last EQDB if any, or last overall
+        const latest = history[history.length - 1];
+        if (latest.id !== original.id) {
+            const latestDate = new Date(latest.created_at).toLocaleDateString();
+            const latestLabel = latest.is_eqdb ? '<span style="color:#44aa44;">EQDB</span>' : '<span style="color:#ffaa00;">Personal</span>';
+            const overwrittenCount = history.filter(h => h.overwritten_at).length;
+            html += '<p style="margin:0;font-size:13px;">'
+                 + '<span style="color:#888;">Last updated by</span> '
+                 + '<strong style="color:#C0C0C0;">' + escapeHtml(latest.submitter) + '</strong>'
+                 + ' <span style="color:#888;">on</span> ' + latestDate
+                 + ' (' + latestLabel + ')'
+                 + '</p>';
+        }
+
+        // Version count
+        if (history.length > 1) {
+            html += '<p style="margin:4px 0 0 0;font-size:12px;color:#666;">'
+                 + history.length + ' version' + (history.length > 1 ? 's' : '') + ' saved'
+                 + '</p>';
+        }
+
+        // Toggle version history button
+        html += '<button id="toggle-history-btn" style="background:#333;color:#ccc;border:1px solid #555;padding:4px 10px;font-size:12px;margin-top:8px;cursor:pointer;" onclick="toggleHistory()">Show Version History</button>';
+        html += '<div id="version-history" style="display:none;margin-top:8px;font-size:12px;max-height:300px;overflow-y:auto;">';
+
+        // Table of all versions
+        html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">'
+             + '<tr style="color:#888;"><th style="text-align:left;padding:4px;border-bottom:1px solid #444;">#</th>'
+             + '<th style="text-align:left;padding:4px;border-bottom:1px solid #444;">Date</th>'
+             + '<th style="text-align:left;padding:4px;border-bottom:1px solid #444;">Submitter</th>'
+             + '<th style="text-align:left;padding:4px;border-bottom:1px solid #444;">Source</th>'
+             + '<th style="text-align:left;padding:4px;border-bottom:1px solid #444;">Status</th></tr>';
+
+        for (let v = 0; v < history.length; v++) {
+            const h = history[v];
+            const vDate = new Date(h.created_at).toLocaleDateString();
+            const vSource = h.is_eqdb ? '<span style="color:#44aa44;">EQDB</span>' : '<span style="color:#ffaa00;">Personal</span>';
+            const vStatus = h.overwritten_at
+                ? '<span style="color:#888;">Overwritten</span>'
+                : '<span style="color:#44aa44;">Active</span>';
+            html += '<tr>'
+                 + '<td style="padding:4px;border-bottom:1px solid #333;">' + (v + 1) + '</td>'
+                 + '<td style="padding:4px;border-bottom:1px solid #333;">' + vDate + '</td>'
+                 + '<td style="padding:4px;border-bottom:1px solid #333;">' + escapeHtml(h.submitter) + '</td>'
+                 + '<td style="padding:4px;border-bottom:1px solid #333;">' + vSource + '</td>'
+                 + '<td style="padding:4px;border-bottom:1px solid #333;">' + vStatus + '</td>'
+                 + '</tr>';
+        }
+        html += '</table></div></div>';
+        return html;
+    }
+
+    // ============================================
+    // ADD LOCATION (editors only)
+    // ============================================
+    function setupLocationSubmit(currentItemName) {
+        document.getElementById('submit-location-btn').addEventListener('click', async function () {
+            const zone = document.getElementById('new-zone').value.trim();
+            const room = document.getElementById('new-room').value.trim();
+            const mob  = document.getElementById('new-mob').value.trim();
+            const msg  = document.getElementById('location-message');
+
+            if (!zone) { msg.innerHTML = '<span style="color:#ff4444;">Zone is required.</span>'; return; }
+
+            const { data: found } = await supabase.from('items_db').select('itemid').ilike('name', currentItemName).limit(1);
+            if (!found || found.length === 0) {
+                msg.innerHTML = '<span style="color:#ff4444;">Item not found in location database.</span>';
+                return;
+            }
+
+            const locItemId = found[0].itemid; // distinct name — does NOT shadow outer itemId
+            const { error } = await supabase.from('itemsloc_db').insert({
+                itemid:     String(locItemId),
+                area:       zone,
+                room:       room || null,
+                mobid:      mob  || null,
+                hits:       1,
+                date_added: new Date().toISOString()
+            });
+
+            if (error) {
+                msg.innerHTML = '<span style="color:#ff4444;">Error: ' + error.message + '</span>';
+            } else {
+                msg.innerHTML = '<span style="color:#44aa44;">Location added! Refresh to see it.</span>';
+                document.getElementById('new-zone').value = '';
+                document.getElementById('new-room').value = '';
+                document.getElementById('new-mob').value  = '';
+            }
+        });
+    }
+
+    // ============================================
+    // COMMENTS
+    // ============================================
+    async function loadComments() {
+        if (!itemId) return;
+        const section = document.getElementById('comments-section');
+        const { data: comments, error } = await supabase
+            .from('comments').select('*')
+            .eq('equipment_id', itemId)
+            .order('created_at', { ascending: false });
+
+        if (error)                              { section.innerHTML = '<p>Error: ' + error.message + '</p>'; return; }
+        if (!comments || comments.length === 0) { section.innerHTML = '<p>No comments yet. Be the first!</p>'; return; }
+
+        section.innerHTML = comments.map(c =>
+            '<div class="comment">'
+            + '<div class="comment-header"><strong>' + escapeHtml(c.display_name) + '</strong> — ' + new Date(c.created_at).toLocaleString() + '</div>'
+            + '<p>' + escapeHtml(c.comment_text) + '</p>'
+            + '</div>'
+        ).join('');
+    }
+
+    document.getElementById('submit-comment').addEventListener('click', async function () {
+        const name = document.getElementById('display-name').value.trim();
+        const text = document.getElementById('comment-text').value.trim();
+        const msg  = document.getElementById('comment-message');
+        if (!name) { msg.textContent = 'Please enter a name.';    return; }
+        if (!text) { msg.textContent = 'Please enter a comment.'; return; }
+        const { error } = await supabase.from('comments').insert({ equipment_id: itemId, display_name: name, comment_text: text });
+        if (error) {
+            msg.textContent = 'Error: ' + error.message;
+        } else {
+            document.getElementById('display-name').value = '';
+            document.getElementById('comment-text').value = '';
+            msg.textContent = 'Comment posted!';
+            loadComments();
+        }
+    });
+
+    // ============================================
+    // MM COLORIZER ENGINE
+    // ============================================
+    const C = {
+        blue: '#8787FF', white: '#C0C0C0', cyan: '#00FFFF', yellow: '#FFFF00',
+        green: '#00FF00', pink: '#D78787', magenta: '#FF00FF', gray: '#808080',
+        olive: '#808000', red: '#FF0000', darkgreen: '#008000'
+    };
+
+    function tag(color, text) {
+        return '<font color="' + color + '">' + text + '</font>';
+    }
+
+    // Wrap digit runs in white within an already-opened font block
+    function numbersWhite(str, baseColor) {
+        return str.replace(/(\d[\d,]*\.?\d*%?)/g,
+            '</font><font color="' + C.white + '">$1</font><font color="' + baseColor + '">');
+    }
+
+    // Clickable item link styled to blend with terminal palette
+    function itemLink(name) {
+        return '<a href="item.html?name=' + encodeURIComponent(name)
+            + '" style="color:' + C.white + ';text-decoration:none;"'
+            + ' onmouseover="this.style.textDecoration=\'underline\'"'
+            + ' onmouseout="this.style.textDecoration=\'none\'">'
+            + escapeHtml(name) + '</a>';
+    }
+
+    function colorizeItemLine(line) {
+        let h = tag(C.blue, "Item '");
+        const nm = line.match(/^Item\s+'(.+?)'\s+is type/);        if (nm) h += tag(C.white, escapeHtml(nm[1])) + tag(C.blue, "' is type ");
+        const tm = line.match(/is type\s+(\S+)/);                  if (tm) h += tag(C.white, escapeHtml(tm[1].replace(',', ''))) + tag(C.blue, ',');
+        const am = line.match(/alignment\s+(-?\d+)/);              if (am) h += tag(C.blue, ' alignment ') + tag(C.white, am[1]) + tag(C.blue, ',');
+        const mm = line.match(/made of\s+(\S+)/);                  if (mm) h += tag(C.blue, ' made of ') + tag(C.white, escapeHtml(mm[1]));
+        const cm = line.match(/\(in\s+\((.+?)\)\s+condition\)/);   if (cm) h += tag(C.blue, ' (in ') + tag(C.white, '(' + escapeHtml(cm[1]) + ')') + tag(C.blue, ' condition)');
+        if (/\[EQDB\]/.test(line))  h += tag(C.white, '[EQDB]');
+        if (/\[Study\]/.test(line)) h += tag(C.white, '[Study]');
+        if (/\[LTB\]/.test(line))   h += tag(C.white, '[LTB]');
+        return h;
+    }
+
+    function colorizeKeywordLine(line) {
+        let h = tag(C.blue, "has keywords '");
+        const km = line.match(/has keywords\s+'([^']+)'/); if (km) h += tag(C.white, escapeHtml(km[1])) + tag(C.blue, "'");
+        const em = line.match(/, equipped\s+(.+?)\.?$/);   if (em) h += tag(C.blue, ', equipped ') + tag(C.white, escapeHtml(em[1])) + tag(C.blue, '.');
+        return h;
+    }
+
+    function colorizeAffectLine(line) {
+        const isSetBonus  = /\(Requires\s+\d+\s+items?\)/.test(line);
+        const labelColor  = isSetBonus ? C.magenta : C.cyan;
+        const match = line.match(/^Affects\s+(.+?)\s+by\s+(-?[\d.]+)\s*(\.?)\s*(\(Requires\s+\d+\s+items?\))?\.?\s*(\{[^}]+\})?/);
+        if (match) {
+            const [, stat, num, dot, req, freq] = match;
+            let h = tag(labelColor, 'Affects') + ' ' + tag(C.white, stat) + ' ' + tag(labelColor, 'by') + ' ' + tag(C.white, num);
+            if (dot) h += tag(labelColor, dot);
+            if (req) {
+                const rm = req.match(/\(Requires\s+(\d+)\s+items?\)/);
+                h += rm
+                    ? ' ' + tag(C.magenta, '(Requires ') + tag(C.white, rm[1]) + tag(C.magenta, ' items)')
+                    : ' ' + tag(C.magenta, req);
+            }
+            if (freq) h += ' ' + tag(C.pink, freq);
+            return h;
+        }
+        return tag(labelColor, escapeHtml(line));
+    }
+
+    function colorizeReqLine(content) {
+        let h = escapeHtml(content);
+        h = h.replace(/Your /,             'Your </font><font color="' + C.white + '">');
+        h = h.replace(/ must be /,         '</font><font color="' + C.cyan + '"> must be </font><font color="' + C.white + '">');
+        h = h.replace(/ must not be /,     '</font><font color="' + C.cyan + '"> must not be </font><font color="' + C.white + '">');
+        h = h.replace(/ to use this item/, '</font><font color="' + C.cyan + '"> to use this item');
+        return h;
+    }
+
+    function colorizeMM(text) {
+        if (!text) return '';
+        text = text.replace(/\n?.*\d+hp\s+\d+sp\s+\d+st[^\n]*\n?/g, '\n');
+        const lines  = text.split('\n');
+        const result = [];
+        let inRelic  = false;
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const t    = line.trim();
+            if (t === '') { result.push(''); continue; }
+
+            // +++ procs = green multi-line block
+            if (/^\+\+\+/.test(t)) {
+                result.push(tag(C.green, escapeHtml(line)));
+                i++;
+                while (i < lines.length) {
+                    const nl = lines[i], nt = nl.trim();
+                    if (nt === '' || /^\+\+\+/.test(nt) || /^Item\s+'/.test(nt) || /^\*/.test(nt)) { i--; break; }
+                    result.push(tag(C.green, escapeHtml(nl)));
+                    i++;
+                }
+                continue;
+            }
+
+            // Relic section = green
+            if (/^Relics:/.test(t))                           { inRelic = true;  result.push(tag(C.green, escapeHtml(line))); continue; }
+            if (inRelic && /^(Small|Medium|Large)\s*\(/.test(t))               { result.push(tag(C.green, escapeHtml(line))); continue; }
+            if (inRelic && /^\s*\(\d+\/\d+/.test(t))          { inRelic = false; result.push(tag(C.green, escapeHtml(line))); continue; }
+
+            // * requirement lines
+            if (/^\*/.test(t)) {
+                if (/^\*\s*Item\s+'/.test(t)) {
+                    // Set bonus item reference — clickable
+                    const si = t.match(/\*\s*(Item\s+')(.+)(')$/);
+                    result.push(si
+                        ? tag(C.yellow, '* ') + tag(C.magenta, si[1]) + itemLink(si[2]) + tag(C.magenta, si[3])
+                        : tag(C.yellow, escapeHtml(line)));
+                    continue;
+                }
+                if (/^\*This/.test(t)) {
+                    // *This … = blue with white numbers
+                    result.push(tag(C.yellow, '*') + tag(C.blue, ' ' + numbersWhite(escapeHtml(t.substring(1).trim()), C.blue) + '</font>'));
+                    continue;
+                }
+                // Default requirement = yellow star + cyan text
+                result.push(tag(C.yellow, '*') + tag(C.cyan, colorizeReqLine(t.substring(1).trim())));
+                continue;
+            }
+
+            // - Item 'name' = set member list — clickable
+            if (/^-\s*Item\s+'/.test(t)) {
+                const di = t.match(/^(-\s*)(Item\s+')(.+)(')$/);
+                if (di) result.push(tag(C.gray, di[1]) + tag(C.magenta, di[2]) + itemLink(di[3]) + tag(C.magenta, di[4]));
+                continue;
+            }
+
+            // Affects line
+            if (/^Affects/.test(t)) { result.push(colorizeAffectLine(t)); continue; }
+
+            // Special weapon attributes
+            if (/^Special weapon attributes:/.test(t)) {
+                const sw = line.match(/^(Special weapon attributes:)\s+(.+)$/);
+                result.push(sw
+                    ? tag(C.blue, escapeHtml(sw[1])) + ' ' + tag(C.white, escapeHtml(sw[2]))
+                    : tag(C.blue, escapeHtml(line)));
+                continue;
+            }
+
+            // Weapon base stats sentence
+            if (/^Your .+ will deal .+ damage with .+ accuracy, at .+ range, with a .+ chance to crit for .+ damage\.$/i.test(t)) {
+                const ws = line.match(/^(Your )(.+?)( will deal )(.+?)( damage with )(.+?)( accuracy, at )(.+?)( range, with a )(.+?)( chance to crit for )(.+?)( damage\.)$/i);
+                if (ws) {
+                    result.push(
+                        tag(C.cyan,  escapeHtml(ws[1]))  + tag(C.white, escapeHtml(ws[2]))  +
+                        tag(C.cyan,  escapeHtml(ws[3]))  + tag(C.white, escapeHtml(ws[4]))  +
+                        tag(C.cyan,  escapeHtml(ws[5]))  + tag(C.white, escapeHtml(ws[6]))  +
+                        tag(C.cyan,  escapeHtml(ws[7]))  + tag(C.white, escapeHtml(ws[8]))  +
+                        tag(C.cyan,  escapeHtml(ws[9]))  + tag(C.white, escapeHtml(ws[10])) +
+                        tag(C.cyan,  escapeHtml(ws[11])) + tag(C.white, escapeHtml(ws[12])) +
+                        tag(C.cyan,  escapeHtml(ws[13]))
+                    );
+                } else {
+                    result.push(tag(C.cyan, escapeHtml(line)));
+                }
+                continue;
+            }
+
+            // "When" proc lines = green with white skill name and numbers
+            if (/^When/.test(t)) {
+                const wm = line.match(/^(When\s+(casting|wielding|evoking|affected\s+by)\s+)(.+?)(,.+)$/i);
+                if (wm) {
+                    const restColored = numbersWhite(escapeHtml(wm[4]), C.green);
+                    let h = tag(C.green, escapeHtml(wm[1])) + tag(C.white, escapeHtml(wm[3])) + '<font color="' + C.green + '">' + restColored + '</font>';
+                    h = h.replace(/<font color="#00FF00"><\/font>/g, '');
+                    result.push(h);
+                } else {
+                    result.push('<font color="' + C.green + '">' + numbersWhite(escapeHtml(line), C.green) + '</font>');
+                }
+                continue;
+            }
+
+            // Special stat lines (cyan, magenta for set bonus)
+            if (/^(Adds resistance|Decreases|Grants|Casts|Improves|Your weapon special|Alters)/.test(t)) {
+                const cls = (/^Adds resistance/.test(t) && /\(Requires/.test(t)) ? C.magenta : C.cyan;
+                result.push(tag(cls, numbersWhite(escapeHtml(line), cls) + '</font>'));
+                continue;
+            }
+
+            // "Increases … to … -based attacks."
+            if (/^Increases/.test(t)) {
+                const inc = line.match(/^(Increases )(.+?)( to )(.+?)(-based attacks\.)/i);
+                if (inc) {
+                    result.push(
+                        tag(C.cyan, escapeHtml(inc[1])) + tag(C.white, escapeHtml(inc[2])) +
+                        tag(C.cyan, escapeHtml(inc[3])) + tag(C.white, escapeHtml(inc[4])) +
+                        tag(C.cyan, escapeHtml(inc[5]))
+                    );
+                } else {
+                    result.push(tag(C.cyan, escapeHtml(line)));
+                }
+                continue;
+            }
+
+            // Item name (first identify line)
+            if (/^Item\s+'/.test(t)) { result.push(colorizeItemLine(t)); continue; }
+
+            // Level XX item 'name' is type ...
+            if (/^Level\s+\d+\s+item\s+'/.test(t)) {
+                const lm = t.match(/^(Level\s+\d+\s+item\s+')(.+?)('\s+is type)/);
+                result.push(lm
+                    ? tag(C.blue, lm[1]) + tag(C.white, escapeHtml(lm[2])) + tag(C.blue, lm[3])
+                    : tag(C.blue, escapeHtml(line)));
+                continue;
+            }
+
+            // Keywords
+            if (/^has keywords/.test(t)) { result.push(colorizeKeywordLine(t)); continue; }
+
+            // Lifespan / expiry lines
+            if (/^This item has a default lifespan/.test(t) || /^This item will lose its status/.test(t) || /^This item will vanish/.test(t)) {
+                result.push(tag(C.blue, numbersWhite(escapeHtml(line), C.blue) + '</font>'));
+                continue;
+            }
+
+            // "This level X item has the attributes:" — split label from attribute list
+            if (/^This level .+ item has the attributes:/.test(t)) {
+                const am = line.match(/^(This level \d+ item has the attributes:)(.+)$/);
+                result.push(am
+                    ? tag(C.blue, numbersWhite(escapeHtml(am[1]), C.blue) + '</font>') + tag(C.white, escapeHtml(am[2]))
+                    : tag(C.blue, escapeHtml(line)));
+                continue;
+            }
+
+            // General stat lines (weight, level, armor, etc.) with optional {Cat. X} in red
+            if (/^(This item weighs|This level|This item has|This armor has|This item protects|This ward has|This relic|This item, when|This amulet|Your magical wand|This light source|Armor resistance|This item will have|This item is enchanted)/.test(t)) {
+                const catMatch = line.match(/\{Cat\.\s*\d+\}/);
+                const catText  = catMatch ? catMatch[0] : '';
+                let working    = escapeHtml(line.replace(/\{Cat\.\s*\d+\}/g, '##CAT##'));
+                let colored    = tag(C.blue, numbersWhite(working, C.blue) + '</font>');
+                if (catText) colored = colored.replace(/##CAT##/g, '</font><font color="' + C.red + '">' + escapeHtml(catText) + '</font><font color="' + C.blue + '">');
+                colored = colored.replace(/<font color="#8787FF"><\/font>/g, '');
+                result.push(colored);
+                continue;
+            }
+
+            // Set membership / "You are currently wearing X pieces"
+            if (/^(This is part of|You are currently)/.test(t)) {
+                result.push(tag(C.magenta, numbersWhite(escapeHtml(line), C.magenta) + '</font>'));
+                continue;
+            }
+
+            // Beyond power
+            if (/This item is beyond your power/.test(t)) { result.push(tag(C.magenta, escapeHtml(line))); continue; }
+
+            // Container / capacity lines
+            if (/^(Capacity:|Upon|Small )/.test(t)) {
+                result.push(tag(C.cyan, numbersWhite(escapeHtml(line), C.cyan) + '</font>'));
+                continue;
+            }
+
+            // Default: plain white
+            result.push(tag(C.white, escapeHtml(line)));
+        }
+
+        return result.join('\n');
+    }
+
+    // ============================================
+    // INIT
+    // ============================================
+    if (itemId || itemName) {
+        loadItem().then(ok => { if (ok) loadComments(); });
+    } else {
+        document.getElementById('item-details').innerHTML = '<p>No item specified. <a href="index.html">Search here</a>.</p>';
+    }
+
+</script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"131579fcdf914a0f9aa2fb16db7f327e","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>

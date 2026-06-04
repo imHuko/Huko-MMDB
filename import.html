@@ -5,111 +5,345 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Add Equipment - MUD Equipment DB</title>
     <style>
-        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
-        a { color: #8787FF; }
-        h1 { color: #C0C0C0; }
-        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; }
-        nav a { margin-right: 15px; }
-        textarea { width: 100%; height: 300px; background: #111; color: #0f0; border: 1px solid #333; padding: 10px; font-family: monospace; font-size: 12px; }
-        button { padding: 8px 16px; background: #8787FF; color: #000; border: none; border-radius: 3px; cursor: pointer; margin: 5px 0; }
-        .result { margin: 10px 0; padding: 10px; border-radius: 5px; }
-        .success { background: #1a3a1a; color: #4a4; }
-        .error { background: #3a1a1a; color: #f44; }
-        .skip { background: #3a3a1a; color: #aa0; }
-        label { display: block; margin: 8px 0; }
-        input { padding: 6px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; width: 300px; }
+        body { font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; }
+        textarea { width: 100%; padding: 10px; box-sizing: border-box; font-family: 'Courier New', monospace; font-size: 12px; }
+        .preview { background: #000; color: #C0C0C0; padding: 15px; margin: 10px 0; border-radius: 5px; 
+                   font-family: 'Courier New', monospace; font-size: 13px; white-space: pre-wrap; line-height: 1.4; }
+        .preview .mm-cyan { color: #00FFFF; }
+        .preview .mm-yellow { color: #FFFF00; }
+        .preview .mm-red { color: #FF0000; }
+        .preview .mm-green { color: #00FF00; }
+        .preview .mm-blue { color: #8787FF; }
+        .preview .mm-pink { color: #D78787; }
+        .preview .mm-white { color: #C0C0C0; }
+        .item-block { border: 1px solid #555; margin: 10px 0; padding: 15px; border-radius: 5px; }
+        .eqdb { border-color: #44aa44; border-width: 2px; background: #f0fff0; }
+        .personal-ask { border-color: #ffaa00; border-width: 2px; background: #fffaf0; }
+        .personal-rejected { border-color: #ff4444; background: #fff0f0; }
+        button { padding: 8px 16px; margin: 5px; cursor: pointer; }
+        .btn-accept { background: #44aa44; color: white; border: none; border-radius: 3px; }
+        .btn-reject { background: #ff4444; color: white; border: none; border-radius: 3px; }
     </style>
 </head>
 <body>
     <h1>Add Equipment</h1>
-    <nav>
-        <a href="index.html">Search</a>
-        <a href="info.html">About</a>
-        <a href="ideas.html">Ideas</a>
-        <a href="leaderboard.html">Leaderboards</a>
-        <span id="editor-links" style="display:none;">
-            <a href="import.html">Add Equipment</a>
-            <a href="batch.html">Batch Import</a>
-            <a href="import-db.html">Import Database</a>
-            <a href="admin.html">Admin</a>
-        </span>
-        <span id="login-link"><a href="login.html">Editor Login</a></span>
-        <span id="logout-link" style="display:none;"><a href="#" onclick="logout()">Logout</a></span>
-    </nav>
+	<a href="admin.html">Admin</a> | 
+    <a href="index.html">← Back to search</a>
     <hr>
-
-    <p>Paste item data from MUD logs below.</p>
-    <textarea id="input" placeholder="Paste item data here..."></textarea>
-    <br>
-    <label><input type="checkbox" id="is_eqdb"> This is from EQDB (official database)</label>
-    <label><input type="checkbox" id="overwrite"> Overwrite existing items</label>
-    <button id="import-btn">Import</button>
-    <div id="results"></div>
+    
+    <div id="not-logged-in">
+        <p>You need to <a href="login.html">login</a> to add equipment.</p>
+    </div>
+    
+    <div id="add-section" style="display:none;">
+        <h2>Paste equipment data from MUSHclient</h2>
+        <p>In MUSHclient, select all (Ctrl+A), copy (Ctrl+C), then paste here (Ctrl+V).</p>
+        <p><small>The HTML from MUSHclient will be processed automatically — colors will be preserved.</small></p>
+        
+        <textarea id="raw-text" rows="20" cols="100" placeholder="Paste MUSHclient output here..."></textarea><br><br>
+        
+        <button id="parse-btn">Check Equipment</button>
+        
+        <hr>
+        <div id="results"></div>
+        <p id="message"></p>
+    </div>
 
     <script type="module">
-        var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
-        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
+        const SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
+        
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-        var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        let parsedItems = [];
+        
+        async function checkAuth() {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                document.getElementById('not-logged-in').style.display = 'none';
+                document.getElementById('add-section').style.display = 'block';
+            }
+        }
+        checkAuth();
+        
+        function stripMushclientHTML(html) {
+            let text = html;
+            
+            // First extract just the stuff between <pre><code> and </code></pre>
+            const codeMatch = text.match(/<pre><code[^>]*>([\s\S]*?)<\/code><\/pre>/i);
+            if (codeMatch) {
+                text = codeMatch[1];
+            }
+            
+            // Remove the MUSHclient comment
+            text = text.replace(/<!--[\s\S]*?-->/g, '');
+            
+            // Convert <font color="#XXXXXX"> to colored spans
+            text = text.replace(/<font color="#8787FF">/gi, '<span class="mm-blue">');
+            text = text.replace(/<font color="#C0C0C0">/gi, '<span class="mm-white">');
+            text = text.replace(/<font color="#00FFFF">/gi, '<span class="mm-cyan">');
+            text = text.replace(/<font color="#FFFF00">/gi, '<span class="mm-yellow">');
+            text = text.replace(/<font color="#FF0000">/gi, '<span class="mm-red">');
+            text = text.replace(/<font color="#00FF00">/gi, '<span class="mm-green">');
+            text = text.replace(/<font color="#D78787">/gi, '<span class="mm-pink">');
+            
+            // Handle any remaining font tags
+            text = text.replace(/<font[^>]*>/gi, '');
+            text = text.replace(/<\/font>/gi, '</span>');
+            
+            // Remove underline tags
+            text = text.replace(/<\/?u>/gi, '');
+            
+            // Remove the wrapper tags
+            text = text.replace(/<table[^>]*>/gi, '');
+            text = text.replace(/<\/table>/gi, '');
+            text = text.replace(/<tr>/gi, '');
+            text = text.replace(/<\/tr>/gi, '');
+            text = text.replace(/<td[^>]*>/gi, '');
+            text = text.replace(/<\/td>/gi, '');
+            text = text.replace(/<pre><code[^>]*>/gi, '');
+            text = text.replace(/<\/code><\/pre>/gi, '');
+            
+            return text.trim();
+        }
+        
+        function getPlainText(html) {
+            // Strip all HTML to get plain text for parsing
+            return html.replace(/<[^>]+>/g, '').trim();
+        }
+        
+        function parseEquipmentBlocks(rawInput) {
+            const items = [];
+            
+            // Clean the HTML
+            const cleanedHTML = stripMushclientHTML(rawInput);
+            
+            // Split into blocks by "Item '"
+            // Use plain text version for splitting
+            const plainText = getPlainText(cleanedHTML);
+            const htmlBlocks = [];
+            
+            // Split the cleaned HTML by the "Item '" pattern
+            const parts = cleanedHTML.split(/(?=<span class="mm-blue">Item '<\/span>)/);
+            
+            for (let i = 1; i < parts.length; i++) {
+                const block = '<span class="mm-blue">Item \'</span>' + parts[i];
+                htmlBlocks.push(block);
+            }
+            
+            // If no splits found, try alternate splitting
+            if (htmlBlocks.length === 0 && plainText.includes("Item '")) {
+                // Just use the whole thing as one block
+                htmlBlocks.push(cleanedHTML);
+            }
+            
+            for (const block of htmlBlocks) {
+                const blockPlain = getPlainText(block);
+                if (!blockPlain.includes("Item '")) continue;
+                
+                const isEQDB = blockPlain.includes('[EQDB]');
+                
+                const nameMatch = blockPlain.match(/^Item '(.+?)' is type/);
+                const name = nameMatch ? nameMatch[1] : null;
+                
+                const typeMatch = blockPlain.match(/is type (\S+)/);
+                let type = 'other';
+                if (typeMatch) {
+                    const rawType = typeMatch[1].replace(/,/g, '');
+                    if (rawType === 'jewelry') type = 'ring';
+                    else if (rawType === 'esoteric' || rawType === 'relic') type = 'other';
+                    else if (rawType === 'armor') type = 'armor';
+                    else if (rawType === 'weapon') type = 'weapon';
+                    else if (rawType === 'potion') type = 'potion';
+                    else if (rawType === 'scroll') type = 'scroll';
+                    else type = rawType;
+                }
+                
+                items.push({
+                    name: name || 'Unknown',
+                    type: type,
+                    isEQDB: isEQDB,
+                    status: isEQDB ? 'eqdb' : 'personal-checking',
+                    rawHTML: block,
+                    id: 'item-' + Math.random().toString(36).substr(2, 9)
+                });
+            }
+            
+            return items;
+        }
+        
+        async function checkPersonalAgainstDB(items) {
+            for (const item of items) {
+                if (item.isEQDB) {
+                    item.status = 'eqdb';
+                    continue;
+                }
+                
+                const { data: existing } = await supabase
+                    .from('equipment')
+                    .select('id, name')
+                    .eq('name', item.name)
+                    .eq('verified', true)
+                    .limit(1);
+                
+                if (existing && existing.length > 0) {
+                    item.status = 'personal-rejected';
+                    item.rejectReason = 'EQDB version already exists in database';
+                } else {
+                    item.status = 'personal-ask';
+                }
+            }
+        }
+        
+        function displayResults(items) {
+            const resultsDiv = document.getElementById('results');
+            
+            if (items.length === 0) {
+                resultsDiv.innerHTML = '<p>No equipment found. Make sure the text contains "Item \'" blocks from MUSHclient.</p>';
+                return;
+            }
+            
+            let html = '<h3>Equipment Found (' + items.length + '):</h3>';
+            
+            items.forEach(function(item) {
+                if (item.status === 'eqdb') {
+                    html += '<div class="item-block eqdb">';
+                    html += '<strong>✅ EQDB Item — Auto-Accepted</strong><br>';
+                    html += '<strong>' + escapeHtml(item.name) + '</strong> [' + item.type + ']<br><br>';
+                    html += '<div class="preview">' + item.rawHTML + '</div>';
+                    html += '<button class="btn-accept" data-id="' + item.id + '">Import This</button>';
+                    html += '</div>';
+                } else if (item.status === 'personal-ask') {
+                    html += '<div class="item-block personal-ask">';
+                    html += '<strong>⚠️ Personal Item — No EQDB version exists yet</strong><br>';
+                    html += '<strong>' + escapeHtml(item.name) + '</strong> [' + item.type + ']<br>';
+                    html += '<p>This appears to be personal gear. No EQDB reference exists in the database yet.</p>';
+                    html += '<div class="preview">' + item.rawHTML + '</div>';
+                    html += '<button class="btn-accept" data-id="' + item.id + '">Import as Reference</button> ';
+                    html += '<button class="btn-reject" data-id="' + item.id + '">Skip</button>';
+                    html += '</div>';
+                } else if (item.status === 'personal-rejected') {
+                    html += '<div class="item-block personal-rejected">';
+                    html += '<strong>❌ Personal Item — EQDB version already exists</strong><br>';
+                    html += '<strong>' + escapeHtml(item.name) + '</strong> [' + item.type + ']<br>';
+                    html += '<p>' + item.rejectReason + '. Personal version not needed.</p>';
+                    html += '</div>';
+                }
+            });
+            
+            resultsDiv.innerHTML = html;
+            
+            document.querySelectorAll('.btn-accept').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const id = this.dataset.id;
+                    const item = items.find(i => i.id === id);
+                    if (item) importItem(item, this);
+                });
+            });
+            
+            document.querySelectorAll('.btn-reject').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const id = this.dataset.id;
+                    const item = items.find(i => i.id === id);
+                    if (item) {
+                        item.status = 'skipped';
+                        displayResults(items);
+                    }
+                });
+            });
+        }
+        
+        function getSubmitterName() {
+            return sessionStorage.getItem('editor_name') || 'anonymous';
+        }
 
         async function logHistory(item) {
-            var submitter = sessionStorage.getItem('editor_name') || 'webimport';
             await supabase.from('submission_history').insert({
-                item_name: item.name || item.item_name || 'unknown',
-                submitter: submitter,
-                source: 'web_import',
-                is_eqdb: item.is_eqdb || false,
-                description: item.description || item.properties?.description || ''
+                item_name: item.name,
+                submitter: getSubmitterName(),
+                source: item.isEQDB ? 'eqdb_import' : 'personal_import',
+                is_eqdb: item.isEQDB || false,
+                description: item.rawHTML || ''
             });
         }
 
-        function parseItem(text) {
-            var lines = text.trim().split('\n');
-            var item = { properties: {} };
-            for (var line of lines) {
-                var m = line.match(/^(\w[\w\s]*?)\s*:\s*(.+)/);
-                if (m) {
-                    var key = m[1].trim().toLowerCase().replace(/\s+/g, '_');
-                    var val = m[2].trim();
-                    if (key === 'name') item.name = val;
-                    else if (key === 'type') item.type = val;
-                    else if (key === 'description') item.description = val;
-                    else if (key === 'slot') item.slot = val;
-                    else item.properties[key] = val;
-                }
+        async function importItem(item, button) {
+            const { data: { user } } = await supabase.auth.getUser();
+            
+            button.textContent = 'Importing...';
+            button.disabled = true;
+            
+            const equipmentData = {
+                name: item.name,
+                type: item.type,
+                description: item.rawHTML,
+                verified: item.isEQDB,
+                properties: { 
+                    source: item.isEQDB ? 'eqdb_import' : 'personal_import',
+                    uploaded_by: getSubmitterName()
+                },
+                created_by: user.id
+            };
+            
+            const { error } = await supabase
+                .from('equipment')
+                .upsert(equipmentData, { onConflict: 'name' })
+                .select();
+            
+            if (error) {
+                button.textContent = 'Error: ' + error.message;
+                button.style.background = '#ff4444';
+            } else {
+                logHistory(item);
+                button.textContent = '✅ Imported!';
+                button.style.background = '#44aa44';
+                item.status = 'imported';
             }
-            return item;
         }
-
-        document.getElementById('import-btn').addEventListener('click', async function() {
-            var text = document.getElementById('input').value;
-            if (!text.trim()) { document.getElementById('results').innerHTML = '<div class="error">Paste item data first.</div>'; return; }
-            var results = document.getElementById('results');
-            results.innerHTML = 'Importing...';
-            var items = text.split(/\n\s*\n/).filter(Boolean).map(parseItem);
-            var html = '';
-            for (var item of items) {
-                if (!item.name) { html += '<div class="skip">Skipped: no name found</div>'; continue; }
-                var eq = await supabase.from('equipment').select('id').eq('name', item.name).limit(1);
-                var existing = eq.data && eq.data.length > 0;
-                if (existing && !document.getElementById('overwrite').checked) { html += '<div class="skip">Skipped: "' + item.name + '" exists</div>'; continue; }
-                if (existing && document.getElementById('overwrite').checked) {
-                    var r = await supabase.from('equipment').update(item).eq('name', item.name);
-                    if (r.error) html += '<div class="error">Error updating "' + item.name + '": ' + r.error.message + '</div>';
-                    else { html += '<div class="success">Updated: ' + item.name + '</div>'; await logHistory(item); }
-                } else {
-                    item.is_eqdb = document.getElementById('is_eqdb').checked;
-                    var r = await supabase.from('equipment').insert(item);
-                    if (r.error) html += '<div class="error">Error inserting "' + item.name + '": ' + r.error.message + '</div>';
-                    else { html += '<div class="success">Added: ' + item.name + '</div>'; await logHistory(item); }
-                }
+        
+        document.getElementById('parse-btn').addEventListener('click', async function() {
+            const text = document.getElementById('raw-text').value;
+            
+            if (!text.trim()) {
+                document.getElementById('results').innerHTML = '<p>Please paste equipment data first.</p>';
+                return;
             }
-            results.innerHTML = html;
+            
+            document.getElementById('results').innerHTML = '<p>Processing equipment data...</p>';
+            
+            parsedItems = parseEquipmentBlocks(text);
+            
+            if (parsedItems.length === 0) {
+                document.getElementById('results').innerHTML = '<p>No equipment blocks found. Make sure you\'re pasting the full MUSHclient output including the "Item \'" line.</p>';
+                return;
+            }
+            
+            await checkPersonalAgainstDB(parsedItems);
+            displayResults(parsedItems);
         });
-
-        if (sessionStorage.getItem('editor_logged_in') !== 'true') { document.getElementById('editor-links').style.display = 'none'; document.getElementById('login-link').style.display = 'inline'; document.getElementById('logout-link').style.display = 'none'; }
-        else { document.getElementById('editor-links').style.display = 'inline'; document.getElementById('login-link').style.display = 'none'; document.getElementById('logout-link').style.display = 'inline'; }
-        function logout() { sessionStorage.removeItem('editor_logged_in'); location.reload(); }
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+		function isEditor() {
+    return sessionStorage.getItem('editor_logged_in') === 'true';
+}
     </script>
+<script>
+    if (sessionStorage.getItem('editor_logged_in') === 'true') {
+        document.getElementById('editor-links').style.display = 'inline';
+        document.getElementById('logout-link').style.display = 'inline';
+        document.getElementById('login-link').style.display = 'none';
+    }
+    function logout() {
+        sessionStorage.removeItem('editor_logged_in');
+        location.reload();
+    }
+</script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"131579fcdf914a0f9aa2fb16db7f327e","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>

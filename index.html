@@ -38,7 +38,7 @@
         <a href="index.html">Search</a>
         <a href="info.html">About</a>
         <a href="ideas.html">Ideas</a>
-        <a href="leaderboard.html">Leaderboards</a>
+        <a href="leaderboard.html">Leaderboard</a>
         <span id="editor-links" style="display:none;">
             <a href="import.html">Add Equipment</a>
             <a href="batch.html">Batch Import</a>
@@ -157,7 +157,6 @@
     <div class="leaderboard" id="leaderboard-section">
         <h2 style="color:#C0C0C0;">Top Contributors</h2>
         <p style="font-size:13px;color:#888;">Players who have submitted the most equipment data.</p>
-        <p style="font-size:11px;color:#666;margin-top:-8px;">Note: Counts only reflect the last uploaded version of each item. Earlier personal submissions that were later overwritten by EQDB are not included until future submissions re-track them.</p>
         <table><thead><tr><th></th><th>Contributor</th><th>Total</th><th class="count-eqdb">EQDB</th><th class="count-personal">Personal</th><th>First</th><th>Last</th></tr></thead>
             <tbody id="leaderboard-body"><tr><td colspan="7" class="leaderboard-loading">Loading...</td></tr></tbody>
         </table>
@@ -408,67 +407,55 @@ if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
         // ============================================
         // LEADERBOARD
         // ============================================
-        async function fetchAllHistory() {
-            var allData = [];
-            var page = 0;
-            var pageSize = 1000;
-            var hasMore = true;
-            while (hasMore) {
-                var from = page * pageSize;
-                var to = from + pageSize - 1;
-                var result = await supabase.from('submission_history').select('*').range(from, to);
-                if (result.error) throw result.error;
-                if (result.data && result.data.length > 0) allData = allData.concat(result.data);
-                hasMore = result.data && result.data.length === pageSize;
-                page++;
-            }
-            return allData;
-        }
-
         async function loadLeaderboard() {
             var tbody = document.getElementById('leaderboard-body');
-            try {
-                var data = await fetchAllHistory();
-                if (!data || data.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px;">No submissions yet. Be the first!</td></tr>';
-                    return;
-                }
-                var ignoreNames = ['huko'];
-                var contributors = {};
-                for (var i = 0; i < data.length; i++) {
-                    var s = data[i];
-                    var name = s.submitter || 'anonymous';
-                    if (ignoreNames.indexOf(name.toLowerCase()) !== -1) continue;
-                    if (!contributors[name]) contributors[name] = { name: name, total: 0, eqdb: 0, personal: 0, first: s.created_at, last: s.created_at };
-                    contributors[name].total++;
-                    if (s.is_eqdb) contributors[name].eqdb++; else contributors[name].personal++;
-                    if (s.created_at < contributors[name].first) contributors[name].first = s.created_at;
-                    if (s.created_at > contributors[name].last) contributors[name].last = s.created_at;
-                }
-                var sorted = Object.values(contributors).sort(function(a, b) { return b.total - a.total; });
-                var html = '';
-                for (var r = 0; r < Math.min(sorted.length, 25); r++) {
-                    var c = sorted[r];
-                    var medal = r === 0 ? '🥇' : r === 1 ? '🥈' : r === 2 ? '🥉' : '';
-                    var rankDisplay = medal || '<span style="color:#666;">' + (r + 1) + '</span>';
-                    var barWidth = Math.round(c.total / sorted[0].total * 100);
-                    html += '<tr>'
-                        + '<td class="medal">' + rankDisplay + '</td>'
-                        + '<td><strong>' + escapeHtml(c.name) + '</strong><div style="height:3px;background:#333;border-radius:2px;margin-top:3px;"><div style="height:100%;background:#8787FF;width:' + barWidth + '%;border-radius:2px;"></div></div></td>'
-                        + '<td>' + c.total + '</td>'
-                        + '<td class="count-eqdb">' + c.eqdb + '</td>'
-                        + '<td class="count-personal">' + c.personal + '</td>'
-                        + '<td style="color:#888;font-size:11px;">' + new Date(c.first).toLocaleDateString() + '</td>'
-                        + '<td style="color:#888;font-size:11px;">' + new Date(c.last).toLocaleDateString() + '</td>'
-                        + '</tr>';
-                }
-                if (sorted.length > 25) {
-                    html += '<tr><td colspan="7" style="text-align:center;color:#666;padding:10px;font-size:12px;">... and ' + (sorted.length - 25) + ' more contributors</td></tr>';
-                }
-                tbody.innerHTML = html;
-            } catch (e) {
-                tbody.innerHTML = '<tr><td colspan="7" class="leaderboard-error">Error: ' + e.message + '</td></tr>';
+            var allData = [];
+            var pageSize = 1000;
+            var from = 0;
+            var fetchMore = true;
+            while (fetchMore) {
+                var r = await supabase.from('submission_history').select('*').range(from, from + pageSize - 1).order('created_at', { ascending: true });
+                if (r.error) { tbody.innerHTML = '<tr><td colspan="7" class="leaderboard-error">Error: ' + r.error.message + '</td></tr>'; return; }
+                if (r.data && r.data.length > 0) { allData = allData.concat(r.data); from += pageSize; }
+                if (!r.data || r.data.length < pageSize) fetchMore = false;
             }
+            var data = allData;
+            if (!data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px;">No submissions yet. Be the first!</td></tr>';
+                return;
+            }
+            var contributors = {};
+            for (var i = 0; i < data.length; i++) {
+                var s = data[i];
+                var name = s.submitter || 'anonymous';
+                if (name === 'Huko') continue;
+                if (!contributors[name]) contributors[name] = { name: name, total: 0, eqdb: 0, personal: 0, first: s.created_at, last: s.created_at };
+                contributors[name].total++;
+                if (s.is_eqdb) contributors[name].eqdb++; else contributors[name].personal++;
+                if (s.created_at < contributors[name].first) contributors[name].first = s.created_at;
+                if (s.created_at > contributors[name].last) contributors[name].last = s.created_at;
+            }
+            var sorted = Object.values(contributors).sort(function(a, b) { return b.total - a.total; });
+            var html = '';
+            for (var r = 0; r < Math.min(sorted.length, 25); r++) {
+                var c = sorted[r];
+                var medal = r === 0 ? '🥇' : r === 1 ? '🥈' : r === 2 ? '🥉' : '';
+                var rankDisplay = medal || '<span style="color:#666;">' + (r + 1) + '</span>';
+                var barWidth = Math.round(c.total / sorted[0].total * 100);
+                html += '<tr>'
+                    + '<td class="medal">' + rankDisplay + '</td>'
+                    + '<td><strong>' + escapeHtml(c.name) + '</strong><div style="height:3px;background:#333;border-radius:2px;margin-top:3px;"><div style="height:100%;background:#8787FF;width:' + barWidth + '%;border-radius:2px;"></div></div></td>'
+                    + '<td>' + c.total + '</td>'
+                    + '<td class="count-eqdb">' + c.eqdb + '</td>'
+                    + '<td class="count-personal">' + c.personal + '</td>'
+                    + '<td style="color:#888;font-size:11px;">' + new Date(c.first).toLocaleDateString() + '</td>'
+                    + '<td style="color:#888;font-size:11px;">' + new Date(c.last).toLocaleDateString() + '</td>'
+                    + '</tr>';
+            }
+            if (sorted.length > 25) {
+                html += '<tr><td colspan="7" style="text-align:center;color:#666;padding:10px;font-size:12px;">... and ' + (sorted.length - 25) + ' more contributors</td></tr>';
+            }
+            tbody.innerHTML = html;
         }
         loadLeaderboard();
 
@@ -492,10 +479,7 @@ if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
             sessionStorage.removeItem('editor_logged_in');
             location.reload();
         }
-        function scrollToLeaderboard() {
-            var el = document.getElementById('leaderboard-section');
-            if (el) el.scrollIntoView({ behavior: 'smooth' });
-        }
     </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"131579fcdf914a0f9aa2fb16db7f327e","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
