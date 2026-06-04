@@ -84,6 +84,7 @@
             <span class="tab" id="tab-eqdb-queue">EQDB Queue</span>
             <span class="tab" id="tab-scrying">Scrying</span>
             <span class="tab" id="tab-contributors">Contributors</span>
+            <span class="tab" id="tab-bugreports">Bug Reports</span>
         </div>
         
         <div id="equipment-section" class="section active">
@@ -143,6 +144,17 @@
             <div class="pagination" id="scrying-pagination"></div>
         </div>
 
+        <div id="bugreports-section" class="section">
+            <div class="toolbar">
+                <button id="refresh-bugs-btn" style="background:#4488ff;color:white;">Refresh</button>
+                <span id="bugreport-status" style="font-size:13px;color:#888;"></span>
+            </div>
+            <table>
+                <thead><tr><th>Description</th><th>Page</th><th>Date</th><th>Actions</th></tr></thead>
+                <tbody id="bugreports-table"></tbody>
+            </table>
+        </div>
+
         <div id="contributors-section" class="section">
             <div class="toolbar">
                 <button id="refresh-contributors-btn" style="background:#4488ff;color:white;">Refresh</button>
@@ -188,6 +200,7 @@
         document.getElementById('tab-eqdb-queue').addEventListener('click', function() { switchTab('eqdb-queue'); });
         document.getElementById('tab-scrying').addEventListener('click', function() { switchTab('scrying'); });
         document.getElementById('tab-contributors').addEventListener('click', function() { switchTab('contributors'); });
+document.getElementById('tab-bugreports').addEventListener('click', function() { switchTab('bugreports'); });
         
         document.getElementById('copy-eqdb-btn').addEventListener('click', function() {
             if (window.eqdbHashes && window.eqdbHashes.length > 0) {
@@ -232,6 +245,7 @@
             if (tab === 'eqdb-queue') loadEqdbQueue();
             if (tab === 'scrying') loadScrying();
             if (tab === 'contributors') loadContributors();
+            if (tab === 'bugreports') loadBugReports();
         }
         
         document.getElementById('equipment-search-btn').addEventListener('click', function() { equipmentSearch = document.getElementById('equipment-search').value.trim(); equipmentPage = 1; loadEquipment(); });
@@ -585,6 +599,40 @@
             btn.disabled = false;
             loadContributors();
         });
+
+        // ============================================
+        // BUG REPORTS
+        // ============================================
+        async function loadBugReports() {
+            var status = document.getElementById('bugreport-status');
+            status.textContent = 'Loading...';
+            var result = await supabase.from('bug_reports').select('*').order('created_at', { ascending: false }).limit(100);
+            var data = result.data;
+            var tbody = document.getElementById('bugreports-table');
+            if (result.error) { tbody.innerHTML = '<tr><td colspan="4">Error: ' + result.error.message + '</td></tr>'; status.textContent = ''; return; }
+            if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="4">No bug reports yet.</td></tr>'; status.textContent = ''; return; }
+            var html = '';
+            for (var i = 0; i < data.length; i++) {
+                var b = data[i];
+                html += '<tr>'
+                    + '<td>' + escapeHtml(b.description || '').substring(0, 120) + '</td>'
+                    + '<td><a href="' + escapeHtml(b.page_url || '') + '" target="_blank" style="font-size:12px;">' + escapeHtml((b.page_url || '').substring(0, 50)) + '</a></td>'
+                    + '<td>' + fmtDate(b.created_at) + '</td>'
+                    + '<td><button class="btn-delete bug-delete" data-id="' + b.id + '">Delete</button></td>'
+                    + '</tr>';
+            }
+            tbody.innerHTML = html;
+            document.querySelectorAll('#bugreports-table .bug-delete').forEach(function(btn) {
+                btn.addEventListener('click', async function() {
+                    if (!confirm('Delete this bug report?')) return;
+                    var r = await supabase.from('bug_reports').delete().eq('id', this.getAttribute('data-id'));
+                    if (r.error) alert('Delete failed: ' + r.error.message);
+                    loadBugReports();
+                });
+            });
+            status.textContent = data.length + ' bug reports';
+        }
+        document.getElementById('refresh-bugs-btn').addEventListener('click', loadBugReports);
 
         // ============================================
         // MM COLORIZER ENGINE
