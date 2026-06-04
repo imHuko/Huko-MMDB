@@ -313,9 +313,9 @@
                 }
                 tbody.innerHTML = rows.join('');
             }
-            document.querySelectorAll('#comments-table .btn-delete').forEach(function(b) { b.addEventListener('click', async function() { if (!confirm('Delete?')) return; await supabase.from('comments').delete().eq('id', this.getAttribute('data-id')); loadComments(); }); });
-            document.querySelectorAll('#comments-table .btn-approve-c').forEach(function(b) { b.addEventListener('click', async function() { await supabase.from('comments').update({ status: 'approved' }).eq('id', this.getAttribute('data-id')); loadComments(); }); });
-            document.querySelectorAll('#comments-table .btn-reject-c').forEach(function(b) { b.addEventListener('click', async function() { await supabase.from('comments').update({ status: 'denied' }).eq('id', this.getAttribute('data-id')); loadComments(); }); });
+            document.querySelectorAll('#comments-table .btn-delete').forEach(function(b) { b.addEventListener('click', async function() { if (!confirm('Delete?')) return; var r = await supabase.from('comments').delete().eq('id', this.getAttribute('data-id')); if (r.error) { alert('Delete failed: ' + r.error.message); return; } loadComments(); }); });
+            document.querySelectorAll('#comments-table .btn-approve-c').forEach(function(b) { b.addEventListener('click', async function() { var r = await supabase.from('comments').update({ status: 'approved' }).eq('id', this.getAttribute('data-id')); if (r.error) { alert('Approve failed: ' + r.error.message); return; } loadComments(); }); });
+            document.querySelectorAll('#comments-table .btn-reject-c').forEach(function(b) { b.addEventListener('click', async function() { var r = await supabase.from('comments').update({ status: 'denied' }).eq('id', this.getAttribute('data-id')); if (r.error) { alert('Deny failed: ' + r.error.message); return; } loadComments(); }); });
             renderPagination('comments', commentsPage, Math.ceil(commentsTotal / PER_PAGE));
         }
         
@@ -336,21 +336,21 @@
                         '<td>' + escapeHtml(idea.submitted_by) + '</td>' +
                         '<td>' + new Date(idea.created_at).toLocaleDateString() + '</td>' +
                         '<td>' + statusDisplay + '</td>' +
-                        '<td><button class="btn-delete" data-id="' + idea.id + '">Delete</button> ' +
-                        '<button class="btn-approve" data-id="' + idea.id + '"' + (status === 'approved' ? ' disabled' : '') + '>Approve</button> ' +
-                        '<button class="btn-reject" data-id="' + idea.id + '"' + (status === 'denied' ? ' disabled' : '') + '>Deny</button></td>' +
+                        '<td><button class="btn-delete-idea" data-id="' + idea.id + '">Delete</button> ' +
+                        '<button class="btn-approve-idea" data-id="' + idea.id + '"' + (status === 'approved' ? ' disabled' : '') + '>Approve</button> ' +
+                        '<button class="btn-reject-idea" data-id="' + idea.id + '"' + (status === 'denied' ? ' disabled' : '') + '>Deny</button></td>' +
                         '</tr>');
                 }
                 tbody.innerHTML = rows.join('');
             }
-            document.querySelectorAll('#ideas-table .btn-delete').forEach(function(b) {
-                b.addEventListener('click', async function() { if (!confirm('Delete?')) return; await supabase.from('ideas').delete().eq('id', this.getAttribute('data-id')); loadIdeas(); });
+            document.querySelectorAll('#ideas-table .btn-delete-idea').forEach(function(b) {
+                b.addEventListener('click', async function() { if (!confirm('Delete?')) return; var r = await supabase.from('ideas').delete().eq('id', this.getAttribute('data-id')); if (r.error) { alert('Delete failed: ' + r.error.message); return; } loadIdeas(); });
             });
-            document.querySelectorAll('#ideas-table .btn-approve').forEach(function(b) {
-                b.addEventListener('click', async function() { await supabase.from('ideas').update({ status: 'approved' }).eq('id', this.getAttribute('data-id')); loadIdeas(); });
+            document.querySelectorAll('#ideas-table .btn-approve-idea').forEach(function(b) {
+                b.addEventListener('click', async function() { var r = await supabase.from('ideas').update({ status: 'approved' }).eq('id', this.getAttribute('data-id')); if (r.error) { alert('Approve failed: ' + r.error.message); return; } loadIdeas(); });
             });
-            document.querySelectorAll('#ideas-table .btn-reject').forEach(function(b) {
-                b.addEventListener('click', async function() { await supabase.from('ideas').update({ status: 'denied' }).eq('id', this.getAttribute('data-id')); loadIdeas(); });
+            document.querySelectorAll('#ideas-table .btn-reject-idea').forEach(function(b) {
+                b.addEventListener('click', async function() { var r = await supabase.from('ideas').update({ status: 'denied' }).eq('id', this.getAttribute('data-id')); if (r.error) { alert('Deny failed: ' + r.error.message); return; } loadIdeas(); });
             });
         }
         
