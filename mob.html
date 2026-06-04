@@ -66,7 +66,7 @@
 
         async function loadMob() {
             if (!mobId) { document.getElementById('mob-name').textContent = 'No mob specified'; document.getElementById('content').innerHTML = '<p>Specify a mob ID: ?id=123</p>'; return; }
-            var r = await supabase.from('mobs').select('*').eq('id', Number(mobId)).single();
+            var r = await supabase.from('mobs_db').select('*').eq('mobid', Number(mobId)).single();
             if (r.error || !r.data) { document.getElementById('mob-name').textContent = 'Mob not found'; document.getElementById('content').innerHTML = '<p>Mob not found.</p>'; return; }
             var mob = r.data;
             document.getElementById('mob-name').textContent = mob.name || 'Unknown Mob';
