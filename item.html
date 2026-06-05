@@ -22,20 +22,21 @@
 </head>
 <body>
 
-    <nav>
-        <a href="index.html">Search</a>
-        <a href="info.html">About</a>
-        <a href="ideas.html">Ideas</a>
-        <a href="leaderboard.html">Leaderboard</a>
-        <span id="editor-links" style="display:none;">
-            <a href="import.html">Add Equipment</a>
-            <a href="batch.html">Batch Import</a>
-            <a href="import-db.html">Import Database</a>
-            <a href="admin.html">Admin</a>
-        </span>
-        <span id="login-link"><a href="login.html">Editor Login</a></span>
-        <span id="logout-link" style="display:none;"><a href="#" onclick="logout()">Logout</a></span>
-    </nav>
+<nav style="background:#222;padding:10px;margin:10px 0;border-radius:5px;">
+    <a href="index.html">Search</a>
+    <span id="editor-links" style="display:none;">
+        <a href="import.html">Add Equipment</a>
+        <a href="batch.html">Batch Import</a>
+        <a href="import-db.html">Import Database</a>
+        <a href="admin.html">Admin</a>
+    </span>
+    <span id="login-link">
+        <a href="login.html">Editor Login</a>
+    </span>
+    <span id="logout-link" style="display:none;">
+        <a href="#" onclick="logout()">Logout</a>
+    </span>
+</nav>
 <hr>
 
 <div id="item-details">Loading...</div>
@@ -191,11 +192,13 @@
             html += '<p style="color:#ffaa00;margin-top:10px;">Stats not yet available — awaiting capture from the MUD.</p>';
         }
 
-        // --- Submitter credit ---
-        html += await buildSubmitterCredit(item.name);
-
-        // --- Locations ---
-        html += await buildLocationsHtml(item.name);
+        // --- Submitter credit and locations in parallel ---
+        const [creditHtml, locationsHtml] = await Promise.all([
+            buildSubmitterCredit(item.name),
+            buildLocationsHtml(item.name)
+        ]);
+        html += creditHtml;
+        html += locationsHtml;
 
         document.getElementById('item-details').innerHTML = html;
 
@@ -244,31 +247,20 @@
         uniqueLocations.sort((a, b) => (b.hits || 0) - (a.hits || 0));
         if (uniqueLocations.length === 0) return '';
 
-        // Resolve room names and mob names — all locations in parallel
-        const resolved = await Promise.all(uniqueLocations.map(async loc => {
-            let roomNum = '', roomName = '';
+        // Batch-resolve all mob names in one query instead of one per location
+        const allMobIds = [...new Set(uniqueLocations.map(l => l.mobid).filter(Boolean).map(String))];
+        const mobNameMap = {};
+        if (allMobIds.length > 0) {
+            const { data: mobRows } = await supabase.from('mobs_db').select('mobid, name').in('mobid', allMobIds);
+            if (mobRows) mobRows.forEach(m => { mobNameMap[String(m.mobid)] = m.name; });
+        }
 
-            if (loc.room) {
-                roomName = String(loc.room);
-                const { data: rr } = await supabase.from('rooms_db').select('uid').ilike('name', '%' + roomName.trim() + '%').limit(1);
-                if (rr && rr.length > 0) roomNum = '#' + rr[0].uid;
-            } else if (loc.mobid) {
-                const { data: ml } = await supabase.from('mobsloc_db').select('room').eq('mobid', String(loc.mobid)).limit(1);
-                if (ml && ml.length > 0 && ml[0].room) {
-                    roomName = String(ml[0].room);
-                    const { data: rr } = await supabase.from('rooms_db').select('uid').ilike('name', '%' + roomName.trim() + '%').limit(1);
-                    if (rr && rr.length > 0) roomNum = '#' + rr[0].uid;
-                }
-            }
-
-            let mobName = '';
-            if (loc.mobid) {
-                const { data: mob } = await supabase.from('mobs_db').select('name').eq('mobid', String(loc.mobid)).limit(1);
-                if (mob && mob.length > 0) mobName = mob[0].name;
-            }
-
-            return { loc, roomNum, roomName, mobName };
-        }));
+        // Build resolved list — room name comes directly from itemsloc_db row, no extra queries needed
+        const resolved = uniqueLocations.map(loc => {
+            const roomName = (loc.room && loc.room !== '-') ? String(loc.room) : '';
+            const mobName  = loc.mobid ? (mobNameMap[String(loc.mobid)] || '') : '';
+            return { loc, roomNum: '', roomName, mobName };
+        });
 
         let html = '<h2 style="color:#C0C0C0;margin-top:20px;">Known Locations (' + uniqueLocations.length + ')</h2>';
         html += '<p style="font-size:12px;color:#888;">🟢 5+ hits = confirmed | 🟡 2-4 hits = likely | 🔴 1 hit = possible player drop</p>';
@@ -728,81 +720,5 @@
 
 </script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"131579fcdf914a0f9aa2fb16db7f327e","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
-    <script>
-        if (sessionStorage.getItem('editor_logged_in') === 'true') {
-            document.getElementById('editor-links').style.display = 'inline';
-            document.getElementById('logout-link').style.display = 'inline';
-            document.getElementById('login-link').style.display = 'none';
-        }
-        function logout() { sessionStorage.removeItem('editor_logged_in'); location.reload(); }
-    </script>
-<style>
-#bug-btn-container{text-align:center;padding:10px 0;margin-top:20px;}
-#bug-btn{background:#ff4444;color:white;border:none;border-radius:3px;padding:8px 16px;cursor:pointer;font-size:13px;}
-#bug-btn:hover{background:#cc0000;}
-#bug-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:none;align-items:center;justify-content:center;}
-#bug-modal-content{background:#1a1a1a;border:2px solid #555;border-radius:10px;padding:20px;width:90%;max-width:500px;color:#ccc;}
-#bug-modal-content h3{margin:0 0 10px;color:#ff4444;}
-#bug-modal-content textarea{width:100%;height:120px;padding:8px;background:#333;color:#ccc;border:1px solid #555;border-radius:3px;box-sizing:border-box;margin:10px 0;font-family:Arial,sans-serif;}
-#bug-modal-content .bug-url{color:#888;font-size:12px;word-break:break-all;}
-#bug-modal-content .btn-row{display:flex;gap:10px;justify-content:flex-end;}
-#bug-modal-content .btn-submit{background:#ff4444;color:white;border:none;border-radius:3px;padding:8px 16px;cursor:pointer;}
-#bug-modal-content .btn-cancel{background:#666;color:white;border:none;border-radius:3px;padding:8px 16px;cursor:pointer;}
-#bug-modal-content .btn-submit:disabled{opacity:0.5;cursor:not-allowed;}
-#bug-modal-content .bug-msg{margin:10px 0 0;font-size:13px;}
-</style>
-<div id="bug-btn-container"><button id="bug-btn" onclick="openBugReport()">Report Bug</button></div>
-<div id="bug-modal" onclick="if(event.target===this)closeBugReport()">
-  <div id="bug-modal-content">
-    <h3>Report Bug</h3>
-    <p class="bug-url">Page: <span id="bug-page-url"></span></p>
-    <textarea id="bug-description" placeholder="Describe what went wrong..."></textarea>
-    <div class="btn-row">
-      <button class="btn-cancel" onclick="closeBugReport()">Cancel</button>
-      <button class="btn-submit" id="bug-submit-btn" onclick="submitBugReport()">Submit</button>
-    </div>
-    <p class="bug-msg" id="bug-msg"></p>
-  </div>
-</div>
-<script>
-    var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
-    var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
-    window.openBugReport = function() {
-        document.getElementById('bug-page-url').textContent = window.location.href;
-        document.getElementById('bug-description').value = '';
-        document.getElementById('bug-msg').textContent = '';
-        document.getElementById('bug-modal').style.display = 'flex';
-        document.getElementById('bug-submit-btn').disabled = false;
-    };
-    window.closeBugReport = function() {
-        document.getElementById('bug-modal').style.display = 'none';
-    };
-    window.submitBugReport = async function() {
-        var d = document.getElementById('bug-description').value.trim();
-        if (!d) { document.getElementById('bug-msg').innerHTML = '<span style="color:#ff4444;">Please describe the bug.</span>'; return; }
-        var b = document.getElementById('bug-submit-btn');
-        b.disabled = true;
-        document.getElementById('bug-msg').innerHTML = '<span style="color:#888;">Submitting...</span>';
-        try {
-            var r = await fetch(SUPABASE_URL + '/rest/v1/bug_reports', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'Prefer': 'return=representation' },
-                body: JSON.stringify({ page_url: window.location.href, description: d })
-            });
-            if (r.ok || r.status === 201) {
-                document.getElementById('bug-msg').innerHTML = '<span style="color:#44aa44;">Bug reported! Thank you.</span>';
-                document.getElementById('bug-description').value = '';
-                setTimeout(window.closeBugReport, 2000);
-            } else {
-                var txt = await r.text();
-                document.getElementById('bug-msg').innerHTML = '<span style="color:#ff4444;">Error: ' + (txt || r.statusText) + '</span>';
-                b.disabled = false;
-            }
-        } catch(e) {
-            document.getElementById('bug-msg').innerHTML = '<span style="color:#ff4444;">Error: ' + e.message + '</span>';
-            b.disabled = false;
-        }
-    };
-</script>
 </body>
 </html>

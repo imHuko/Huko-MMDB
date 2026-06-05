@@ -51,73 +51,123 @@
         }
         
         async function loadMob() {
-            // Get mob name
-            var mobResult = await supabase.from('mobs_db').select('*').eq('mobid', mobId).limit(1);
+            // Fire mob lookup and integer-ID locations in parallel
+            var [mobResult, intLocResult] = await Promise.all([
+                supabase.from('mobs_db').select('*').eq('mobid', mobId).limit(1),
+                supabase.from('mobsloc_db').select('area, room, hits').eq('mobid', String(mobId)).limit(500)
+            ]);
+
             var mob = mobResult.data && mobResult.data.length > 0 ? mobResult.data[0] : null;
             var mobName = mob ? mob.name : ('Mob #' + mobId);
-            
+
             var html = '<h1>' + escapeHtml(mobName) + '</h1>';
-            
             if (mob && mob.long_desc) {
                 html += '<p style="color:#888;">' + escapeHtml(mob.long_desc) + '</p>';
             }
-            
-            // Get spawn locations
-            var locResult = await supabase.from('mobsloc_db').select('area, room, hits').eq('mobid', mobId).order('area', { ascending: true }).limit(200);
-            
-            if (locResult.data && locResult.data.length > 0) {
-                html += '<h2 style="color:#C0C0C0;margin-top:20px;">Spawn Locations (' + locResult.data.length + ')</h2>';
+
+            // Now find hash IDs matching this mob name and fetch their locations — also parallel
+            var allMobIds = [String(mobId)];
+            var hashLocs = [];
+            if (mobName && mobName !== ('Mob #' + mobId)) {
+                var hashResult = await supabase.from('mobs_db').select('mobid').ilike('name', mobName).filter('mobid', 'neq', String(mobId));
+                if (hashResult.data && hashResult.data.length > 0) {
+                    var hashIds = hashResult.data.map(function(r) { return String(r.mobid); });
+                    allMobIds = allMobIds.concat(hashIds);
+                    var hashLocResult = await supabase.from('mobsloc_db').select('area, room, hits').in('mobid', hashIds).limit(500);
+                    hashLocs = hashLocResult.data || [];
+                }
+            }
+
+            // Merge integer and hash location rows, and fire items query in parallel
+            var allLocs = (intLocResult.data || []).concat(hashLocs);
+            var locResult = { data: allLocs };
+            // Start items query now — we have allMobIds and don't need to wait for location render
+            var itemsPromise = supabase.from('itemsloc_db').select('itemid, area, room').in('mobid', allMobIds).limit(200);
+            var allLocs = locResult.data || [];
+
+            // Deduplicate by area+room, keeping highest hits
+            var locMap = {};
+            for (var i = 0; i < allLocs.length; i++) {
+                var loc = allLocs[i];
+                var key = (loc.area || '') + '|' + (loc.room || '');
+                if (!locMap[key] || (loc.hits || 0) > (locMap[key].hits || 0)) {
+                    locMap[key] = loc;
+                }
+            }
+            var uniqueLocs = Object.values(locMap);
+            // Sort by hits descending
+            uniqueLocs.sort(function(a, b) { return (b.hits || 0) - (a.hits || 0); });
+
+            // Filter out rows where room is '-' or empty if better data exists
+            var hasRealRooms = uniqueLocs.some(function(l) { return l.room && l.room !== '-'; });
+            if (hasRealRooms) {
+                uniqueLocs = uniqueLocs.filter(function(l) { return l.room && l.room !== '-'; });
+            }
+
+            if (uniqueLocs.length > 0) {
+                html += '<h2 style="color:#C0C0C0;margin-top:20px;">Spawn Locations (' + uniqueLocs.length + ')</h2>';
+                html += '<p style="font-size:12px;color:#888;">🟢 5+ hits = confirmed | 🟡 2-4 hits = likely | 🔴 1 hit = rare</p>';
                 html += '<table>';
                 html += '<tr><th>Zone</th><th>Room</th><th>Hits</th></tr>';
-                
-                for (var i = 0; i < locResult.data.length; i++) {
-                    var loc = locResult.data[i];
+                for (var i = 0; i < uniqueLocs.length; i++) {
+                    var loc = uniqueLocs[i];
                     html += '<tr>';
                     html += '<td>' + escapeHtml(loc.area || '') + '</td>';
-                    html += '<td>' + (loc.room ? escapeHtml(String(loc.room)) : '-') + '</td>';
-                    html += '<td>' + (loc.hits ? escapeHtml(String(loc.hits)) : '-') + '</td>';
+                    html += '<td>' + escapeHtml(loc.room || '-') + '</td>';
+                    html += '<td>' + hitBadge(loc.hits) + '</td>';
                     html += '</tr>';
                 }
                 html += '</table>';
             } else {
                 html += '<p>No spawn locations found.</p>';
             }
-            
-            // Get items dropped by this mob
-            var itemsResult = await supabase.from('itemsloc_db').select('itemid, area, room').eq('mobid', mobId).limit(100);
-            
-            if (itemsResult.data && itemsResult.data.length > 0) {
-                // Get item names
-                var itemIds = [];
-                for (var i = 0; i < itemsResult.data.length; i++) {
-                    itemIds.push(String(itemsResult.data[i].itemid));
-                }
-                
-                var namesResult = await supabase.from('items_db').select('itemid, name').in('itemid', itemIds.slice(0, 50));
+
+            // Await the items query we already started above
+            var itemsResult = await itemsPromise;
+            var allDrops = itemsResult.data || [];
+
+            // Deduplicate drops by itemid
+            var dropMap = {};
+            for (var d = 0; d < allDrops.length; d++) {
+                var drop = allDrops[d];
+                if (!dropMap[String(drop.itemid)]) dropMap[String(drop.itemid)] = drop;
+            }
+            var uniqueDrops = Object.values(dropMap);
+
+            if (uniqueDrops.length > 0) {
+                var itemIds = uniqueDrops.map(function(d) { return String(d.itemid); });
+                var namesResult = await supabase.from('items_db').select('itemid, name').in('itemid', itemIds.slice(0, 100));
                 var nameMap = {};
                 if (namesResult.data) {
                     for (var n = 0; n < namesResult.data.length; n++) {
                         nameMap[String(namesResult.data[n].itemid)] = namesResult.data[n].name;
                     }
                 }
-                
-                html += '<h2 style="color:#C0C0C0;margin-top:20px;">Items Dropped (' + itemsResult.data.length + ')</h2>';
+
+                html += '<h2 style="color:#C0C0C0;margin-top:20px;">Items Dropped (' + uniqueDrops.length + ')</h2>';
                 html += '<table>';
                 html += '<tr><th>Item</th><th>Zone</th><th>Room</th></tr>';
-                
-                for (var d = 0; d < itemsResult.data.length; d++) {
-                    var drop = itemsResult.data[d];
+                for (var d = 0; d < uniqueDrops.length; d++) {
+                    var drop = uniqueDrops[d];
                     var itemName = nameMap[String(drop.itemid)] || ('Item #' + drop.itemid);
                     html += '<tr>';
                     html += '<td><a href="item.html?name=' + encodeURIComponent(itemName) + '">' + escapeHtml(itemName) + '</a></td>';
                     html += '<td>' + escapeHtml(drop.area || '') + '</td>';
-                    html += '<td>' + (drop.room ? escapeHtml(String(drop.room)) : '-') + '</td>';
+                    html += '<td>' + escapeHtml(drop.room && drop.room !== '-' ? drop.room : '-') + '</td>';
                     html += '</tr>';
                 }
                 html += '</table>';
             }
-            
+
             document.getElementById('mob-details').innerHTML = html;
+        }
+
+        function hitBadge(hits) {
+            var n = hits ? parseInt(hits) : 0;
+            if (n >= 5)  return '<span style="color:#44aa44;font-weight:bold;">' + n + '</span>';
+            if (n >= 2)  return '<span style="color:#ffaa00;">' + n + '</span>';
+            if (n === 1) return '<span style="color:#ff4444;">' + n + '</span>';
+            return '-';
         }
         
         function escapeHtml(text) {

@@ -12,7 +12,7 @@
    save_state="y"
    date_written="2026-05-17"
    requires="4.71"
-   version="7.5"
+   version="7.42"
    >
 
 <description trim="y">
@@ -363,22 +363,6 @@ function currentVersion()
   return ver or "0.0"
 end
 
-function asyncReloadPlugin()
-  -- Uses DoAfterSpecial to reload the plugin after a 1-second delay.
-  -- This gets around MUSHclient's restriction on a plugin reloading itself.
-  if GetAlphaOption("script_prefix") == "" then
-    SetAlphaOption("script_prefix", "\\\\\\")
-  end
-  local scriptPrefix = GetAlphaOption("script_prefix")
-  Execute(
-    scriptPrefix .. "DoAfterSpecial("
-    ..    "1, "
-    ..    "\"" .. "ReloadPlugin('" .. GetPluginID() .. "')" .. "\", "
-    ..    sendto.script
-    .. ")"
-  )
-end
-
 function mcg_update()
   local cur = currentVersion()
   ColourNote("yellow", "black", "[GearCap] Checking for update (current: v" .. cur .. ")...")
@@ -402,20 +386,18 @@ function mcg_update()
     ColourNote("yellow", "black", "[GearCap] New version available: v" .. remote_ver .. " (current: v" .. cur .. ")")
     ColourNote("yellow", "black", "[GearCap] Downloading and installing...")
 
-    local plugin_file = GetPluginInfo(GetPluginID(), 6)
+    -- Write directly over the current plugin file so reload picks it up
+    local plugin_file = GetPluginInfo(GetPluginID(), 6)  -- full path to this plugin file
     if not plugin_file or plugin_file == "" then
       ColourNote("red", "black", "[GearCap] Could not find plugin path. Manual install: " .. UPDATE_URL)
       return
     end
-
-    -- Strip Windows CRLF and write in binary mode to avoid corruption
-    xml = string.gsub(xml, "\r", "")
-    local f = io.open(plugin_file, "wb")
+    local f = io.open(plugin_file, "w")
     if f then
       f:write(xml)
       f:close()
-      ColourNote("lime", "black", "[GearCap] Updated to v" .. remote_ver .. "! Reloading automatically...")
-      asyncReloadPlugin()
+      ColourNote("lime", "black", "[GearCap] File updated to v" .. remote_ver .. "!")
+      ColourNote("yellow", "black", "[GearCap] *** Reload now: Plugin menu -> Reload \"MM_Gear_Capture\" ***")
     else
       ColourNote("red", "black", "[GearCap] Could not write file. Manual install: " .. UPDATE_URL)
     end
