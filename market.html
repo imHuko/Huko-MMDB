@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Market - MUD Equipment DB</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+        a { color: #8787FF; }
+        h1, h2 { color: #C0C0C0; }
+        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        nav a { margin-right: 15px; }
+        input, select, textarea, button { padding: 8px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; font-family: Arial, sans-serif; }
+        button { cursor: pointer; }
+        .btn-primary { background: #8787FF; color: #000; border: none; }
+        .btn-danger  { background: #ff4444; color: white; border: none; font-size: 12px; padding: 3px 8px; }
+        .btn-sold    { background: #44aa44; color: white; border: none; font-size: 12px; padding: 3px 8px; }
+        .filters { display: flex; gap: 8px; flex-wrap: wrap; margin: 15px 0; align-items: center; }
+        .listing { border: 1px solid #444; margin: 10px 0; padding: 14px; border-radius: 5px; background: #222; }
+        .listing.sell  { border-left: 3px solid #44aa44; }
+        .listing.buy   { border-left: 3px solid #8787FF; }
+        .listing.trade { border-left: 3px solid #ffaa00; }
+        .listing.sold  { opacity: 0.45; }
+        .listing-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+        .listing-title { font-size: 15px; font-weight: bold; color: #C0C0C0; }
+        .listing-type  { font-size: 11px; font-weight: bold; padding: 2px 7px; border-radius: 3px; white-space: nowrap; }
+        .type-sell  { background: #1a3a1a; color: #44aa44; }
+        .type-buy   { background: #1a1a3a; color: #8787FF; }
+        .type-trade { background: #3a2a00; color: #ffaa00; }
+        .type-sold  { background: #2a2a2a; color: #666; }
+        .listing-meta { font-size: 12px; color: #888; margin-top: 6px; }
+        .listing-desc { font-size: 13px; margin-top: 8px; color: #aaa; white-space: pre-wrap; }
+        .listing-actions { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+        .pin-input { width: 80px; font-size: 12px; padding: 3px 6px; }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.75); z-index: 999; display: none; align-items: center; justify-content: center; }
+        .modal-overlay.open { display: flex; }
+        .modal { background: #222; border: 1px solid #555; border-radius: 8px; padding: 25px; width: 90%; max-width: 520px; }
+        .modal h2 { margin: 0 0 15px; color: #C0C0C0; }
+        .field { margin: 10px 0; }
+        .field label { display: block; font-size: 13px; color: #888; margin-bottom: 4px; }
+        .field input, .field select, .field textarea { width: 100%; box-sizing: border-box; }
+        .field textarea { height: 80px; resize: vertical; }
+        .field-row { display: flex; gap: 10px; }
+        .field-row .field { flex: 1; }
+        .pin-box { background: #111; border: 1px solid #ffaa00; border-radius: 5px; padding: 12px; margin: 12px 0; text-align: center; }
+        .pin-box .pin-num { font-size: 32px; font-weight: bold; color: #ffaa00; letter-spacing: 6px; }
+        .pin-box p { margin: 5px 0 0; font-size: 12px; color: #888; }
+        .msg-ok  { color: #44aa44; font-size: 13px; margin-top: 8px; }
+        .msg-err { color: #ff4444; font-size: 13px; margin-top: 8px; }
+        .empty { color: #555; text-align: center; padding: 40px 0; }
+        .tab-bar { display: flex; gap: 6px; margin: 15px 0; }
+        .tab-bar button { background: #333; color: #888; border: 1px solid #444; border-radius: 3px; padding: 6px 14px; font-size: 13px; }
+        .tab-bar button.active { background: #8787FF; color: #000; border-color: #8787FF; }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="index.html">Search</a>
+        <a href="info.html">About</a>
+        <a href="ideas.html">Ideas</a>
+        <a href="market.html">Market</a>
+        <a href="leaderboard.html">Leaderboard</a>
+        <span id="editor-links" style="display:none;"><a href="admin.html">Admin</a></span>
+    </nav>
+    <hr>
+
+    <h1>Player Market</h1>
+    <p style="color:#888;font-size:13px;">Post items for sale, trade offers, or wanted listings. Contact sellers in-game. <strong style="color:#ffaa00;">Save your PIN</strong> — you need it to manage your listing.</p>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <div class="tab-bar">
+            <button class="active" id="tab-all"  onclick="setTab('all')">All</button>
+            <button id="tab-sell"  onclick="setTab('sell')">Selling</button>
+            <button id="tab-buy"   onclick="setTab('buy')">Buying</button>
+            <button id="tab-trade" onclick="setTab('trade')">Trade</button>
+        </div>
+        <button class="btn-primary" onclick="openPost()">+ Post Listing</button>
+    </div>
+
+    <div class="filters">
+        <input type="text" id="search-input" placeholder="Search listings..." style="width:200px;">
+        <label style="font-size:13px;color:#888;display:flex;align-items:center;gap:6px;">
+            <input type="checkbox" id="hide-sold" checked> Hide sold/closed
+        </label>
+        <button class="btn-primary" onclick="loadListings()">Search</button>
+    </div>
+
+    <div id="listings-container"><p class="empty">Loading...</p></div>
+    <div id="load-more-row" style="text-align:center;margin:15px 0;display:none;">
+        <button class="btn-primary" onclick="loadMore()">Load More</button>
+    </div>
+
+    <!-- Post Modal -->
+    <div class="modal-overlay" id="post-modal" onclick="if(event.target===this)closePost()">
+        <div class="modal">
+            <h2>Post a Listing</h2>
+            <div class="field-row">
+                <div class="field">
+                    <label>Type</label>
+                    <select id="post-type">
+                        <option value="sell">Selling</option>
+                        <option value="buy">Buying</option>
+                        <option value="trade">Trade</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Your character name</label>
+                    <input type="text" id="post-char" placeholder="Huko" maxlength="40">
+                </div>
+            </div>
+            <div class="field">
+                <label>Item name <span style="color:#555;font-size:11px;">(links to item page if it exists)</span></label>
+                <input type="text" id="post-item" placeholder="glowing sword of doom" maxlength="120">
+            </div>
+            <div class="field-row">
+                <div class="field">
+                    <label>Price / offer <span style="color:#555;font-size:11px;">(optional)</span></label>
+                    <input type="text" id="post-price" placeholder="500k gold, negotiable..." maxlength="80">
+                </div>
+                <div class="field">
+                    <label>Expires</label>
+                    <select id="post-expires">
+                        <option value="1">1 day</option>
+                        <option value="3">3 days</option>
+                        <option value="7" selected>7 days</option>
+                        <option value="14">14 days</option>
+                        <option value="30">30 days</option>
+                        <option value="0">Never</option>
+                    </select>
+                </div>
+            </div>
+            <div class="field">
+                <label>Description <span style="color:#555;font-size:11px;">(optional — extra notes, what you want in trade, etc)</span></label>
+                <textarea id="post-desc" placeholder="Open to offers, PST Huko in-game..."></textarea>
+            </div>
+            <div id="pin-reveal" style="display:none;">
+                <div class="pin-box">
+                    <div class="pin-num" id="pin-number"></div>
+                    <p>Write this down! You need it to mark sold or delete your listing.</p>
+                </div>
+                <p class="msg-ok">Listing posted! ✓</p>
+                <button class="btn-primary" onclick="closePost()">Done</button>
+            </div>
+            <div id="post-form-btns" style="display:flex;gap:8px;margin-top:12px;">
+                <button class="btn-primary" onclick="submitPost()">Post Listing</button>
+                <button style="background:#555;color:#ccc;border:none;" onclick="closePost()">Cancel</button>
+            </div>
+            <p id="post-msg"></p>
+        </div>
+    </div>
+
+    <!-- Manage Modal -->
+    <div class="modal-overlay" id="manage-modal" onclick="if(event.target===this)closeManage()">
+        <div class="modal">
+            <h2>Manage Listing</h2>
+            <p id="manage-listing-name" style="color:#C0C0C0;margin:0 0 12px;"></p>
+            <div class="field">
+                <label>Enter your PIN</label>
+                <input type="number" id="manage-pin-input" placeholder="1234" maxlength="4" style="width:100px;">
+            </div>
+            <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+                <button class="btn-sold" onclick="doManage('sold')">Mark as Sold/Closed</button>
+                <button class="btn-danger" onclick="doManage('delete')">Delete Listing</button>
+                <button style="background:#555;color:#ccc;border:none;" onclick="closeManage()">Cancel</button>
+            </div>
+            <p id="manage-msg"></p>
+        </div>
+    </div>
+
+    <script type="module">
+        var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
+        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+        var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        var currentTab = 'all';
+        var currentOffset = 0;
+        var PAGE_SIZE = 20;
+        var managingId = null;
+
+        // ── Tab switching ────────────────────────────────────────
+        window.setTab = function(tab) {
+            currentTab = tab;
+            currentOffset = 0;
+            document.querySelectorAll('.tab-bar button').forEach(function(b) { b.classList.remove('active'); });
+            document.getElementById('tab-' + tab).classList.add('active');
+            loadListings();
+        };
+
+        // ── Load listings ────────────────────────────────────────
+        window.loadListings = function() {
+            currentOffset = 0;
+            document.getElementById('listings-container').innerHTML = '<p class="empty">Loading...</p>';
+            fetchListings(false);
+        };
+
+        window.loadMore = function() {
+            fetchListings(true);
+        };
+
+        async function fetchListings(append) {
+            var search    = document.getElementById('search-input').value.trim();
+            var hideSold  = document.getElementById('hide-sold').checked;
+
+            var q = supabase.from('market_listings')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .range(currentOffset, currentOffset + PAGE_SIZE - 1);
+
+            if (currentTab !== 'all') q = q.eq('listing_type', currentTab);
+            if (hideSold) q = q.eq('is_sold', false).eq('is_deleted', false);
+            if (search) q = q.ilike('item_name', '%' + search + '%');
+
+            var result = await q;
+            var rows = result.data || [];
+
+            // Filter out expired listings client-side
+            var now = new Date();
+            rows = rows.filter(function(r) {
+                if (!r.expires_at) return true;
+                return new Date(r.expires_at) > now;
+            });
+
+            var container = document.getElementById('listings-container');
+            if (!append) container.innerHTML = '';
+
+            if (rows.length === 0 && !append) {
+                container.innerHTML = '<p class="empty">No listings found.</p>';
+                document.getElementById('load-more-row').style.display = 'none';
+                return;
+            }
+
+            rows.forEach(function(r) { container.appendChild(buildCard(r)); });
+            currentOffset += rows.length;
+            document.getElementById('load-more-row').style.display = rows.length === PAGE_SIZE ? 'block' : 'none';
+        }
+
+        function buildCard(r) {
+            var div = document.createElement('div');
+            var typeClass = r.is_sold || r.is_deleted ? 'sold' : r.listing_type;
+            div.className = 'listing ' + typeClass;
+
+            var typeLabel = r.is_sold ? 'SOLD/CLOSED' : r.is_deleted ? 'REMOVED' : r.listing_type.toUpperCase();
+            var typeCls   = r.is_sold || r.is_deleted ? 'type-sold' : 'type-' + r.listing_type;
+            var expires   = r.expires_at ? 'Expires ' + timeAgo(r.expires_at) : 'No expiry';
+            var posted    = timeAgo(r.created_at) + ' ago';
+
+            var itemLink = '<a href="item.html?name=' + encodeURIComponent(r.item_name) + '">' + escHtml(r.item_name) + '</a>';
+
+            div.innerHTML = '<div class="listing-header">'
+                + '<div class="listing-title">' + itemLink + '</div>'
+                + '<span class="listing-type ' + typeCls + '">' + typeLabel + '</span>'
+                + '</div>'
+                + '<div class="listing-meta">'
+                + 'Posted by <strong style="color:#C0C0C0;">' + escHtml(r.character_name) + '</strong>'
+                + (r.price ? ' &nbsp;·&nbsp; <span style="color:#44aa44;">' + escHtml(r.price) + '</span>' : '')
+                + ' &nbsp;·&nbsp; ' + posted
+                + ' &nbsp;·&nbsp; <span style="color:#555;">' + expires + '</span>'
+                + '</div>'
+                + (r.description ? '<div class="listing-desc">' + escHtml(r.description) + '</div>' : '');
+
+            if (!r.is_sold && !r.is_deleted) {
+                var actions = document.createElement('div');
+                actions.className = 'listing-actions';
+                var manageBtn = document.createElement('button');
+                manageBtn.className = 'btn-danger';
+                manageBtn.textContent = 'Manage';
+                manageBtn.addEventListener('click', function() { openManage(r.id, r.item_name); });
+                actions.appendChild(manageBtn);
+                div.appendChild(actions);
+            }
+
+            return div;
+        }
+
+        // ── Post listing ─────────────────────────────────────────
+        window.openPost = function() {
+            document.getElementById('post-modal').classList.add('open');
+            document.getElementById('pin-reveal').style.display = 'none';
+            document.getElementById('post-form-btns').style.display = 'flex';
+            document.getElementById('post-msg').textContent = '';
+            document.getElementById('post-item').value = '';
+            document.getElementById('post-char').value = '';
+            document.getElementById('post-price').value = '';
+            document.getElementById('post-desc').value = '';
+        };
+
+        window.closePost = function() {
+            document.getElementById('post-modal').classList.remove('open');
+            loadListings();
+        };
+
+        window.submitPost = async function() {
+            var itemName  = document.getElementById('post-item').value.trim();
+            var charName  = document.getElementById('post-char').value.trim();
+            var price     = document.getElementById('post-price').value.trim();
+            var desc      = document.getElementById('post-desc').value.trim();
+            var type      = document.getElementById('post-type').value;
+            var expireDays = parseInt(document.getElementById('post-expires').value);
+            var msgEl     = document.getElementById('post-msg');
+
+            if (!itemName) { msgEl.className = 'msg-err'; msgEl.textContent = 'Item name is required.'; return; }
+            if (!charName) { msgEl.className = 'msg-err'; msgEl.textContent = 'Character name is required.'; return; }
+
+            var pin = Math.floor(1000 + Math.random() * 9000);
+            var expiresAt = expireDays > 0 ? new Date(Date.now() + expireDays * 86400000).toISOString() : null;
+
+            var result = await supabase.from('market_listings').insert({
+                item_name:      itemName,
+                character_name: charName,
+                listing_type:   type,
+                price:          price || null,
+                description:    desc  || null,
+                expires_at:     expiresAt,
+                pin:            String(pin),
+                is_sold:        false,
+                is_deleted:     false
+            });
+
+            if (result.error) {
+                msgEl.className = 'msg-err';
+                msgEl.textContent = 'Error: ' + result.error.message;
+                return;
+            }
+
+            document.getElementById('post-form-btns').style.display = 'none';
+            document.getElementById('pin-number').textContent = pin;
+            document.getElementById('pin-reveal').style.display = 'block';
+            msgEl.textContent = '';
+        };
+
+        // ── Manage listing ────────────────────────────────────────
+        window.openManage = function(id, name) {
+            managingId = id;
+            document.getElementById('manage-listing-name').textContent = name;
+            document.getElementById('manage-pin-input').value = '';
+            document.getElementById('manage-msg').textContent = '';
+            document.getElementById('manage-modal').classList.add('open');
+        };
+
+        window.closeManage = function() {
+            document.getElementById('manage-modal').classList.remove('open');
+            managingId = null;
+        };
+
+        window.doManage = async function(action) {
+            var pin = document.getElementById('manage-pin-input').value.trim();
+            var msgEl = document.getElementById('manage-msg');
+            if (!pin) { msgEl.className = 'msg-err'; msgEl.textContent = 'Enter your PIN.'; return; }
+
+            // Verify PIN
+            var check = await supabase.from('market_listings').select('id, pin').eq('id', managingId).limit(1);
+            if (!check.data || check.data.length === 0) { msgEl.className = 'msg-err'; msgEl.textContent = 'Listing not found.'; return; }
+            if (check.data[0].pin !== pin) { msgEl.className = 'msg-err'; msgEl.textContent = 'Wrong PIN.'; return; }
+
+            var update = action === 'delete' ? { is_deleted: true } : { is_sold: true };
+            var result = await supabase.from('market_listings').update(update).eq('id', managingId);
+
+            if (result.error) { msgEl.className = 'msg-err'; msgEl.textContent = 'Error: ' + result.error.message; return; }
+
+            msgEl.className = 'msg-ok';
+            msgEl.textContent = action === 'delete' ? 'Listing removed.' : 'Marked as sold!';
+            setTimeout(function() { closeManage(); loadListings(); }, 1200);
+        };
+
+        // ── Helpers ───────────────────────────────────────────────
+        function timeAgo(dateStr) {
+            var diff = Math.floor((Date.now() - new Date(dateStr)) / 1000);
+            if (diff < 0) { // future = expires_at
+                diff = Math.abs(diff);
+                if (diff < 86400)   return 'in ' + Math.floor(diff / 3600) + 'h';
+                return 'in ' + Math.floor(diff / 86400) + 'd';
+            }
+            if (diff < 60)     return 'just now';
+            if (diff < 3600)   return Math.floor(diff / 60) + 'm ago';
+            if (diff < 86400)  return Math.floor(diff / 3600) + 'h ago';
+            return Math.floor(diff / 86400) + 'd ago';
+        }
+
+        function escHtml(s) {
+            if (!s) return '';
+            var d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
+        // Initial load
+        loadListings();
+    </script>
+
+    <script>
+        if (sessionStorage.getItem('editor_logged_in') === 'true') {
+            document.getElementById('editor-links').style.display = 'inline';
+        }
+    </script>
+</body>
+</html>

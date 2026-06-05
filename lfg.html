@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LFG Board - MUD Equipment DB</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+        a { color: #8787FF; }
+        h1, h2 { color: #C0C0C0; }
+        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        nav a { margin-right: 15px; }
+        input, select, textarea, button { padding: 8px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; font-family: Arial, sans-serif; }
+        button { cursor: pointer; }
+        .btn-primary { background: #8787FF; color: #000; border: none; }
+        .btn-danger  { background: #ff4444; color: white; border: none; font-size: 12px; padding: 3px 8px; }
+        .filters { display: flex; gap: 8px; flex-wrap: wrap; margin: 15px 0; align-items: center; }
+        .tab-bar { display: flex; gap: 6px; margin: 15px 0; flex-wrap: wrap; }
+        .tab-bar button { background: #333; color: #888; border: 1px solid #444; border-radius: 3px; padding: 6px 14px; font-size: 13px; }
+        .tab-bar button.active { background: #8787FF; color: #000; border-color: #8787FF; }
+        .post { border: 1px solid #444; margin: 10px 0; padding: 14px; border-radius: 5px; background: #222; }
+        .post.need   { border-left: 3px solid #ff8800; }
+        .post.offer  { border-left: 3px solid #44aa44; }
+        .post.run    { border-left: 3px solid #8787FF; }
+        .post.interest { border-left: 3px solid #aa44aa; }
+        .post-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+        .post-title  { font-size: 15px; font-weight: bold; color: #C0C0C0; }
+        .post-badge  { font-size: 11px; font-weight: bold; padding: 2px 8px; border-radius: 3px; white-space: nowrap; }
+        .badge-need     { background: #3a2000; color: #ff8800; }
+        .badge-offer    { background: #1a3a1a; color: #44aa44; }
+        .badge-run      { background: #1a1a3a; color: #8787FF; }
+        .badge-interest { background: #2a1a2a; color: #aa44aa; }
+        .post-meta  { font-size: 12px; color: #888; margin-top: 5px; }
+        .post-note  { font-size: 13px; color: #aaa; margin-top: 8px; white-space: pre-wrap; }
+        .post-sub   { font-size: 11px; color: #555; margin-top: 5px; }
+        .modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); z-index:999; display:none; align-items:center; justify-content:center; }
+        .modal-overlay.open { display: flex; }
+        .modal { background: #222; border: 1px solid #555; border-radius: 8px; padding: 25px; width: 90%; max-width: 520px; max-height: 90vh; overflow-y: auto; }
+        .modal h2 { margin: 0 0 15px; color: #C0C0C0; }
+        .field { margin: 10px 0; }
+        .field label { display: block; font-size: 13px; color: #888; margin-bottom: 4px; }
+        .field input, .field select, .field textarea { width: 100%; box-sizing: border-box; }
+        .field textarea { height: 80px; resize: vertical; }
+        .field-row { display: flex; gap: 10px; }
+        .field-row .field { flex: 1; }
+        .pin-box { background: #111; border: 1px solid #ffaa00; border-radius: 5px; padding: 12px; margin: 12px 0; text-align: center; }
+        .pin-box .pin-num { font-size: 32px; font-weight: bold; color: #ffaa00; letter-spacing: 6px; }
+        .pin-box p { margin: 5px 0 0; font-size: 12px; color: #888; }
+        .msg-ok  { color: #44aa44; font-size: 13px; margin-top: 8px; }
+        .msg-err { color: #ff4444; font-size: 13px; margin-top: 8px; }
+        .empty { color: #555; text-align: center; padding: 40px 0; }
+        /* Autocomplete */
+        .ac-wrap { position: relative; }
+        .ac-list { position: absolute; top: 100%; left: 0; right: 0; background: #2a2a2a; border: 1px solid #555; border-top: none; border-radius: 0 0 4px 4px; max-height: 200px; overflow-y: auto; z-index: 100; display: none; }
+        .ac-list.open { display: block; }
+        .ac-item { padding: 7px 10px; font-size: 13px; cursor: pointer; }
+        .ac-item:hover, .ac-item.selected { background: #3a3a5a; color: #fff; }
+        .type-desc { font-size: 12px; color: #666; margin-top: 6px; }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="index.html">Search</a>
+        <a href="info.html">About</a>
+        <a href="ideas.html">Ideas</a>
+        <a href="market.html">Market</a>
+        <a href="lfg.html">LFG</a>
+        <a href="leaderboard.html">Leaderboard</a>
+        <span id="editor-links" style="display:none;"><a href="admin.html">Admin</a></span>
+    </nav>
+    <hr>
+
+    <h1>LFG Board</h1>
+    <p style="color:#888;font-size:13px;">Looking for group, help with marks, or zone runs. Contact people in-game. <strong style="color:#ffaa00;">Save your PIN</strong> to manage your post.</p>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:5px;">
+        <div class="tab-bar">
+            <button class="active" id="tab-all"      onclick="setTab('all')">All</button>
+            <button id="tab-need"     onclick="setTab('need')">Need Help</button>
+            <button id="tab-offer"    onclick="setTab('offer')">Offering Help</button>
+            <button id="tab-run"      onclick="setTab('run')">Zone Run</button>
+            <button id="tab-interest" onclick="setTab('interest')">Interested</button>
+        </div>
+        <button class="btn-primary" onclick="openPost()">+ Post</button>
+    </div>
+
+    <div class="filters">
+        <div class="ac-wrap" style="flex:1;min-width:180px;">
+            <input type="text" id="search-input" placeholder="Filter by mark or zone..." style="width:100%;box-sizing:border-box;" oninput="filterSearch(this.value)" autocomplete="off">
+            <div class="ac-list" id="search-ac"></div>
+        </div>
+        <label style="font-size:13px;color:#888;display:flex;align-items:center;gap:6px;">
+            <input type="checkbox" id="hide-expired" checked> Hide expired
+        </label>
+        <button class="btn-primary" onclick="loadPosts()">Search</button>
+    </div>
+
+    <div id="posts-container"><p class="empty">Loading...</p></div>
+    <div id="load-more-row" style="text-align:center;margin:15px 0;display:none;">
+        <button class="btn-primary" onclick="loadMore()">Load More</button>
+    </div>
+
+    <!-- Post Modal -->
+    <div class="modal-overlay" id="post-modal" onclick="if(event.target===this)closePost()">
+        <div class="modal">
+            <h2>New Post</h2>
+            <div class="field">
+                <label>Type</label>
+                <select id="post-type" onchange="updateTypeDesc()">
+                    <option value="need">Need Help</option>
+                    <option value="offer">Offering Help</option>
+                    <option value="run">Zone Run</option>
+                    <option value="interest">Interested (can't commit yet)</option>
+                </select>
+                <div class="type-desc" id="type-desc">Looking for someone to help you with a mark or zone.</div>
+            </div>
+            <div class="field">
+                <label>Mark or Zone <span style="color:#555;font-size:11px;">(start typing to search)</span></label>
+                <div class="ac-wrap">
+                    <input type="text" id="post-target" placeholder="e.g. Worldgates, Dungeon Avarice..." autocomplete="off" oninput="acSearch(this.value, 'post-ac')" onkeydown="acKey(event, 'post-ac', 'post-target')">
+                    <div class="ac-list" id="post-ac"></div>
+                </div>
+            </div>
+            <div class="field-row">
+                <div class="field">
+                    <label>Your character name</label>
+                    <input type="text" id="post-char" placeholder="Huko" maxlength="40">
+                </div>
+                <div class="field">
+                    <label>Expires</label>
+                    <select id="post-expires">
+                        <option value="2">2 hours</option>
+                        <option value="8">8 hours</option>
+                        <option value="24" selected>24 hours</option>
+                        <option value="72">3 days</option>
+                        <option value="168">1 week</option>
+                        <option value="720">1 month</option>
+                        <option value="0">Never</option>
+                    </select>
+                </div>
+            </div>
+            <div class="field">
+                <label>Note <span style="color:#555;font-size:11px;">(optional — time, requirements, any details)</span></label>
+                <textarea id="post-note" placeholder="Available evenings EST, need group of 3..."></textarea>
+            </div>
+            <div id="pin-reveal" style="display:none;">
+                <div class="pin-box">
+                    <div class="pin-num" id="pin-number"></div>
+                    <p>Write this down! You need it to delete your post.</p>
+                </div>
+                <p class="msg-ok">Posted! ✓</p>
+                <button class="btn-primary" onclick="closePost()">Done</button>
+            </div>
+            <div id="post-form-btns" style="display:flex;gap:8px;margin-top:12px;">
+                <button class="btn-primary" onclick="submitPost()">Post</button>
+                <button style="background:#555;color:#ccc;border:none;" onclick="closePost()">Cancel</button>
+            </div>
+            <p id="post-msg"></p>
+        </div>
+    </div>
+
+    <!-- Delete Modal -->
+    <div class="modal-overlay" id="del-modal" onclick="if(event.target===this)closeDel()">
+        <div class="modal" style="max-width:380px;">
+            <h2>Delete Post</h2>
+            <p id="del-post-name" style="color:#C0C0C0;margin:0 0 12px;"></p>
+            <div class="field">
+                <label>Enter your PIN</label>
+                <input type="number" id="del-pin" placeholder="1234" style="width:100px;">
+            </div>
+            <div style="display:flex;gap:8px;margin-top:12px;">
+                <button class="btn-danger" onclick="doDelete()">Delete</button>
+                <button style="background:#555;color:#ccc;border:none;" onclick="closeDel()">Cancel</button>
+            </div>
+            <p id="del-msg"></p>
+        </div>
+    </div>
+
+    <script>
+        var ZONES = ["A Bloody Clearing In The Trees", "A Cliffside Cabin", "A Cobwebbed Train Station", "A Desolate Greenhouse", "A Disturbed Pyramid", "A Dwarven Passage Between Sigil and", "A Faceblight Checkpoint", "A Faceblight Shroomwall", "A Fetid Mantoid Den", "A Fiery Catwalk", "A Floral Cavern", "A Forsaken Oil Well", "A Ghost Town", "A Glyph Haven", "A Hill Giant Refuge", "A Hydras Den", "A Labyrinthine Molehill", "A Makeshift Checkpoint", "A Mineshaft Between Alyria and the", "A Mosaiced Home", "A Natural Cave Between Alyria and t", "A Passage Beneath Xaventry", "A Peak In The Crystal Dunes", "A Rift Between Sigil and The Unders", "A Sandy Cave Deep In The Tunnels", "A Stylites Home", "A Temple Of Vizra", "A Yurt Between Maples", "Aequtus", "All Spirits Eve Global", "Althaman", "Alyria", "An Abandoned Lighthouse", "An Abandoned Oil Well", "An AcidDrenched Cavern", "An Empty Shack In The Forest", "An Innermost Faceblight Checkpoint", "An Unreinforced Tunnel", "Arcane Archipelago", "Arena", "Ariendyth", "Atlantis", "Awesome Clan Hall", "Bandit Camp", "Bartletts Summer Retreat", "Begoras Sanctuary", "Beltane", "Beneath A Trellis", "Capture the Flag Arena", "Catacombs of Shame", "Cavhfail", "Challenge Arenas", "Chanctonbury Woods", "Chat Rooms", "Chat Rooms Wilderness", "Civmars Tower", "Cogworks City", "Complex dAmour", "Curse of Xazra", "Daggerwind Reef", "Darksea", "Deep In The Floral Jungle", "Deeper Into The Cave System", "Desert Thorn", "Discord", "Domain of Arbaces", "Dungeon Avarice", "Dungeon Deceit", "Dungeon Odious", "Dungeon Wroth", "Eanoss Azelmar", "Emperors Crossroads", "Engineers Exclave", "Ethereal Void", "Faceblight Forest", "Faerie Plane Wilderness", "Focault Magic Equipment Company", "Friends Retreat", "Frigates End", "Frost Giants Keep", "Frosthold", "Genauras", "Gilvery", "Glarshak", "Goblam", "Goblir", "Gorth", "Gourevitchs Hideaway", "Great Alyrian Underground", "Grigmorths Crossing", "Grimbolds Annex", "Hall of Honor", "Hellbent Mountain", "Hlegmals Tavern", "Hotel Hello", "Human Outpost", "Inn of the Twin Moons", "Irda Isle", "Irda Isle Caverns", "Islandtop Ruins", "Isle of the Sea Hag", "Jalur Lumber Camp", "Kessarians Dungeon", "Lair of the Cybears", "Lair of the Death Huaka", "Lair of the Ice Witch", "Lasler Valley", "Limbo Maze", "Lowangen", "Magencia", "Maldra Keep", "Mandrake Woods", "Mount Vesuvius", "Murder Mystery", "Naulitas", "New Kolvir", "Nomad Village", "Ofstadt Monastery", "Ogre Village", "Old Amaunet Clan Hall", "Old Armageddon Clan Hall", "Old Ascendancy Clan Hall", "Old Federation Clan Hall", "Palace of Diocletian", "Palamire", "Pelicans Demise", "Pirates Cove", "Portabello City", "Rahdiyr", "Refuge Of The Xanai", "Renn", "Rimeward", "Rune Forest", "Rune Graveyard", "Runic Castle", "Seelie Castle", "Shadow Castle", "Shlarksh", "Shrine of Dira", "Shrine of Gath", "Shrine of Ithrilis", "Shrine of Maradas", "Shrine of Vandyne", "Sigil", "Sigil Underground", "Single Barrel", "Smugglers Cave", "Smugglers Gulch", "Strange Ruins", "Stronghold of the Garbool Tribe", "Taberts Inn", "Takhtin", "Tavern of the Boars", "Tellerium", "Temple Crypt", "Temple of Sumter", "Templeton", "The Acid Checkpoint", "The Airship Inconvenience", "The Angry Whale", "The Artificers Citadel", "The Astral Realm", "The Black Lodge", "The Chattering Skull Tavern", "The Citadel Above The Beach", "The Coral Keep", "The Coven of Kalywak", "The Covian Stronghold", "The Crystalline Ruins", "The Desert Oasis", "The Domain of Kelp", "The Faceblight Marine Patrol", "The Final Resting Place of Admiral", "The Fishing Village of Dorathon", "The Hamlet of Winton", "The Iceberg", "The Indestructible Cenotaphy", "The Joint Magical Consortium", "The Lonely Dragon Inn", "The Magnetic Confluence", "The Mountain Village of Teolaven", "The Obsidian Tear", "The Proving Grounds", "The Pumpworks", "The Pyre Of Tirumathi", "The Recycling Center", "The Remnants of a Caldera", "The Repository of Future Anguish", "The River Bath", "The Sacred Temple of the Tentacle C", "The Saucy Wench Tavern", "The Seeress Fogchamber", "The Sigilian Stronghold", "The Singing Stones", "The Skeletal Train", "The Tavern at the End of Time", "The Templetonian Stronghold", "The Towne of New Rigel", "The Towne of Xaventry", "The Treants Truce", "The Village of Colyon", "The Village of Lasler", "The Village of Mulakanathos", "The Village of Muldar Lohk Mulvar", "The Wandering Sidhe", "The Weevils Ballroom", "The Wreck of the Feisty Wench", "The Xaventry Stronghold", "ThreeBearded Jakes", "Tower of Aroxa", "Tower of Art", "Tower of Riga", "Towne of Decara", "Towne of Rune", "Travelers Retreat", "Troglodyte Village", "Unseelie Castle", "Vaatt", "Van Pelts Emporium", "Vandemaars Keep", "Verity Isle", "Vir", "Vospire", "Waylanders Retreat", "Winterborn Mansion", "Wizards Hut", "Xalt Unseelie Outpost"];
+        var MARKS = ["Abjuration", "Ablution", "Abstraction", "Absurdity", "Acceptance", "Accumulation", "Acrimony", "Acronyms", "Activity", "Adventure", "Affluence", "Aggregation", "Aggression", "Agility", "Agony", "Agronomy", "Air", "Airy", "Alchemy", "Alignment", "Aliment", "Alteration", "Altruism", "Anarchy", "Ancestry", "Anger", "Anguish", "Animation", "Annual", "Anonymity", "Appointments", "Arachnids", "Arbitration", "Archaeology", "Ardor", "Armies", "Arts", "Asceticism", "Ashes", "Assassination", "Assault", "Assessment", "Assistance", "Association", "Astrology", "Astronomy", "Atonement", "Atrocity", "Audition", "Austerity", "Automation", "Avarice", "Awareness", "Balance", "Baldness", "Balloons", "Balrogs", "Barbarity", "Barrier", "Bastion", "Battle", "Bazani", "Beginning", "Belief", "Bells", "Beltane", "Benevolence", "Betrayal", "Biennial", "Bingo", "Birthdays", "Blades", "Blasting", "Bloodbaths", "Bloodlines", "Bloodwine", "Boatswain", "Boom", "Boss-slayer-1", "Boss-slayer-10", "Boss-slayer-2", "Boss-slayer-3", "Boss-slayer-4", "Boss-slayer-5", "Boss-slayer-6", "Boss-slayer-7", "Boss-slayer-8", "Boss-slayer-9", "Brain-freeze", "Brotherhood", "Brutality", "Burning", "C", "Camaraderie", "Candy", "Capacity", "Captain", "Carbonization", "Carillon", "Caution", "Cavalier", "Cavalry", "Ceremony", "Chains", "Chance", "Chaos", "Charisma", "Charms", "Chill", "Chromatomancy", "Chronomancy", "Cinders", "Cirrhosis", "Citizenship", "Civicmindedness", "Clairsentience", "Clairvoyance", "Cleansing", "Clergy", "Coexistence", "Cogworks", "Cold-kept", "Collapse", "Collection", "Command", "Community", "Comprehension", "Confinement", "Conformity", "Conjuration", "Conscription", "Consideration", "Consistency", "Conspiracy", "Construction", "Consumption", "Containment", "Contemplation", "Convenience", "Cooking", "Cooperation", "Costumes", "Courage", "Courtship", "Craftsmanship", "Creation", "Creativity", "Cremation", "Cruelty", "Dares", "Darkness", "Dawn", "Debauchery", "Decennial", "Decisiveness", "Declaration", "Decrepitude", "Defense", "Defrosting", "Degeneration", "Deities", "Deliberation", "Delight", "Delirium", "Delusion", "Depravity", "Depths", "Despoilment", "Destruction", "Deterioration", "Devilry", "Discipline", "Discord", "Discovery", "Discretion", "Disingenuousness", "Disloyalty", "Disposal", "Disrepute", "Distance", "Divination", "Divinity", "Documentation", "Dominance", "Drama", "Druidism", "Duplicity", "Durability", "Dusk", "Dwarven-courage", "Dwarven-strength", "Dwarven-vitality", "Earth", "Ebongates", "Economy", "Education", "Elation", "Elements", "Elevation", "Elimination", "Embracing", "Empathy", "Emperor", "Endurance", "Enemies", "Enlightenment", "Entanglement", "Entropy", "Epiphany", "Escape", "Estates", "Estrangement", "Ether", "Excavation", "Exclusion", "Exhaustion", "Exhilaration", "Exploration", "Exposure", "Extermination", "Extinguishment", "Faerie", "Faith", "Falsity", "Familicide", "Famine", "Fashion", "Fealty", "Fear", "Feeding", "Ferrovermology", "Fervor", "Fiend", "Fighting", "Filch", "Fire", "Flames", "Flammability", "Fleshbags", "Flexing", "Flight", "Flub", "Fnargh", "Fnord", "Foe", "Force", "Formations", "Fortitude", "Fortune", "Fragility", "Fragrance", "Fraud", "Friendship", "Fright", "Frivolity", "Frostbite", "Frostbound", "Frosthoard", "Fulfillment", "Furnaces", "Futility", "Gain", "Gambling", "Gastronomy", "Gathering", "Genocide", "Getaways", "Gloom", "Glurff", "Goodness", "Gore", "Gorging", "Grace", "Graduation", "Greed", "Greeting", "Groundedness", "Groundwater", "Harassment", "Hardness", "Harvest", "Hatching", "Healing", "Hello", "Helpfulness", "Hematite", "Heresy", "Hermit", "Heroicism", "Heroics", "Hexennial", "Hexing", "Hierophant", "Highlander", "Hilarity", "Hoarding", "Homeownership", "Homeward", "Honor", "Hordes", "Horrors", "Hostility", "Hot", "Humility", "Hunger", "Hygiene", "Hypnosis", "Ice", "Idiocy", "Idolatry", "Ignition", "Impotence", "Incineration", "Incompetence", "Incursion", "Infamy", "Influence", "Ingenuity", "Inheritance", "Initiative", "Innovation", "Insanity", "Insects", "Insight", "Invention", "Investigation", "Invigoration", "Irresponsibility", "Ithrilis", "Jealousy", "Jogging", "Justice", "Keeping", "Killer-Snowman-1", "Killer-Snowman-2", "Killer-Snowman-3", "Killer-Snowman-4", "Killer-Snowman-5", "Killer-snowman-6", "Kindness", "Kinship", "Knowledge", "Lamentation", "Landlubbers", "Landmarks", "Learning", "Legacies", "Leisure", "Lethargy", "Liberation", "Life", "Light", "Lightbringer", "Loathing", "Location", "Looting", "Loss", "Love", "Lucidity", "Luck", "Luddism", "Lust", "Lycanthropy", "Madness", "Mageknights", "Magic", "Management", "Manipulation", "Marksmanship", "Martyr", "Mediocrity", "Mediums", "Melting", "Menace", "Mercantilism", "Mercenary", "Merry", "Mimicry", "Mindfulness", "Ministry", "Miracles", "Mischief", "Mischievousness", "Misery", "Misfortune", "Modulation", "Morality", "Mordant", "Musicianship", "Mystery", "Nadazar", "Necromancy", "Nemesis", "Nobility", "Noggin", "Numismatism", "Nurturing", "Obedience", "Obscurantism", "Observation", "Oddity", "Ogrish", "Oology", "Opulence", "Order", "Oversight", "Ownership", "Pain", "Parables", "Participation", "Passion", "Patricide", "Patriotism", "Patronage", "Patterns", "Payback", "Peace", "Peg", "Permanence", "Persecution", "Perseverance", "Persistence", "Personality", "Perspective", "Pestilence", "Petting", "Philanthropy", "Philosophy", "Picnicking", "Picnics", "Piracy", "Planning", "Pleasure", "Plumbing", "Plundering", "Portals", "Positioning", "Possibility", "Power", "Prayer", "Precision", "Preservation", "Pride", "Priestliness", "Profession", "Professionalism", "Promises", "Prophecy", "Protection", "Prowess", "Puissance", "Quadrennial", "Quartermaster", "Quinquennial", "Rage", "Randomness", "Reality", "Rebirth", "Reckoning", "Reclamation", "Recovery", "Recycling", "Regicide", "Reincarnation", "Reliability", "Reliquary", "Remembrance", "Remorselessness", "Requiem", "Respect", "Resurrection", "Retreat", "Revelation", "Revenge", "Ridership", "Righteousness", "Risk", "Rites", "Rivalry", "Robocide", "Rooting", "Routing", "Roving", "Ruination", "Rulership", "Running", "Ruthlessness", "Sacrifice", "Sagacity", "Sailing", "Salt", "Salutes", "Sanctuary", "Sanity", "Satisfaction", "Savagery", "Scenery", "Schedules", "Scorching", "Scrapping", "Scrolls", "Scylla", "Seafaring", "Seamanship", "Self", "Sepharia", "Serenity", "Servility", "Shadow", "Shame", "Shinobi", "Sleighing", "Slime", "Sloth", "Sludge", "Slushie", "Snacking", "Snowforged", "Sociability", "Sociableness", "Sociality", "Softness", "Solitude", "Solutions", "Song", "Sorcery", "Speed", "Spelunking", "Spirituality", "Spontaneous", "Spooky-dials", "Sporeclouds", "Status", "Stone", "Storytelling", "Strength", "Stupidity", "Subterfuge", "Subtlety", "Suffering", "Summoners", "Summoning", "Sun", "Survival", "Swarms", "Swashbuckling", "Tactics", "Tame", "Tariff", "Taxonomy", "Tedium", "Telepathy", "Temperance", "Tenacity", "Terra", "Terror", "Terror-1", "Terror-2", "Terror-3", "Terror-4", "Thaumaturgy", "Theoretical", "Thievery", "Tides", "Time", "Timetables", "Tithing", "Touch", "Transformation", "Transience", "Transport", "Traveler", "Treachery", "Treants", "Treats", "Trespassing", "Tribalism", "Tribulation", "Tricks", "Triennial", "Triumph", "Trophies", "Truth", "Tundra", "Turbulence", "Turmoil", "Understanding", "Unity", "Vagary", "Vagrancy", "Valkyjra", "Valor", "Vengeance", "Vertigo", "Vibrancy", "Vicarship", "Vice", "Victory", "Vigor", "Violence", "Virality", "Virtue", "Vision", "Vitality", "Volume", "Voraciousness", "Voting-1", "Voting-2", "Voting-3", "Voting-4", "Voting-5", "Wanderer", "War", "Warding", "Warfare", "Warpstones", "Water", "Waves", "Wealth", "Whaling", "Whirlpools", "Wickedness", "Witchery", "Wizardry", "Wonder", "Worldgates", "Xanai", "Xyzzy", "Yeoman", "Yeoman-1", "Yeoman-2", "Yeoman-3", "Yeoman-4", "Yeoman-5", "Yeoman-6", "Yeoman-7", "Zephyr"];
+        var ALL_ITEMS = MARKS.concat(ZONES).sort();
+    </script>
+
+    <script type="module">
+        var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
+        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+        var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        var currentTab = 'all';
+        var currentOffset = 0;
+        var PAGE_SIZE = 20;
+        var deletingId = null;
+        var searchFilter = '';
+
+        var TYPE_DESCS = {
+            need:     'Looking for someone to help you with a mark or zone.',
+            offer:    'You can help others — they can reach out to you in-game.',
+            run:      'Organising a zone run and want company.',
+            interest: 'You want to do this but can't commit yet — lets others know.'
+        };
+
+        var BADGES = {
+            need:     { cls: 'badge-need',     label: 'NEED HELP' },
+            offer:    { cls: 'badge-offer',    label: 'OFFERING HELP' },
+            run:      { cls: 'badge-run',      label: 'ZONE RUN' },
+            interest: { cls: 'badge-interest', label: 'INTERESTED' }
+        };
+
+        // ── Tabs ─────────────────────────────────────────────────
+        window.setTab = function(tab) {
+            currentTab = tab;
+            currentOffset = 0;
+            document.querySelectorAll('.tab-bar button').forEach(function(b) { b.classList.remove('active'); });
+            document.getElementById('tab-' + tab).classList.add('active');
+            loadPosts();
+        };
+
+        // ── Load posts ────────────────────────────────────────────
+        window.loadPosts = function() {
+            currentOffset = 0;
+            document.getElementById('posts-container').innerHTML = '<p class="empty">Loading...</p>';
+            fetchPosts(false);
+        };
+
+        window.loadMore = function() { fetchPosts(true); };
+
+        async function fetchPosts(append) {
+            var hideExpired = document.getElementById('hide-expired').checked;
+            var q = supabase.from('lfg_posts')
+                .select('*')
+                .eq('is_deleted', false)
+                .order('created_at', { ascending: false })
+                .range(currentOffset, currentOffset + PAGE_SIZE - 1);
+
+            if (currentTab !== 'all') q = q.eq('post_type', currentTab);
+            if (searchFilter) q = q.ilike('target', '%' + searchFilter + '%');
+            if (hideExpired) q = q.or('expires_at.is.null,expires_at.gt.' + new Date().toISOString());
+
+            var result = await q;
+            var rows = result.data || [];
+
+            var container = document.getElementById('posts-container');
+            if (!append) container.innerHTML = '';
+
+            if (rows.length === 0 && !append) {
+                container.innerHTML = '<p class="empty">No posts found.</p>';
+                document.getElementById('load-more-row').style.display = 'none';
+                return;
+            }
+
+            rows.forEach(function(r) { container.appendChild(buildCard(r)); });
+            currentOffset += rows.length;
+            document.getElementById('load-more-row').style.display = rows.length === PAGE_SIZE ? 'block' : 'none';
+        }
+
+        function buildCard(r) {
+            var div = document.createElement('div');
+            div.className = 'post ' + r.post_type;
+            var badge = BADGES[r.post_type] || { cls: '', label: r.post_type.toUpperCase() };
+            var expires = r.expires_at ? 'Expires ' + timeAgo(r.expires_at) : 'No expiry';
+            var posted  = timeAgo(r.created_at) + ' ago';
+
+            var header = document.createElement('div');
+            header.className = 'post-header';
+
+            var title = document.createElement('div');
+            title.className = 'post-title';
+            title.textContent = r.target;
+
+            var badgeEl = document.createElement('span');
+            badgeEl.className = 'post-badge ' + badge.cls;
+            badgeEl.textContent = badge.label;
+
+            header.appendChild(title);
+            header.appendChild(badgeEl);
+            div.appendChild(header);
+
+            var meta = document.createElement('div');
+            meta.className = 'post-meta';
+            meta.innerHTML = 'Posted by <strong style="color:#C0C0C0;">' + escHtml(r.character_name) + '</strong>'
+                + ' &nbsp;·&nbsp; ' + posted
+                + ' &nbsp;·&nbsp; <span style="color:#555;">' + expires + '</span>';
+            div.appendChild(meta);
+
+            if (r.note) {
+                var note = document.createElement('div');
+                note.className = 'post-note';
+                note.textContent = r.note;
+                div.appendChild(note);
+            }
+
+            var delBtn = document.createElement('button');
+            delBtn.className = 'btn-danger';
+            delBtn.style.marginTop = '8px';
+            delBtn.textContent = 'Delete';
+            delBtn.addEventListener('click', function() { openDel(r.id, r.target); });
+            div.appendChild(delBtn);
+
+            return div;
+        }
+
+        // ── Post ──────────────────────────────────────────────────
+        window.openPost = function() {
+            document.getElementById('post-modal').classList.add('open');
+            document.getElementById('pin-reveal').style.display = 'none';
+            document.getElementById('post-form-btns').style.display = 'flex';
+            document.getElementById('post-msg').textContent = '';
+            document.getElementById('post-target').value = '';
+            document.getElementById('post-char').value = '';
+            document.getElementById('post-note').value = '';
+            updateTypeDesc();
+        };
+
+        window.closePost = function() {
+            document.getElementById('post-modal').classList.remove('open');
+            loadPosts();
+        };
+
+        window.updateTypeDesc = function() {
+            var t = document.getElementById('post-type').value;
+            document.getElementById('type-desc').textContent = TYPE_DESCS[t] || '';
+        };
+
+        window.submitPost = async function() {
+            var target  = document.getElementById('post-target').value.trim();
+            var charName= document.getElementById('post-char').value.trim();
+            var note    = document.getElementById('post-note').value.trim();
+            var type    = document.getElementById('post-type').value;
+            var expireH = parseInt(document.getElementById('post-expires').value);
+            var msgEl   = document.getElementById('post-msg');
+
+            if (!target)   { msgEl.className='msg-err'; msgEl.textContent='Enter a mark or zone name.'; return; }
+            if (!charName) { msgEl.className='msg-err'; msgEl.textContent='Enter your character name.'; return; }
+
+            var pin = Math.floor(1000 + Math.random() * 9000);
+            var expiresAt = expireH > 0 ? new Date(Date.now() + expireH * 3600000).toISOString() : null;
+
+            var result = await supabase.from('lfg_posts').insert({
+                target:         target,
+                character_name: charName,
+                post_type:      type,
+                note:           note || null,
+                expires_at:     expiresAt,
+                pin:            String(pin),
+                is_deleted:     false
+            });
+
+            if (result.error) { msgEl.className='msg-err'; msgEl.textContent='Error: ' + result.error.message; return; }
+
+            document.getElementById('post-form-btns').style.display = 'none';
+            document.getElementById('pin-number').textContent = pin;
+            document.getElementById('pin-reveal').style.display = 'block';
+            msgEl.textContent = '';
+        };
+
+        // ── Delete ────────────────────────────────────────────────
+        window.openDel = function(id, name) {
+            deletingId = id;
+            document.getElementById('del-post-name').textContent = name;
+            document.getElementById('del-pin').value = '';
+            document.getElementById('del-msg').textContent = '';
+            document.getElementById('del-modal').classList.add('open');
+        };
+
+        window.closeDel = function() {
+            document.getElementById('del-modal').classList.remove('open');
+            deletingId = null;
+        };
+
+        window.doDelete = async function() {
+            var pin   = document.getElementById('del-pin').value.trim();
+            var msgEl = document.getElementById('del-msg');
+            if (!pin) { msgEl.className='msg-err'; msgEl.textContent='Enter your PIN.'; return; }
+
+            var check = await supabase.from('lfg_posts').select('id,pin').eq('id', deletingId).limit(1);
+            if (!check.data || !check.data.length) { msgEl.className='msg-err'; msgEl.textContent='Post not found.'; return; }
+            if (check.data[0].pin !== pin) { msgEl.className='msg-err'; msgEl.textContent='Wrong PIN.'; return; }
+
+            await supabase.from('lfg_posts').update({ is_deleted: true }).eq('id', deletingId);
+            msgEl.className = 'msg-ok';
+            msgEl.textContent = 'Deleted.';
+            setTimeout(function() { closeDel(); loadPosts(); }, 1000);
+        };
+
+        // ── Autocomplete ──────────────────────────────────────────
+        var acSelected = -1;
+
+        window.acSearch = function(val, listId) {
+            var list = document.getElementById(listId);
+            if (!val || val.length < 2) { list.classList.remove('open'); return; }
+            var lower = val.toLowerCase();
+            var matches = ALL_ITEMS.filter(function(i) { return i.toLowerCase().indexOf(lower) >= 0; }).slice(0, 12);
+            if (!matches.length) { list.classList.remove('open'); return; }
+            list.innerHTML = '';
+            acSelected = -1;
+            matches.forEach(function(m) {
+                var item = document.createElement('div');
+                item.className = 'ac-item';
+                item.textContent = m;
+                item.addEventListener('mousedown', function(e) {
+                    e.preventDefault();
+                    document.getElementById('post-target').value = m;
+                    list.classList.remove('open');
+                });
+                list.appendChild(item);
+            });
+            list.classList.add('open');
+        };
+
+        window.acKey = function(e, listId, inputId) {
+            var list = document.getElementById(listId);
+            var items = list.querySelectorAll('.ac-item');
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                acSelected = Math.min(acSelected + 1, items.length - 1);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                acSelected = Math.max(acSelected - 1, -1);
+            } else if (e.key === 'Enter' && acSelected >= 0) {
+                e.preventDefault();
+                document.getElementById(inputId).value = items[acSelected].textContent;
+                list.classList.remove('open');
+                acSelected = -1;
+                return;
+            } else if (e.key === 'Escape') {
+                list.classList.remove('open');
+                return;
+            }
+            items.forEach(function(i, idx) {
+                i.classList.toggle('selected', idx === acSelected);
+            });
+        };
+
+        window.filterSearch = function(val) {
+            searchFilter = val.trim();
+            var list = document.getElementById('search-ac');
+            if (!val || val.length < 2) { list.classList.remove('open'); return; }
+            var lower = val.toLowerCase();
+            var matches = ALL_ITEMS.filter(function(i) { return i.toLowerCase().indexOf(lower) >= 0; }).slice(0, 8);
+            list.innerHTML = '';
+            matches.forEach(function(m) {
+                var item = document.createElement('div');
+                item.className = 'ac-item';
+                item.textContent = m;
+                item.addEventListener('mousedown', function(e) {
+                    e.preventDefault();
+                    document.getElementById('search-input').value = m;
+                    searchFilter = m;
+                    list.classList.remove('open');
+                    loadPosts();
+                });
+                list.appendChild(item);
+            });
+            list.classList.toggle('open', matches.length > 0);
+        };
+
+        // Close autocomplete on outside click
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.ac-wrap')) {
+                document.querySelectorAll('.ac-list').forEach(function(l) { l.classList.remove('open'); });
+            }
+        });
+
+        // ── Helpers ───────────────────────────────────────────────
+        function timeAgo(dateStr) {
+            var diff = Math.floor((Date.now() - new Date(dateStr)) / 1000);
+            if (diff < 0) {
+                diff = Math.abs(diff);
+                if (diff < 3600)  return 'in ' + Math.floor(diff / 60) + 'm';
+                if (diff < 86400) return 'in ' + Math.floor(diff / 3600) + 'h';
+                return 'in ' + Math.floor(diff / 86400) + 'd';
+            }
+            if (diff < 60)    return 'just now';
+            if (diff < 3600)  return Math.floor(diff / 60) + 'm ago';
+            if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+            return Math.floor(diff / 86400) + 'd ago';
+        }
+
+        function escHtml(s) {
+            if (!s) return '';
+            var d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
+        loadPosts();
+    </script>
+
+    <script>
+        if (sessionStorage.getItem('editor_logged_in') === 'true') {
+            document.getElementById('editor-links').style.display = 'inline';
+        }
+    </script>
+</body>
+</html>
