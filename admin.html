@@ -626,9 +626,7 @@
         // DASHBOARD
         // ============================================
         async function loadDashboard() {
-            // Fire all queries in parallel
-            var [equipResult, bugResult, ideaResult, commentResult,
-                 equipCount, bugCount, ideaCount, commentCount, eqdbCount] = await Promise.all([
+            var results = await Promise.all([
                 supabase.from('equipment').select('name,verified,created_at,properties').order('created_at', { ascending: false }).limit(6),
                 supabase.from('bug_reports').select('description,page_url,created_at').order('created_at', { ascending: false }).limit(6),
                 supabase.from('ideas').select('idea_text,submitted_by,created_at').order('created_at', { ascending: false }).limit(6),
@@ -639,74 +637,101 @@
                 supabase.from('comments').select('*', { count: 'exact', head: true }),
                 supabase.from('eqdb_queue').select('*', { count: 'exact', head: true }).eq('processed', false)
             ]);
+            var equipResult = results[0], bugResult = results[1], ideaResult = results[2], commentResult = results[3];
+            var equipCount = results[4], bugCount = results[5], ideaCount = results[6], commentCount = results[7], eqdbCount = results[8];
 
-            // Stats bar
+            // Stats cards
             var stats = [
-                { label: 'Equipment', count: equipCount.count || 0, tab: 'equipment', color: '#8787FF' },
-                { label: 'Bug Reports', count: bugCount.count || 0, tab: 'bugs', color: bugCount.count > 0 ? '#ff4444' : '#44aa44' },
-                { label: 'Ideas', count: ideaCount.count || 0, tab: 'ideas', color: '#ffaa00' },
-                { label: 'Comments', count: commentCount.count || 0, tab: 'comments', color: '#8787FF' },
-                { label: 'EQDB Queue', count: eqdbCount.count || 0, tab: 'scrying', color: eqdbCount.count > 0 ? '#ffaa00' : '#44aa44' }
+                { label: 'Equipment',  count: equipCount.count  || 0, tab: 'equipment', color: '#8787FF' },
+                { label: 'Bug Reports',count: bugCount.count    || 0, tab: 'bugs',      color: (bugCount.count  || 0) > 0 ? '#ff4444' : '#44aa44' },
+                { label: 'Ideas',      count: ideaCount.count   || 0, tab: 'ideas',     color: '#ffaa00' },
+                { label: 'Comments',   count: commentCount.count|| 0, tab: 'comments',  color: '#8787FF' },
+                { label: 'EQDB Queue', count: eqdbCount.count   || 0, tab: 'scrying',   color: (eqdbCount.count || 0) > 0 ? '#ffaa00' : '#44aa44' }
             ];
-            var statsHtml = '';
+            var statsEl = document.getElementById('dash-stats');
+            statsEl.innerHTML = '';
             for (var si = 0; si < stats.length; si++) {
-                var s = stats[si];
-                statsHtml += '<div data-tab="' + s.tab + '" class="dash-stat-card" style="background:#222;padding:15px 25px;border-radius:5px;text-align:center;cursor:pointer;border:1px solid #333;min-width:100px;flex:1;">'
-                    + '<div style="font-size:28px;font-weight:bold;color:' + s.color + ';">' + s.count.toLocaleString() + '</div>'
-                    + '<div style="font-size:12px;color:#888;margin-top:4px;">' + s.label + '</div>'
-                    + '</div>';
-            }
-            document.getElementById('dash-stats').innerHTML = statsHtml;
-            document.querySelectorAll('.dash-stat-card').forEach(function(card) {
+                var card = document.createElement('div');
+                card.style.cssText = 'background:#222;padding:15px 25px;border-radius:5px;text-align:center;cursor:pointer;border:1px solid #333;min-width:100px;flex:1;';
+                card.innerHTML = '<div style="font-size:28px;font-weight:bold;color:' + stats[si].color + ';">' + (stats[si].count).toLocaleString() + '</div>'
+                    + '<div style="font-size:12px;color:#888;margin-top:4px;">' + stats[si].label + '</div>';
+                card.setAttribute('data-tab', stats[si].tab);
                 card.addEventListener('click', function() { switchTab(this.getAttribute('data-tab')); });
-            });
+                statsEl.appendChild(card);
+            }
 
             // Recent equipment
             var eq = equipResult.data || [];
-            document.getElementById('dash-equipment').innerHTML = eq.length === 0 ? '<p style="color:#555;">None yet.</p>' :
-                eq.map(function(e) {
+            var eqEl = document.getElementById('dash-equipment');
+            if (eq.length === 0) { eqEl.innerHTML = '<p style="color:#555;">None yet.</p>'; }
+            else {
+                eqEl.innerHTML = '';
+                for (var i = 0; i < eq.length; i++) {
+                    var e = eq[i];
+                    var row = document.createElement('div');
+                    row.style.cssText = 'padding:6px 0;border-bottom:1px solid #2a2a2a;';
                     var src = e.verified ? '<span style="color:#44aa44;font-size:11px;">EQDB</span>' : '<span style="color:#ffaa00;font-size:11px;">Personal</span>';
-                    var by = e.properties && e.properties.uploaded_by ? ' <span style="color:#555;font-size:11px;">by ' + escapeHtml(e.properties.uploaded_by) + '</span>' : '';
-                    return '<div style="padding:6px 0;border-bottom:1px solid #2a2a2a;">'
-                        + '<a href="item.html?name=' + encodeURIComponent(e.name) + '">' + escapeHtml(e.name) + '</a> '
-                        + src + by
-                        + '<span style="float:right;color:#555;font-size:11px;">' + new Date(e.created_at).toLocaleDateString() + '</span>'
-                        + '</div>';
-                }).join('');
+                    var by = (e.properties && e.properties.uploaded_by) ? ' <span style="color:#555;font-size:11px;">by ' + escapeHtml(e.properties.uploaded_by) + '</span>' : '';
+                    row.innerHTML = '<a href="item.html?name=' + encodeURIComponent(e.name) + '">' + escapeHtml(e.name) + '</a> ' + src + by
+                        + '<span style="float:right;color:#555;font-size:11px;">' + new Date(e.created_at).toLocaleDateString() + '</span>';
+                    eqEl.appendChild(row);
+                }
+            }
 
             // Recent bugs
             var bugs = bugResult.data || [];
-            document.getElementById('dash-bugs').innerHTML = bugs.length === 0 ? '<p style="color:#44aa44;">No bug reports!</p>' :
-                bugs.map(function(b) {
+            var bugsEl = document.getElementById('dash-bugs');
+            if (bugs.length === 0) { bugsEl.innerHTML = '<p style="color:#44aa44;">No bug reports!</p>'; }
+            else {
+                bugsEl.innerHTML = '';
+                for (var i = 0; i < bugs.length; i++) {
+                    var b = bugs[i];
+                    var row = document.createElement('div');
+                    row.style.cssText = 'padding:6px 0;border-bottom:1px solid #2a2a2a;cursor:pointer;';
                     var shortUrl = (b.page_url || '').replace(/^https?:\/\/[^/]+/, '') || b.page_url || '';
-                    return '<div style="padding:6px 0;border-bottom:1px solid #2a2a2a;cursor:pointer;" onclick="switchTabGlobal('bugs')">'
-                        + '<span style="color:#ff4444;">⚠</span> ' + escapeHtml((b.description || '').substring(0, 60)) + (b.description && b.description.length > 60 ? '...' : '')
-                        + '<br><span style="color:#555;font-size:11px;">' + escapeHtml(shortUrl) + ' · ' + new Date(b.created_at).toLocaleDateString() + '</span>'
-                        + '</div>';
-                }).join('');
+                    var desc = (b.description || '').substring(0, 60) + (b.description && b.description.length > 60 ? '...' : '');
+                    row.innerHTML = '<span style="color:#ff4444;">&#9888;</span> ' + escapeHtml(desc)
+                        + '<br><span style="color:#555;font-size:11px;">' + escapeHtml(shortUrl) + ' · ' + new Date(b.created_at).toLocaleDateString() + '</span>';
+                    row.addEventListener('click', function() { switchTab('bugs'); });
+                    bugsEl.appendChild(row);
+                }
+            }
 
             // Recent ideas
             var ideas = ideaResult.data || [];
-            document.getElementById('dash-ideas').innerHTML = ideas.length === 0 ? '<p style="color:#555;">No ideas yet.</p>' :
-                ideas.map(function(i) {
-                    return '<div style="padding:6px 0;border-bottom:1px solid #2a2a2a;">'
-                        + escapeHtml((i.idea_text || '').substring(0, 70)) + (i.idea_text && i.idea_text.length > 70 ? '...' : '')
-                        + '<br><span style="color:#555;font-size:11px;">' + escapeHtml(i.submitted_by || 'anonymous') + ' · ' + new Date(i.created_at).toLocaleDateString() + '</span>'
-                        + '</div>';
-                }).join('');
+            var ideasEl = document.getElementById('dash-ideas');
+            if (ideas.length === 0) { ideasEl.innerHTML = '<p style="color:#555;">No ideas yet.</p>'; }
+            else {
+                ideasEl.innerHTML = '';
+                for (var i = 0; i < ideas.length; i++) {
+                    var idea = ideas[i];
+                    var row = document.createElement('div');
+                    row.style.cssText = 'padding:6px 0;border-bottom:1px solid #2a2a2a;';
+                    var txt = (idea.idea_text || '').substring(0, 70) + (idea.idea_text && idea.idea_text.length > 70 ? '...' : '');
+                    row.innerHTML = escapeHtml(txt)
+                        + '<br><span style="color:#555;font-size:11px;">' + escapeHtml(idea.submitted_by || 'anonymous') + ' · ' + new Date(idea.created_at).toLocaleDateString() + '</span>';
+                    ideasEl.appendChild(row);
+                }
+            }
 
             // Recent comments
             var comments = commentResult.data || [];
-            document.getElementById('dash-comments').innerHTML = comments.length === 0 ? '<p style="color:#555;">No comments yet.</p>' :
-                comments.map(function(c) {
-                    return '<div style="padding:6px 0;border-bottom:1px solid #2a2a2a;">'
-                        + escapeHtml((c.comment_text || '').substring(0, 60)) + (c.comment_text && c.comment_text.length > 60 ? '...' : '')
-                        + '<br><span style="color:#555;font-size:11px;">'
-                        + 'on <a href="item.html?name=' + encodeURIComponent(c.item_name || '') + '">' + escapeHtml(c.item_name || '') + '</a>'
+            var commEl = document.getElementById('dash-comments');
+            if (comments.length === 0) { commEl.innerHTML = '<p style="color:#555;">No comments yet.</p>'; }
+            else {
+                commEl.innerHTML = '';
+                for (var i = 0; i < comments.length; i++) {
+                    var c = comments[i];
+                    var row = document.createElement('div');
+                    row.style.cssText = 'padding:6px 0;border-bottom:1px solid #2a2a2a;';
+                    var ctxt = (c.comment_text || '').substring(0, 60) + (c.comment_text && c.comment_text.length > 60 ? '...' : '');
+                    row.innerHTML = escapeHtml(ctxt)
+                        + '<br><span style="color:#555;font-size:11px;">on <a href="item.html?name=' + encodeURIComponent(c.item_name || '') + '">' + escapeHtml(c.item_name || '') + '</a>'
                         + ' by ' + escapeHtml(c.display_name || 'anonymous')
-                        + ' · ' + new Date(c.created_at).toLocaleDateString()
-                        + '</span></div>';
-                }).join('');
+                        + ' · ' + new Date(c.created_at).toLocaleDateString() + '</span>';
+                    commEl.appendChild(row);
+                }
+            }
         }
 
         // Expose switchTab globally so dashboard stat cards can use onclick
