@@ -249,8 +249,11 @@
         function switchTab(tab) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-            document.getElementById('tab-' + tab).classList.add('active');
-            document.getElementById(tab + '-section').classList.add('active');
+            var tabEl = document.getElementById('tab-' + tab);
+            var secEl = document.getElementById(tab + '-section');
+            if (!tabEl || !secEl) { console.error('switchTab: unknown tab', tab); return; }
+            tabEl.classList.add('active');
+            secEl.classList.add('active');
             if (tab === 'equipment') loadEquipment();
             if (tab === 'comments') loadComments();
             if (tab === 'ideas') loadIdeas();
@@ -643,14 +646,20 @@
                 { label: 'Bug Reports', count: bugCount.count || 0, tab: 'bugs', color: bugCount.count > 0 ? '#ff4444' : '#44aa44' },
                 { label: 'Ideas', count: ideaCount.count || 0, tab: 'ideas', color: '#ffaa00' },
                 { label: 'Comments', count: commentCount.count || 0, tab: 'comments', color: '#8787FF' },
-                { label: 'EQDB Queue', count: eqdbCount.count || 0, tab: 'eqdb-queue', color: eqdbCount.count > 0 ? '#ffaa00' : '#44aa44' }
+                { label: 'EQDB Queue', count: eqdbCount.count || 0, tab: 'scrying', color: eqdbCount.count > 0 ? '#ffaa00' : '#44aa44' }
             ];
-            document.getElementById('dash-stats').innerHTML = stats.map(function(s) {
-                return '<div onclick="switchTabGlobal('' + s.tab + '')" style="background:#222;padding:15px 25px;border-radius:5px;text-align:center;cursor:pointer;border:1px solid #333;min-width:100px;flex:1;">'
+            var statsHtml = '';
+            for (var si = 0; si < stats.length; si++) {
+                var s = stats[si];
+                statsHtml += '<div data-tab="' + s.tab + '" class="dash-stat-card" style="background:#222;padding:15px 25px;border-radius:5px;text-align:center;cursor:pointer;border:1px solid #333;min-width:100px;flex:1;">'
                     + '<div style="font-size:28px;font-weight:bold;color:' + s.color + ';">' + s.count.toLocaleString() + '</div>'
                     + '<div style="font-size:12px;color:#888;margin-top:4px;">' + s.label + '</div>'
                     + '</div>';
-            }).join('');
+            }
+            document.getElementById('dash-stats').innerHTML = statsHtml;
+            document.querySelectorAll('.dash-stat-card').forEach(function(card) {
+                card.addEventListener('click', function() { switchTab(this.getAttribute('data-tab')); });
+            });
 
             // Recent equipment
             var eq = equipResult.data || [];
