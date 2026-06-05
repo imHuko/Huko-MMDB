@@ -12,7 +12,7 @@
    save_state="y"
    date_written="2026-05-17"
    requires="4.71"
-   version="7.42"
+   version="7.4"
    >
 
 <description trim="y">
@@ -385,21 +385,23 @@ function mcg_update()
     end
     ColourNote("yellow", "black", "[GearCap] New version available: v" .. remote_ver .. " (current: v" .. cur .. ")")
     ColourNote("yellow", "black", "[GearCap] Downloading and installing...")
-
-    -- Write directly over the current plugin file so reload picks it up
-    local plugin_file = GetPluginInfo(GetPluginID(), 6)  -- full path to this plugin file
-    if not plugin_file or plugin_file == "" then
-      ColourNote("red", "black", "[GearCap] Could not find plugin path. Manual install: " .. UPDATE_URL)
-      return
-    end
-    local f = io.open(plugin_file, "w")
+    
+    -- Save to temp file and load (InstallPlugin not available in plugin sandbox)
+    local plugin_dir = GetInfo(60)  -- plugins directory
+    local temp_file = plugin_dir .. "\\mmgearcap_update.xml"
+    local f = io.open(temp_file, "w")
     if f then
       f:write(xml)
       f:close()
-      ColourNote("lime", "black", "[GearCap] File updated to v" .. remote_ver .. "!")
-      ColourNote("yellow", "black", "[GearCap] *** Reload now: Plugin menu -> Reload \"MM_Gear_Capture\" ***")
+      local load_ok, load_err = LoadPlugin(temp_file)
+      if load_ok then
+        ColourNote("lime", "black", "[GearCap] Updated successfully! Reload plugin to use new version.")
+      else
+        ColourNote("red", "black", "[GearCap] Install failed: " .. tostring(load_err) .. ". Manual install: " .. UPDATE_URL)
+      end
+      os.remove(temp_file)
     else
-      ColourNote("red", "black", "[GearCap] Could not write file. Manual install: " .. UPDATE_URL)
+      ColourNote("red", "black", "[GearCap] Could not write temp file. Manual install: " .. UPDATE_URL)
     end
   end)
 end

@@ -11,44 +11,53 @@
         input, button { padding: 8px; margin: 5px; }
         button { background: #8787FF; color: #000; border: none; border-radius: 3px; cursor: pointer; }
         button:disabled { opacity: 0.5; cursor: not-allowed; }
-        .status { margin: 10px 0; padding: 10px; background: #222; border-radius: 5px; }
-        .table-status { margin: 5px 0; padding: 8px; background: #1a1a1a; border: 1px solid #444; border-radius: 3px; font-size: 13px; }
-        .table-status.good { border-color: #44aa44; }
-        .table-status.bad { border-color: #ff4444; }
-        .table-status.check { border-color: #ffaa00; }
-        .hidden { display: none; }
         nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; }
         nav a { margin-right: 15px; }
-        .btn-retry { background: #ff8800; color: white; font-size: 11px; padding: 2px 8px; margin-left: 10px; }
+        .hidden { display: none; }
+        .table-card { margin: 8px 0; padding: 12px; background: #222; border: 1px solid #444; border-radius: 5px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+        .table-card.ready  { border-color: #44aa44; }
+        .table-card.exists { border-color: #ffaa00; }
+        .table-card.skip   { border-color: #555; opacity: 0.5; }
+        .table-card.error  { border-color: #ff4444; }
+        .table-info { font-size: 13px; }
+        .table-info strong { color: #C0C0C0; }
+        .table-info .dim { color: #888; font-size: 12px; }
+        .table-actions { display: flex; gap: 6px; align-items: center; }
+        .btn-sm { padding: 4px 10px; font-size: 12px; }
+        .btn-warn { background: #ff8800; color: white; }
+        .btn-danger { background: #ff4444; color: white; }
+        .btn-go { background: #44aa44; color: white; }
+        .status-box { margin: 15px 0; padding: 12px; background: #222; border-radius: 5px; font-family: monospace; font-size: 13px; min-height: 40px; }
+        .progress-bar-wrap { background: #333; border-radius: 3px; height: 8px; margin: 8px 0; }
+        .progress-bar { background: #8787FF; height: 8px; border-radius: 3px; transition: width 0.2s; width: 0%; }
+        .import-all-row { margin: 15px 0; display: flex; gap: 10px; align-items: center; }
     </style>
 </head>
 <body>
-    <h1>Import All Tables from .db File</h1>
+    <h1>Import Database</h1>
     <nav>
         <a href="index.html">Search</a>
-        <a href="info.html">About</a>
-        <a href="ideas.html">Ideas</a>
-        <a href="leaderboard.html">Leaderboard</a>
-        <span id="editor-links" style="display:none;">
-            <a href="import.html">Add Equipment</a>
-            <a href="batch.html">Batch Import</a>
-            <a href="import-db.html">Import Database</a>
-            <a href="admin.html">Admin</a>
-        </span>
-        <span id="login-link"><a href="login.html">Editor Login</a></span>
-        <span id="logout-link" style="display:none;"><a href="#" onclick="logout()">Logout</a></span>
+        <a href="import.html">Add Equipment</a>
+        <a href="batch.html">Batch Import</a>
+        <a href="admin.html">Admin</a>
     </nav>
     <hr>
-    
-    <p>Select a SQLite .db file. Already imported tables are skipped. Use <strong>Reimport</strong> to redo a table.</p>
-    
+
+    <p>Upload your <strong>.db</strong> file. New rows are merged in — existing rows with the same ID are skipped, so you won't get duplicates. Use <strong>Reimport</strong> to fully replace a table.</p>
+    <p style="font-size:13px;color:#888;">Tables: items, mobs, itemsloc, mobsloc</p>
+
     <input type="file" id="file-input" accept=".db,.sqlite,.sqlite3">
-    
-    <div class="hidden" id="status-section">
-        <h3>Tables Found:</h3>
-        <div id="table-statuses"></div>
-        <button id="import-all-btn" disabled>Import All</button>
-        <div class="status" id="import-status"></div>
+
+    <div class="hidden" id="main-section">
+        <div id="table-cards"></div>
+        <div class="import-all-row">
+            <button id="import-all-btn" class="btn-go" disabled>Import All New Tables</button>
+            <span id="import-all-status" style="font-size:13px;color:#888;"></span>
+        </div>
+        <div class="progress-bar-wrap hidden" id="progress-wrap">
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+        <div class="status-box hidden" id="status-box"></div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
@@ -57,258 +66,244 @@
         var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
         var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        
-        var SQL = await initSqlJs({ locateFile: function(file) { return 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/' + file; } });
-        
-        var db = null;
-        var tableData = {};
-        var supabaseTableMap = {
-            'items': 'items_db',
+
+        var SQL = await initSqlJs({ locateFile: function(f) { return 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/' + f; } });
+
+        // Map local table name -> Supabase table name
+        // Also defines which tables we care about (others are ignored)
+        var TABLE_MAP = {
+            'items':    'items_db',
+            'mobs':     'mobs_db',
             'itemsloc': 'itemsloc_db',
-            'mobs': 'mobs_db',
-            'mobsloc': 'mobsloc_db'
+            'mobsloc':  'mobsloc_db'
         };
-        var skipTables = ['skillstrain', 'skills', 'sqlite_sequence'];
-        
-        async function getExistingRows(tableName) {
-            var result = await supabase.from(tableName).select('*', { count: 'exact', head: true });
-            return result.count || 0;
+
+        // The conflict column for upsert per table (used to skip duplicates)
+        // itemid/mobid/skillid are the natural keys in the source db
+        var CONFLICT_COL = {
+            'items_db':    'itemid',
+            'mobs_db':     'mobid',
+            'itemsloc_db': 'itemid,mobid,area',
+            'mobsloc_db':  'mobid,area,room'
+        };
+
+        var localDb = null;
+        var tableData = {};   // tn -> { columns, rows, supabaseTable, existingCount }
+
+        function setStatus(msg) {
+            var box = document.getElementById('status-box');
+            box.classList.remove('hidden');
+            box.textContent = msg;
         }
-        
+
+        function setProgress(pct) {
+            document.getElementById('progress-wrap').classList.remove('hidden');
+            document.getElementById('progress-bar').style.width = Math.round(pct) + '%';
+        }
+
+        // ── File loaded ──────────────────────────────────────────────
         document.getElementById('file-input').addEventListener('change', async function(e) {
             var file = e.target.files[0];
             if (!file) return;
-            
-            document.getElementById('status-section').classList.remove('hidden');
-            var statusesDiv = document.getElementById('table-statuses');
-            statusesDiv.innerHTML = '<p>Loading database...</p>';
-            
+
+            document.getElementById('main-section').classList.remove('hidden');
+            document.getElementById('table-cards').innerHTML = '<p style="color:#888;">Reading database...</p>';
+
             var buffer = await file.arrayBuffer();
-            db = new SQL.Database(new Uint8Array(buffer));
-            
-            var tables = db.exec("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
-            if (tables.length === 0 || tables[0].values.length === 0) {
-                statusesDiv.innerHTML = '<p class="table-status bad">No tables found.</p>';
+            localDb = new SQL.Database(new Uint8Array(buffer));
+
+            var result = localDb.exec("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
+            if (!result.length || !result[0].values.length) {
+                document.getElementById('table-cards').innerHTML = '<p style="color:#ff4444;">No tables found in file.</p>';
                 return;
             }
-            
-            var tableNames = [];
-            for (var t = 0; t < tables[0].values.length; t++) {
-                tableNames.push(tables[0].values[t][0]);
-            }
-            
+
+            var allTables = result[0].values.map(function(r) { return r[0]; });
             tableData = {};
             var html = '';
             var anyReady = false;
-            
-            for (var t = 0; t < tableNames.length; t++) {
-                var tn = tableNames[t];
-                
-                // Skip unwanted tables
-                if (skipTables.indexOf(tn.toLowerCase()) >= 0) {
-                    html += '<div class="table-status check"><strong>' + tn + '</strong>: Skipped</div>';
+
+            for (var i = 0; i < allTables.length; i++) {
+                var tn = allTables[i].toLowerCase();
+                var supabaseTable = TABLE_MAP[tn];
+
+                if (!supabaseTable) {
+                    // Unknown/ignored table
+                    html += '<div class="table-card skip"><div class="table-info"><strong>' + escHtml(allTables[i]) + '</strong> <span class="dim">— not imported</span></div></div>';
                     continue;
                 }
-                
+
+                // Read columns
                 var cols = [];
                 try {
-                    var colResult = db.exec("PRAGMA table_info('" + tn + "')");
-                    if (colResult.length > 0) {
-                        for (var r = 0; r < colResult[0].values.length; r++) {
-                            cols.push(colResult[0].values[r][1]);
-                        }
-                    }
+                    var ci = localDb.exec("PRAGMA table_info('" + tn + "')");
+                    if (ci.length) ci[0].values.forEach(function(r) { cols.push(r[1]); });
                 } catch(ex) {
-                    html += '<div class="table-status bad"><strong>' + tn + '</strong>: Error</div>';
+                    html += '<div class="table-card error"><div class="table-info"><strong>' + escHtml(tn) + '</strong> — error reading columns</div></div>';
                     continue;
                 }
-                
+
+                // Read rows
                 var rows = [];
                 try {
-                    var result = db.exec("SELECT * FROM [" + tn + "]");
-                    if (result.length > 0) rows = result[0].values;
+                    var ri = localDb.exec("SELECT * FROM [" + tn + "]");
+                    if (ri.length) rows = ri[0].values;
                 } catch(ex) {
-                    html += '<div class="table-status bad"><strong>' + tn + '</strong>: Error</div>';
+                    html += '<div class="table-card error"><div class="table-info"><strong>' + escHtml(tn) + '</strong> — error reading rows</div></div>';
                     continue;
                 }
-                
-                tableData[tn] = { columns: cols, rows: rows };
-                
-                var supabaseTable = supabaseTableMap[tn.toLowerCase()] || tn;
-                var existingCount = await getExistingRows(supabaseTable);
-                
+
+                // Check existing count in Supabase
+                var existingCount = 0;
+                var countResult = await supabase.from(supabaseTable).select('*', { count: 'exact', head: true });
+                existingCount = countResult.count || 0;
+
+                tableData[tn] = { columns: cols, rows: rows, supabaseTable: supabaseTable, existingCount: existingCount };
+
                 if (existingCount > 0) {
-                    html += '<div class="table-status check"><strong>' + tn + '</strong>: ' + cols.length + ' cols, ' + rows.length + ' rows | Supabase: ' + existingCount + ' rows <button class="btn-retry" data-table="' + tn + '">Reimport</button></div>';
+                    html += '<div class="table-card exists" id="card-' + tn + '">'
+                        + '<div class="table-info"><strong>' + escHtml(tn) + '</strong> → ' + escHtml(supabaseTable)
+                        + '<br><span class="dim">' + rows.length.toLocaleString() + ' rows in file | ' + existingCount.toLocaleString() + ' already in Supabase</span></div>'
+                        + '<div class="table-actions">'
+                        + '<button class="btn-sm btn-go btn-merge" data-table="' + tn + '">Merge New</button>'
+                        + '<button class="btn-sm btn-warn btn-reimport" data-table="' + tn + '">Reimport</button>'
+                        + '</div></div>';
                 } else {
-                    html += '<div class="table-status good"><strong>' + tn + '</strong>: ' + cols.length + ' cols, ' + rows.length + ' rows | Ready</div>';
+                    html += '<div class="table-card ready" id="card-' + tn + '">'
+                        + '<div class="table-info"><strong>' + escHtml(tn) + '</strong> → ' + escHtml(supabaseTable)
+                        + '<br><span class="dim">' + rows.length.toLocaleString() + ' rows ready to import</span></div>'
+                        + '<div class="table-actions"><button class="btn-sm btn-go btn-import-one" data-table="' + tn + '">Import</button></div>'
+                        + '</div>';
                     anyReady = true;
                 }
             }
-            
-            statusesDiv.innerHTML = html;
+
+            document.getElementById('table-cards').innerHTML = html;
             document.getElementById('import-all-btn').disabled = !anyReady;
-            
-            // Reimport button handlers
-                        document.querySelectorAll('.btn-retry').forEach(function(btn) {
-                btn.addEventListener('click', async function() {
+
+            // Wire up per-table buttons
+            document.querySelectorAll('.btn-import-one').forEach(function(b) {
+                b.addEventListener('click', function() { importTable(this.getAttribute('data-table'), false); });
+            });
+            document.querySelectorAll('.btn-merge').forEach(function(b) {
+                b.addEventListener('click', function() { importTable(this.getAttribute('data-table'), false); });
+            });
+            document.querySelectorAll('.btn-reimport').forEach(function(b) {
+                b.addEventListener('click', async function() {
                     var tn = this.getAttribute('data-table');
-                    if (!confirm('Delete all rows from ' + tn + ' and reimport?')) return;
-                    var supabaseTable = supabaseTableMap[tn.toLowerCase()] || tn;
-                    
-                    var status = document.getElementById('import-status');
-                    status.textContent = 'Clearing ' + tn + '...';
-                    
-                    var allRows = await supabase.from(supabaseTable).select('id');
-                    if (allRows.data) {
-                        for (var i = 0; i < allRows.data.length; i++) {
-                            await supabase.from(supabaseTable).delete().eq('id', allRows.data[i].id);
-                        }
-                    }
-                    
-                    status.textContent = 'Reimporting ' + tn + '...';
-                    document.getElementById('import-all-btn').disabled = true;
-                    
-                    var data = tableData[tn];
-                    var imported = 0;
-                    var errors = 0;
-                    
-                    for (var r = 0; r < data.rows.length; r += 100) {
-                        var batch = [];
-                        for (var b = 0; b < 100 && (r + b) < data.rows.length; b++) {
-                            var row = data.rows[r + b];
-                            var obj = {};
-                            for (var c = 0; c < data.columns.length; c++) {
-                                var colName = data.columns[c];
-                                if (colName.toLowerCase() === 'id') continue;
-                                var val = row[c];
-                                if (val !== null && val !== undefined) obj[colName] = val;
-                            }
-                            batch.push(obj);
-                        }
-                        
-                        var result = await supabase.from(supabaseTable).insert(batch);
-                        if (result.error) {
-                            for (var s = 0; s < batch.length; s++) {
-                                var sr = await supabase.from(supabaseTable).insert(batch[s]);
-                                if (sr.error) errors++; else imported++;
-                            }
-                        } else {
-                            imported += batch.length;
-                        }
-                        
-                        status.textContent = tn + ': ' + Math.min(r + 100, data.rows.length) + '/' + data.rows.length + ' (' + imported + ' done, ' + errors + ' errors)';
-                    }
-                    
-                    status.textContent = tn + ': Done! ' + imported + ' imported, ' + errors + ' errors.';
-                    document.getElementById('import-all-btn').disabled = false;
+                    if (!confirm('Delete all rows from ' + tableData[tn].supabaseTable + ' and reimport from file? This cannot be undone.')) return;
+                    await clearTable(tableData[tn].supabaseTable);
+                    importTable(tn, false);
                 });
             });
         });
-        
+
+        // Import All button
         document.getElementById('import-all-btn').addEventListener('click', async function() {
-            var tableNames = Object.keys(tableData);
-            if (tableNames.length === 0) return;
-            
-            var status = document.getElementById('import-status');
-            document.getElementById('import-all-btn').disabled = true;
-            
-            for (var t = 0; t < tableNames.length; t++) {
-                var tn = tableNames[t];
-                
-                if (skipTables.indexOf(tn.toLowerCase()) >= 0) continue;
-                
-                var data = tableData[tn];
-                var supabaseTable = supabaseTableMap[tn.toLowerCase()] || (tn + '_db');
-                
-                var existingCount = await getExistingRows(supabaseTable);
-                if (existingCount > 0) {
-                    status.textContent = 'Skipping ' + tn + ' (already has ' + existingCount + ' rows)';
-                    continue;
+            this.disabled = true;
+            for (var tn in tableData) {
+                if (tableData[tn].existingCount === 0) {
+                    await importTable(tn, true);
                 }
-                
-                status.textContent = 'Importing ' + tn + ' (' + data.rows.length + ' rows)...';
-                
-                var imported = 0;
-                var errors = 0;
-                
-                for (var r = 0; r < data.rows.length; r += 100) {
-                    var batch = [];
-                    for (var b = 0; b < 100 && (r + b) < data.rows.length; b++) {
-                        var row = data.rows[r + b];
-                        var obj = {};
-                        for (var c = 0; c < data.columns.length; c++) {
-                            var colName = data.columns[c];
-                            if (colName.toLowerCase() === 'id') continue;
-                            var val = row[c];
-                            if (val !== null && val !== undefined) obj[colName] = val;
-                        }
-                        batch.push(obj);
-                    }
-                    
-                    var result = await supabase.from(supabaseTable).insert(batch);
-                    if (result.error) {
-                        for (var s = 0; s < batch.length; s++) {
-                            var sr = await supabase.from(supabaseTable).insert(batch[s]);
-                            if (sr.error) errors++; else imported++;
-                        }
-                    } else {
-                        imported += batch.length;
-                    }
-                    
-                    status.textContent = tn + ': ' + Math.min(r + 100, data.rows.length) + '/' + data.rows.length + ' (' + imported + ' done, ' + errors + ' errors)';
-                }
-                
-                status.textContent = tn + ': Done! ' + imported + ' imported, ' + errors + ' errors.';
             }
-            
-            status.textContent = 'All tables processed!';
+            setStatus('All tables imported!');
+            document.getElementById('import-all-status').textContent = 'Done!';
         });
-		function isEditor() {
-    return sessionStorage.getItem('editor_logged_in') === 'true';
-}
+
+        // ── Clear a Supabase table fast using gt/lt trick ──────────────
+        async function clearTable(supabaseTable) {
+            setStatus('Clearing ' + supabaseTable + '...');
+            // Delete all rows — Supabase requires a filter; id > 0 matches everything
+            var r = await supabase.from(supabaseTable).delete().gt('id', 0);
+            if (r.error) {
+                // Fallback: delete where id >= 0 (catches id=0 edge case)
+                await supabase.from(supabaseTable).delete().gte('id', 0);
+            }
+        }
+
+        // ── Import a single table ──────────────────────────────────────
+        async function importTable(tn, silent) {
+            var info = tableData[tn];
+            if (!info) return;
+            var supabaseTable = info.supabaseTable;
+            var rows = info.rows;
+            var cols = info.columns;
+            var conflictCol = CONFLICT_COL[supabaseTable] || null;
+
+            var imported = 0, skipped = 0, errors = 0;
+            var BATCH = 200;
+            var total = rows.length;
+
+            if (!silent) setStatus('Importing ' + tn + ' (' + total.toLocaleString() + ' rows)...');
+            setProgress(0);
+
+            for (var r = 0; r < total; r += BATCH) {
+                var batch = [];
+                for (var b = 0; b < BATCH && (r + b) < total; b++) {
+                    var row = rows[r + b];
+                    var obj = {};
+                    for (var c = 0; c < cols.length; c++) {
+                        var colName = cols[c];
+                        // Skip the local auto-increment id — Supabase generates its own
+                        if (colName.toLowerCase() === 'id') continue;
+                        var val = row[c];
+                        if (val !== null && val !== undefined) obj[colName] = val;
+                    }
+                    batch.push(obj);
+                }
+
+                var result;
+                if (conflictCol) {
+                    // Upsert: skip rows whose natural key already exists
+                    result = await supabase.from(supabaseTable).upsert(batch, { onConflict: conflictCol, ignoreDuplicates: true });
+                } else {
+                    result = await supabase.from(supabaseTable).insert(batch);
+                }
+
+                if (result.error) {
+                    // Batch failed — try inserting one at a time to salvage good rows
+                    for (var s = 0; s < batch.length; s++) {
+                        var sr = conflictCol
+                            ? await supabase.from(supabaseTable).upsert(batch[s], { onConflict: conflictCol, ignoreDuplicates: true })
+                            : await supabase.from(supabaseTable).insert(batch[s]);
+                        if (sr.error) errors++; else imported++;
+                    }
+                } else {
+                    imported += batch.length;
+                }
+
+                setProgress((r + BATCH) / total * 100);
+                setStatus(tn + ': ' + Math.min(r + BATCH, total).toLocaleString() + ' / ' + total.toLocaleString() + ' — imported: ' + imported.toLocaleString() + (errors ? ' | errors: ' + errors : ''));
+            }
+
+            setProgress(100);
+            setStatus(tn + ' done! ' + imported.toLocaleString() + ' imported, ' + skipped + ' skipped, ' + errors + ' errors.');
+
+            // Update the card to reflect new state
+            var card = document.getElementById('card-' + tn);
+            if (card) {
+                card.classList.remove('ready', 'exists');
+                card.classList.add('ready');
+                card.querySelector('.table-info').innerHTML = '<strong>' + escHtml(tn) + '</strong> → ' + escHtml(supabaseTable)
+                    + '<br><span class="dim" style="color:#44aa44;">✔ ' + imported.toLocaleString() + ' rows imported</span>';
+                card.querySelector('.table-actions').innerHTML = '';
+            }
+        }
+
+        function escHtml(s) {
+            if (!s) return '';
+            return String(s).replace(/[&<>"']/g, function(c) {
+                return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+            });
+        }
     </script>
     <script>
         if (sessionStorage.getItem('editor_logged_in') === 'true') {
-            document.getElementById('editor-links').style.display = 'inline';
-            document.getElementById('logout-link').style.display = 'inline';
-            document.getElementById('login-link').style.display = 'none';
+            document.getElementById('editor-links') && (document.getElementById('editor-links').style.display = 'inline');
+            document.getElementById('logout-link') && (document.getElementById('logout-link').style.display = 'inline');
+            document.getElementById('login-link') && (document.getElementById('login-link').style.display = 'none');
         }
         function logout() { sessionStorage.removeItem('editor_logged_in'); location.reload(); }
     </script>
-<style>
-#bug-btn-container{text-align:center;padding:10px 0;margin-top:20px;}
-#bug-btn{background:#ff4444;color:white;border:none;border-radius:3px;padding:8px 16px;cursor:pointer;font-size:13px;}
-#bug-btn:hover{background:#cc0000;}
-#bug-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:none;align-items:center;justify-content:center;}
-#bug-modal-content{background:#1a1a1a;border:2px solid #555;border-radius:10px;padding:20px;width:90%;max-width:500px;color:#ccc;}
-#bug-modal-content h3{margin:0 0 10px;color:#ff4444;}
-#bug-modal-content textarea{width:100%;height:120px;padding:8px;background:#333;color:#ccc;border:1px solid #555;border-radius:3px;box-sizing:border-box;margin:10px 0;font-family:Arial,sans-serif;}
-#bug-modal-content .bug-url{color:#888;font-size:12px;word-break:break-all;}
-#bug-modal-content .btn-row{display:flex;gap:10px;justify-content:flex-end;}
-#bug-modal-content .btn-submit{background:#ff4444;color:white;border:none;border-radius:3px;padding:8px 16px;cursor:pointer;}
-#bug-modal-content .btn-cancel{background:#666;color:white;border:none;border-radius:3px;padding:8px 16px;cursor:pointer;}
-#bug-modal-content .btn-submit:disabled{opacity:0.5;cursor:not-allowed;}
-#bug-modal-content .bug-msg{margin:10px 0 0;font-size:13px;}
-</style>
-<div id="bug-btn-container"><button id="bug-btn" onclick="openBugReport()">Report Bug</button></div>
-<div id="bug-modal" onclick="if(event.target===this)closeBugReport()">
-  <div id="bug-modal-content">
-    <h3>Report Bug</h3>
-    <p class="bug-url">Page: <span id="bug-page-url"></span></p>
-    <textarea id="bug-description" placeholder="Describe what went wrong..."></textarea>
-    <div class="btn-row">
-      <button class="btn-cancel" onclick="closeBugReport()">Cancel</button>
-      <button class="btn-submit" id="bug-submit-btn" onclick="submitBugReport()">Submit</button>
-    </div>
-    <p class="bug-msg" id="bug-msg"></p>
-  </div>
-</div>
-<script>
-function openBugReport(){document.getElementById('bug-page-url').textContent=window.location.href;document.getElementById('bug-description').value='';document.getElementById('bug-msg').textContent='';document.getElementById('bug-modal').style.display='flex';document.getElementById('bug-submit-btn').disabled=false;}
-function closeBugReport(){document.getElementById('bug-modal').style.display='none';}
-function submitBugReport(){var d=document.getElementById('bug-description').value.trim();if(!d){document.getElementById('bug-msg').innerHTML='<span style="color:#ff4444;">Please describe the bug.</span>';return;}
-var b=document.getElementById('bug-submit-btn');b.disabled=true;document.getElementById('bug-msg').innerHTML='<span style="color:#888;">Submitting...</span>';
-fetch('https://fpvwpxtsrmrmdvnswrzx.supabase.co/rest/v1/bug_reports',{method:'POST',headers:{'apikey':'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY','Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY','Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({page_url:window.location.href,description:d})}).then(function(r){if(r.ok||r.status===201){document.getElementById('bug-msg').innerHTML='<span style="color:#44aa44;">Bug reported! Thank you.</span>';document.getElementById('bug-description').value='';setTimeout(closeBugReport,2000);}else{document.getElementById('bug-msg').innerHTML='<span style="color:#ff4444;">Error submitting. Try again later.</span>';b.disabled=false;}}).catch(function(){document.getElementById('bug-msg').innerHTML='<span style="color:#ff4444;">Network error. Try again later.</span>';b.disabled=false;});}
-</script>
 </body>
 </html>

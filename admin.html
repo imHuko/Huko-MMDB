@@ -19,16 +19,10 @@
         .btn-delete { background: #ff4444; color: white; }
         .btn-edit { background: #4488ff; color: white; }
         .btn-approve { background: #44aa44; color: white; }
-        .btn-approve:disabled, .btn-reject:disabled { opacity: 0.4; cursor: not-allowed; }
         .btn-review { background: #44aa44; color: white; }
         .btn-save { background: #44aa44; color: white; }
         .btn-cancel { background: #666; color: white; }
         .btn-recolor { background: #ff8800; color: white; }
-        .btn-reject { background: #ff4444; color: white; }
-        .c-del { background: #ff4444; color: white; border: none; border-radius: 3px; padding: 2px 6px; font-size: 11px; cursor: pointer; }
-        .c-app { background: #44aa44; color: white; border: none; border-radius: 3px; padding: 2px 6px; font-size: 11px; cursor: pointer; }
-        .c-app:disabled, .c-rej:disabled { opacity: 0.4; cursor: not-allowed; }
-        .c-rej { background: #ff4444; color: white; border: none; border-radius: 3px; padding: 2px 6px; font-size: 11px; cursor: pointer; }
         input, select, textarea { padding: 8px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; }
         .hidden { display: none !important; }
         .tabs { margin: 15px 0; }
@@ -62,17 +56,9 @@
     <h1>Admin Panel</h1>
     <nav>
         <a href="index.html">Search</a>
-        <a href="info.html">About</a>
-        <a href="ideas.html">Ideas</a>
-        <a href="leaderboard.html">Leaderboard</a>
-        <span id="editor-links" style="display:none;">
-            <a href="import.html">Add Equipment</a>
-            <a href="batch.html">Batch Import</a>
-            <a href="import-db.html">Import Database</a>
-            <a href="admin.html">Admin</a>
-        </span>
-        <span id="login-link"><a href="login.html">Editor Login</a></span>
-        <span id="logout-link" style="display:none;"><a href="#" onclick="logout()">Logout</a></span>
+        <a href="import.html">Add Equipment</a>
+        <a href="batch.html">Hash Import</a>
+        <a href="admin.html">Admin</a>
     </nav>
     <hr>
     
@@ -84,7 +70,7 @@
             <span class="tab" id="tab-eqdb-queue">EQDB Queue</span>
             <span class="tab" id="tab-scrying">Scrying</span>
             <span class="tab" id="tab-contributors">Contributors</span>
-            <span class="tab" id="tab-bugreports">Bug Reports</span>
+            <span class="tab" id="tab-bugs">Bug Reports</span>
         </div>
         
         <div id="equipment-section" class="section active">
@@ -111,7 +97,7 @@
                 <button id="comments-reset-btn">Reset</button>
             </div>
             <table>
-                <thead><tr><th>Comment</th><th>By</th><th>On Item</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
+                <thead><tr><th>Comment</th><th>By</th><th>On Item</th><th>Date</th><th>Actions</th></tr></thead>
                 <tbody id="comments-table"></tbody>
             </table>
             <div class="pagination" id="comments-pagination"></div>
@@ -144,17 +130,6 @@
             <div class="pagination" id="scrying-pagination"></div>
         </div>
 
-        <div id="bugreports-section" class="section">
-            <div class="toolbar">
-                <button id="refresh-bugs-btn" style="background:#4488ff;color:white;">Refresh</button>
-                <span id="bugreport-status" style="font-size:13px;color:#888;"></span>
-            </div>
-            <table>
-                <thead><tr><th>Description</th><th>Page</th><th>Date</th><th>Actions</th></tr></thead>
-                <tbody id="bugreports-table"></tbody>
-            </table>
-        </div>
-
         <div id="contributors-section" class="section">
             <div class="toolbar">
                 <button id="refresh-contributors-btn" style="background:#4488ff;color:white;">Refresh</button>
@@ -165,6 +140,18 @@
                 <thead><tr><th>Rank</th><th>Contributor</th><th>Total Submissions</th><th>EQDB</th><th>Personal</th><th>First Submission</th><th>Last Submission</th></tr></thead>
                 <tbody id="contributors-table"></tbody>
             </table>
+        </div>
+        <div id="bugs-section" class="section">
+            <div class="toolbar">
+                <button id="refresh-bugs-btn" style="background:#4488ff;color:white;">Refresh</button>
+                <button id="delete-all-bugs-btn" style="background:#ff4444;color:white;">Delete All</button>
+                <span id="bugs-status" style="font-size:13px;color:#888;"></span>
+            </div>
+            <table>
+                <thead><tr><th>Description</th><th>Page</th><th>Date</th><th>Actions</th></tr></thead>
+                <tbody id="bugs-table"></tbody>
+            </table>
+            <div class="pagination" id="bugs-pagination"></div>
         </div>
     </div>
     
@@ -200,7 +187,7 @@
         document.getElementById('tab-eqdb-queue').addEventListener('click', function() { switchTab('eqdb-queue'); });
         document.getElementById('tab-scrying').addEventListener('click', function() { switchTab('scrying'); });
         document.getElementById('tab-contributors').addEventListener('click', function() { switchTab('contributors'); });
-document.getElementById('tab-bugreports').addEventListener('click', function() { switchTab('bugreports'); });
+        document.getElementById('tab-bugs').addEventListener('click', function() { switchTab('bugs'); });
         
         document.getElementById('copy-eqdb-btn').addEventListener('click', function() {
             if (window.eqdbHashes && window.eqdbHashes.length > 0) {
@@ -245,7 +232,7 @@ document.getElementById('tab-bugreports').addEventListener('click', function() {
             if (tab === 'eqdb-queue') loadEqdbQueue();
             if (tab === 'scrying') loadScrying();
             if (tab === 'contributors') loadContributors();
-            if (tab === 'bugreports') loadBugReports();
+            if (tab === 'bugs') loadBugReports();
         }
         
         document.getElementById('equipment-search-btn').addEventListener('click', function() { equipmentSearch = document.getElementById('equipment-search').value.trim(); equipmentPage = 1; loadEquipment(); });
@@ -310,7 +297,7 @@ document.getElementById('tab-bugreports').addEventListener('click', function() {
                     var uploaderDisplay = (item.properties && item.properties.uploaded_by) ? '<span class="uploader-tag">' + escapeHtml(item.properties.uploaded_by) + '</span>' : '<span class="anon-tag">anonymous</span>';
                     var sourceDisplay = item.verified ? '<span class="eqdb-label">EQDB</span>' : '<span class="personal-label">Personal</span>';
                     var viaDisplay = (item.properties && item.properties.source) ? escapeHtml(item.properties.source) : '<span class="anon-tag">unknown</span>';
-                    rows.push('<tr><td><a href="item.html?name=' + encodeURIComponent(item.name) + '" target="_blank">' + escapeHtml(item.name) + '</a></td><td>' + escapeHtml(item.type) + '</td><td>' + sourceDisplay + '</td><td>' + uploaderDisplay + '</td><td>' + viaDisplay + '</td><td>' + fmtDate(item.created_at) + '</td><td><button class="btn-delete" data-id="' + item.id + '">Delete</button> <button class="btn-edit" data-id="' + item.id + '">Edit</button></td></tr>');
+                    rows.push('<tr><td><a href="item.html?name=' + encodeURIComponent(item.name) + '" target="_blank">' + escapeHtml(item.name) + '</a></td><td>' + escapeHtml(item.type) + '</td><td>' + sourceDisplay + '</td><td>' + uploaderDisplay + '</td><td>' + viaDisplay + '</td><td>' + new Date(item.created_at).toLocaleDateString() + '</td><td><button class="btn-delete" data-id="' + item.id + '">Delete</button> <button class="btn-edit" data-id="' + item.id + '">Edit</button></td></tr>');
                 }
                 tbody.innerHTML = rows.join('');
             }
@@ -319,29 +306,6 @@ document.getElementById('tab-bugreports').addEventListener('click', function() {
             renderPagination('equipment', equipmentPage, Math.ceil(equipmentTotal / PER_PAGE));
         }
         
-        function statusIcon(status) {
-            if (status === 'approved') return '<span style="color:#44aa44;">Approved</span>';
-            if (status === 'denied') return '<span style="color:#ff4444;">Denied</span>';
-            return '<span style="color:#ffaa00;">Pending</span>';
-        }
-        
-        function fmtDate(d) {
-            var dt = new Date(d);
-            return dt.toLocaleString('en-US', { timeZone: 'America/New_York', timeZoneName: 'short' });
-        }
-        
-        window.adminDeleteIdea = async function(id) { if (!confirm('Delete?')) return; var r = await supabase.from('ideas').delete().eq('id', id); if (r.error) alert('Delete failed: ' + r.error.message); loadIdeas(); };
-        window.adminApproveIdea = async function(id) { var r = await supabase.from('ideas').update({ status: 'approved' }).eq('id', id); if (r.error) alert('Approve failed: ' + r.error.message); loadIdeas(); };
-        window.adminRejectIdea = async function(id) { var r = await supabase.from('ideas').update({ status: 'denied' }).eq('id', id); if (r.error) alert('Deny failed: ' + r.error.message); loadIdeas(); };
-        
-        document.addEventListener('click', function(e) {
-            var t = e.target;
-            if (!t || !t.classList) return;
-            if (t.classList.contains('c-del')) { if (!confirm('Delete?')) return; supabase.from('comments').delete().eq('id', t.dataset.id).then(function(r) { if (r.error) alert('Delete failed: ' + r.error.message); loadComments(); }); }
-            else if (t.classList.contains('c-app')) { supabase.from('comments').update({ status: 'approved' }).eq('id', t.dataset.id).then(function(r) { if (r.error) alert('Approve failed: ' + r.error.message); loadComments(); }); }
-            else if (t.classList.contains('c-rej')) { supabase.from('comments').update({ status: 'denied' }).eq('id', t.dataset.id).then(function(r) { if (r.error) alert('Deny failed: ' + r.error.message); loadComments(); }); }
-        });
-        
         async function loadComments() {
             var q = supabase.from('comments').select('*', { count: 'exact' });
             if (commentsSearch) q = q.or('comment_text.ilike.%' + commentsSearch + '%,display_name.ilike.%' + commentsSearch + '%');
@@ -349,18 +313,18 @@ document.getElementById('tab-bugreports').addEventListener('click', function() {
             var r = await q.order('created_at', { ascending: false }).range(from, to);
             var data = r.data; commentsTotal = r.count || 0;
             var tbody = document.getElementById('comments-table');
-            if (r.error) { tbody.innerHTML = '<tr><td colspan="6">Error: ' + r.error.message + '</td></tr>'; return; }
-            if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="6">No comments found.</td></tr>'; }
+            if (r.error) { tbody.innerHTML = '<tr><td colspan="5">Error: ' + r.error.message + '</td></tr>'; return; }
+            if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="5">No comments found.</td></tr>'; }
             else {
                 var rows = [];
                 for (var c = 0; c < data.length; c++) {
                     var comment = data[c], itemName = '(deleted)';
                     if (comment.equipment_id) { var eq = await supabase.from('equipment').select('name').eq('id', comment.equipment_id).single(); if (eq.data) itemName = eq.data.name; }
-                    var s = comment.status || 'pending';
-                    rows.push('<tr><td>' + escapeHtml(comment.comment_text).substring(0, 80) + '</td><td>' + escapeHtml(comment.display_name) + '</td><td><a href="item.html?name=' + encodeURIComponent(itemName) + '">' + escapeHtml(itemName) + '</a></td><td>' + statusIcon(s) + '</td><td>' + fmtDate(comment.created_at) + '</td><td><button class="c-del" data-id="' + comment.id + '">Delete</button> <button class="c-app" data-id="' + comment.id + '"' + (s === 'approved' ? ' disabled' : '') + '>Approve</button> <button class="c-rej" data-id="' + comment.id + '"' + (s === 'denied' ? ' disabled' : '') + '>Deny</button></td></tr>');
+                    rows.push('<tr><td>' + escapeHtml(comment.comment_text).substring(0, 80) + '</td><td>' + escapeHtml(comment.display_name) + '</td><td>' + escapeHtml(itemName) + '</td><td>' + new Date(comment.created_at).toLocaleDateString() + '</td><td><button class="btn-delete" data-id="' + comment.id + '">Delete</button></td></tr>');
                 }
                 tbody.innerHTML = rows.join('');
             }
+            document.querySelectorAll('#comments-table .btn-delete').forEach(function(b) { b.addEventListener('click', async function() { if (!confirm('Delete?')) return; await supabase.from('comments').delete().eq('id', this.getAttribute('data-id')); loadComments(); }); });
             renderPagination('comments', commentsPage, Math.ceil(commentsTotal / PER_PAGE));
         }
         
@@ -374,20 +338,28 @@ document.getElementById('tab-bugreports').addEventListener('click', function() {
                 var rows = [];
                 for (var i = 0; i < data.length; i++) {
                     var idea = data[i];
-                    var status = idea.status || 'pending';
-                    var statusDisplay = status === 'approved' ? '<span style="color:#44aa44;">Approved</span>' : status === 'denied' ? '<span style="color:#ff4444;">Denied</span>' : '<span style="color:#ffaa00;">Pending</span>';
                     rows.push('<tr>' +
                         '<td>' + escapeHtml(idea.idea_text) + '</td>' +
                         '<td>' + escapeHtml(idea.submitted_by) + '</td>' +
-                        '<td>' + fmtDate(idea.created_at) + '</td>' +
-                        '<td>' + statusDisplay + '</td>' +
-                        '<td><button class="btn-delete" data-id="' + idea.id + '" onclick="adminDeleteIdea(\'' + idea.id + '\')">Delete</button> ' +
-                        '<button class="btn-approve" data-id="' + idea.id + '"' + (status === 'approved' ? ' disabled' : '') + ' onclick="adminApproveIdea(\'' + idea.id + '\')">Approve</button> ' +
-                        '<button class="btn-reject" data-id="' + idea.id + '"' + (status === 'denied' ? ' disabled' : '') + ' onclick="adminRejectIdea(\'' + idea.id + '\')">Deny</button></td>' +
+                        '<td>' + new Date(idea.created_at).toLocaleDateString() + '</td>' +
+                        '<td>' + (idea.reviewed ? '✅' : '👀') + '</td>' +
+                        '<td><button class="btn-delete" data-id="' + idea.id + '">Delete</button> ' +
+                        '<button class="btn-review" data-id="' + idea.id + '">' + (idea.reviewed ? 'Unmark' : 'Mark Reviewed') + '</button></td>' +
                         '</tr>');
                 }
                 tbody.innerHTML = rows.join('');
             }
+            document.querySelectorAll('#ideas-table .btn-delete').forEach(function(b) {
+                b.addEventListener('click', async function() { if (!confirm('Delete?')) return; await supabase.from('ideas').delete().eq('id', this.getAttribute('data-id')); loadIdeas(); });
+            });
+            document.querySelectorAll('#ideas-table .btn-review').forEach(function(b) {
+                b.addEventListener('click', async function() {
+                    var id = this.getAttribute('data-id');
+                    var current = this.textContent === 'Mark Reviewed';
+                    await supabase.from('ideas').update({ reviewed: current }).eq('id', id);
+                    loadIdeas();
+                });
+            });
         }
         
         async function loadEqdbQueue() {
@@ -408,7 +380,7 @@ document.getElementById('tab-bugreports').addEventListener('click', function() {
                     rows.push('<tr>' +
                         '<td style="font-family:monospace;font-size:11px;cursor:pointer;" onclick="navigator.clipboard.writeText(\'' + s.hash + '\')">' + s.hash.substring(0, 20) + '...</td>' +
                         '<td>' + escapeHtml(s.submitted_by) + '</td>' +
-                        '<td>' + fmtDate(s.created_at) + '</td>' +
+                        '<td>' + new Date(s.created_at).toLocaleDateString() + '</td>' +
                         '<td>' + (s.processed ? '<span style="color:#44aa44;">Processed</span>' : '<span style="color:#ffaa00;">Pending</span>') + '</td>' +
                         '<td><button class="btn-delete" data-id="' + s.id + '">Delete</button></td>' +
                         '</tr>');
@@ -439,7 +411,7 @@ document.getElementById('tab-bugreports').addEventListener('click', function() {
                     rows.push('<tr>' +
                         '<td style="font-family:monospace;font-size:11px;cursor:pointer;" onclick="navigator.clipboard.writeText(\'' + s.hash + '\')">' + s.hash.substring(0, 20) + '...</td>' +
                         '<td>' + escapeHtml(s.submitted_by) + '</td>' +
-                        '<td>' + fmtDate(s.created_at) + '</td>' +
+                        '<td>' + new Date(s.created_at).toLocaleDateString() + '</td>' +
                         '<td>' + (s.approved ? '<span style="color:#44aa44;">Approved</span>' : (s.reviewed ? '<span style="color:#ffaa00;">Reviewed</span>' : '<span style="color:#888;">Pending</span>')) + '</td>' +
                         '<td>' +
                         '<button class="btn-approve" data-id="' + s.id + '"' + (s.approved ? ' disabled' : '') + '>Approve</button> ' +
@@ -483,6 +455,7 @@ document.getElementById('tab-bugreports').addEventListener('click', function() {
             else if (type === 'comments') { commentsPage = page; loadComments(); }
             else if (type === 'eqdb-queue') { eqdbQueuePage = page; loadEqdbQueue(); }
             else if (type === 'scrying') { scryingPage = page; loadScrying(); }
+            else if (type === 'bugs') { bugsPage = page; loadBugReports(); }
         }
         
         async function openEditModal(id) {
@@ -518,19 +491,24 @@ document.getElementById('tab-bugreports').addEventListener('click', function() {
         async function loadContributors() {
             var status = document.getElementById('contributor-status');
             status.textContent = 'Loading...';
-            var result = await supabase.from('submission_history').select('*');
-            if (result.error) {
-                document.getElementById('contributors-table').innerHTML = '<tr><td colspan="7">Error: ' + result.error.message + '</td></tr>';
-                status.textContent = '';
-                return;
+
+            // Page through all submission_history — no 1000 row cap
+            var data = [];
+            var page = 0, pageSize = 1000;
+            while (true) {
+                var r = await supabase.from('submission_history').select('submitter,is_eqdb,created_at').range(page * pageSize, (page + 1) * pageSize - 1);
+                if (r.error) { document.getElementById('contributors-table').innerHTML = '<tr><td colspan="7">Error: ' + r.error.message + '</td></tr>'; status.textContent = ''; return; }
+                if (!r.data || r.data.length === 0) break;
+                data = data.concat(r.data);
+                if (r.data.length < pageSize) break;
+                page++;
             }
-            var data = result.data;
-            if (!data || data.length === 0) {
+
+            if (data.length === 0) {
                 document.getElementById('contributors-table').innerHTML = '<tr><td colspan="7">No submissions recorded yet.</td></tr>';
                 status.textContent = '';
                 return;
             }
-            // Aggregate by submitter
             var contributors = {};
             for (var i = 0; i < data.length; i++) {
                 var s = data[i];
@@ -553,8 +531,8 @@ document.getElementById('tab-bugreports').addEventListener('click', function() {
                     + '<td style="padding:5px;border-bottom:1px solid #333;">' + c.total + '</td>'
                     + '<td style="padding:5px;border-bottom:1px solid #333;color:#44aa44;">' + c.eqdb + '</td>'
                     + '<td style="padding:5px;border-bottom:1px solid #333;color:#ffaa00;">' + c.personal + '</td>'
-                    + '<td style="padding:5px;border-bottom:1px solid #333;">' + fmtDate(c.first) + '</td>'
-                    + '<td style="padding:5px;border-bottom:1px solid #333;">' + fmtDate(c.last) + '</td>'
+                    + '<td style="padding:5px;border-bottom:1px solid #333;">' + new Date(c.first).toLocaleDateString() + '</td>'
+                    + '<td style="padding:5px;border-bottom:1px solid #333;">' + new Date(c.last).toLocaleDateString() + '</td>'
                     + '</tr>';
             }
             tbody.innerHTML = html;
@@ -563,37 +541,52 @@ document.getElementById('tab-bugreports').addEventListener('click', function() {
         document.getElementById('refresh-contributors-btn').addEventListener('click', loadContributors);
 
         document.getElementById('backfill-contributors-btn').addEventListener('click', async function() {
-            if (!confirm('This will import all existing equipment records into submission_history. Continue?')) return;
+            if (!confirm('This will create submission_history entries for equipment that does not have one yet. Continue?')) return;
             var btn = this;
             btn.disabled = true;
             var status = document.getElementById('contributor-status');
-            status.textContent = 'Fetching equipment records...';
 
-            // Fetch all equipment
+            // Page through ALL equipment — no source filter, no cap
             var allItems = [];
-            var page = 0, pageSize = 1000, hasMore = true;
-            while (hasMore) {
-                var from = page * pageSize, to = from + pageSize - 1;
-                var result = await supabase.from('equipment').select('id,name,verified,properties,created_at,description').range(from, to);
-                if (result.data && result.data.length > 0) allItems = allItems.concat(result.data);
-                hasMore = result.data && result.data.length === pageSize;
+            var page = 0, pageSize = 1000;
+            while (true) {
+                status.textContent = 'Loading equipment... ' + allItems.length + ' so far';
+                var r = await supabase.from('equipment').select('id,name,verified,properties,created_at').range(page * pageSize, (page + 1) * pageSize - 1);
+                if (r.error) { status.textContent = 'Error: ' + r.error.message; btn.disabled = false; return; }
+                if (!r.data || r.data.length === 0) break;
+                allItems = allItems.concat(r.data);
+                if (r.data.length < pageSize) break;
                 page++;
             }
-            status.textContent = 'Importing ' + allItems.length + ' records to history...';
+
+            // Get all existing history item names (also paginated)
+            status.textContent = 'Loaded ' + allItems.length + ' items. Checking existing history...';
+            var existingNames = new Set();
+            var hPage = 0;
+            while (true) {
+                var hr = await supabase.from('submission_history').select('item_name').range(hPage * pageSize, (hPage + 1) * pageSize - 1);
+                if (!hr.data || hr.data.length === 0) break;
+                hr.data.forEach(function(e) { existingNames.add(e.item_name); });
+                if (hr.data.length < pageSize) break;
+                hPage++;
+            }
+
+            var missing = allItems.filter(function(i) { return !existingNames.has(i.name); });
+            status.textContent = missing.length + ' items need history entries, ' + (allItems.length - missing.length) + ' already have them.';
 
             var imported = 0, errors = 0;
-            for (var i = 0; i < allItems.length; i++) {
-                var item = allItems[i];
-                var result = await supabase.from('submission_history').insert({
+            for (var i = 0; i < missing.length; i++) {
+                var item = missing[i];
+                var r2 = await supabase.from('submission_history').insert({
                     item_name: item.name,
                     submitter: (item.properties && item.properties.uploaded_by) || 'anonymous',
-                    source: (item.properties && item.properties.source) || 'unknown',
+                    source: (item.properties && item.properties.source) || 'plugin_import',
                     is_eqdb: item.verified || false,
-                    description: item.description || '',
+                    description: 'Backfilled from equipment table',
                     created_at: item.created_at
                 });
-                if (result.error) errors++; else imported++;
-                if (i % 100 === 0) status.textContent = 'Importing... ' + i + '/' + allItems.length + ' (' + imported + ' done)';
+                if (r2.error) errors++; else imported++;
+                if (i % 50 === 0) status.textContent = 'Backfilling... ' + i + '/' + missing.length + ' (' + imported + ' done)';
             }
             status.textContent = 'Done! ' + imported + ' imported, ' + errors + ' errors.';
             btn.disabled = false;
@@ -603,36 +596,47 @@ document.getElementById('tab-bugreports').addEventListener('click', function() {
         // ============================================
         // BUG REPORTS
         // ============================================
+        var bugsPage = 1, bugsTotal = 0;
+
         async function loadBugReports() {
-            var status = document.getElementById('bugreport-status');
+            var status = document.getElementById('bugs-status');
             status.textContent = 'Loading...';
-            var result = await supabase.from('bug_reports').select('*').order('created_at', { ascending: false }).limit(100);
-            var data = result.data;
-            var tbody = document.getElementById('bugreports-table');
-            if (result.error) { tbody.innerHTML = '<tr><td colspan="4">Error: ' + result.error.message + '</td></tr>'; status.textContent = ''; return; }
-            if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="4">No bug reports yet.</td></tr>'; status.textContent = ''; return; }
-            var html = '';
-            for (var i = 0; i < data.length; i++) {
-                var b = data[i];
-                html += '<tr>'
-                    + '<td>' + escapeHtml(b.description || '').substring(0, 120) + '</td>'
-                    + '<td><a href="' + escapeHtml(b.page_url || '') + '" target="_blank" style="font-size:12px;">' + escapeHtml((b.page_url || '').substring(0, 50)) + '</a></td>'
-                    + '<td>' + fmtDate(b.created_at) + '</td>'
-                    + '<td><button class="btn-delete bug-delete" data-id="' + b.id + '">Delete</button></td>'
-                    + '</tr>';
+            var from = (bugsPage - 1) * PER_PAGE, to = from + PER_PAGE - 1;
+            var r = await supabase.from('bug_reports').select('*', { count: 'exact' }).order('created_at', { ascending: false }).range(from, to);
+            bugsTotal = r.count || 0;
+            var tbody = document.getElementById('bugs-table');
+            if (r.error) { tbody.innerHTML = '<tr><td colspan="4">Error: ' + r.error.message + '</td></tr>'; status.textContent = ''; return; }
+            if (!r.data || r.data.length === 0) { tbody.innerHTML = '<tr><td colspan="4">No bug reports.</td></tr>'; status.textContent = '0 reports'; return; }
+            var rows = [];
+            for (var i = 0; i < r.data.length; i++) {
+                var b = r.data[i];
+                var shortUrl = (b.page_url || '').replace(/^https?:\/\/[^/]+/, '');
+                rows.push('<tr>' +
+                    '<td>' + escapeHtml(b.description || '') + '</td>' +
+                    '<td style="font-size:12px;color:#888;" title="' + escapeHtml(b.page_url || '') + '">' + escapeHtml(shortUrl || b.page_url || '') + '</td>' +
+                    '<td>' + new Date(b.created_at).toLocaleDateString() + '</td>' +
+                    '<td><button class="btn-delete" data-id="' + b.id + '">Delete</button></td>' +
+                    '</tr>');
             }
-            tbody.innerHTML = html;
-            document.querySelectorAll('#bugreports-table .bug-delete').forEach(function(btn) {
-                btn.addEventListener('click', async function() {
+            tbody.innerHTML = rows.join('');
+            status.textContent = bugsTotal + ' total reports';
+            document.querySelectorAll('#bugs-table .btn-delete').forEach(function(b) {
+                b.addEventListener('click', async function() {
                     if (!confirm('Delete this bug report?')) return;
-                    var r = await supabase.from('bug_reports').delete().eq('id', this.getAttribute('data-id'));
-                    if (r.error) alert('Delete failed: ' + r.error.message);
+                    await supabase.from('bug_reports').delete().eq('id', this.getAttribute('data-id'));
                     loadBugReports();
                 });
             });
-            status.textContent = data.length + ' bug reports';
+            renderPagination('bugs', bugsPage, Math.ceil(bugsTotal / PER_PAGE));
         }
+
         document.getElementById('refresh-bugs-btn').addEventListener('click', loadBugReports);
+        document.getElementById('delete-all-bugs-btn').addEventListener('click', async function() {
+            if (!confirm('Delete ALL bug reports? This cannot be undone.')) return;
+            var r = await supabase.from('bug_reports').delete().neq('id', 0);
+            if (r.error) { document.getElementById('bugs-status').textContent = 'Error: ' + r.error.message; }
+            else { loadBugReports(); }
+        });
 
         // ============================================
         // MM COLORIZER ENGINE
@@ -725,48 +729,5 @@ document.getElementById('tab-bugreports').addEventListener('click', function() {
         }
     </script>
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"131579fcdf914a0f9aa2fb16db7f327e","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
-    <script>
-        if (sessionStorage.getItem('editor_logged_in') === 'true') {
-            document.getElementById('editor-links').style.display = 'inline';
-            document.getElementById('logout-link').style.display = 'inline';
-            document.getElementById('login-link').style.display = 'none';
-        }
-        function logout() { sessionStorage.removeItem('editor_logged_in'); location.reload(); }
-    </script>
-<style>
-#bug-btn-container{text-align:center;padding:10px 0;margin-top:20px;}
-#bug-btn{background:#ff4444;color:white;border:none;border-radius:3px;padding:8px 16px;cursor:pointer;font-size:13px;}
-#bug-btn:hover{background:#cc0000;}
-#bug-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:none;align-items:center;justify-content:center;}
-#bug-modal-content{background:#1a1a1a;border:2px solid #555;border-radius:10px;padding:20px;width:90%;max-width:500px;color:#ccc;}
-#bug-modal-content h3{margin:0 0 10px;color:#ff4444;}
-#bug-modal-content textarea{width:100%;height:120px;padding:8px;background:#333;color:#ccc;border:1px solid #555;border-radius:3px;box-sizing:border-box;margin:10px 0;font-family:Arial,sans-serif;}
-#bug-modal-content .bug-url{color:#888;font-size:12px;word-break:break-all;}
-#bug-modal-content .btn-row{display:flex;gap:10px;justify-content:flex-end;}
-#bug-modal-content .btn-submit{background:#ff4444;color:white;border:none;border-radius:3px;padding:8px 16px;cursor:pointer;}
-#bug-modal-content .btn-cancel{background:#666;color:white;border:none;border-radius:3px;padding:8px 16px;cursor:pointer;}
-#bug-modal-content .btn-submit:disabled{opacity:0.5;cursor:not-allowed;}
-#bug-modal-content .bug-msg{margin:10px 0 0;font-size:13px;}
-</style>
-<div id="bug-btn-container"><button id="bug-btn" onclick="openBugReport()">Report Bug</button></div>
-<div id="bug-modal" onclick="if(event.target===this)closeBugReport()">
-  <div id="bug-modal-content">
-    <h3>Report Bug</h3>
-    <p class="bug-url">Page: <span id="bug-page-url"></span></p>
-    <textarea id="bug-description" placeholder="Describe what went wrong..."></textarea>
-    <div class="btn-row">
-      <button class="btn-cancel" onclick="closeBugReport()">Cancel</button>
-      <button class="btn-submit" id="bug-submit-btn" onclick="submitBugReport()">Submit</button>
-    </div>
-    <p class="bug-msg" id="bug-msg"></p>
-  </div>
-</div>
-<script>
-function openBugReport(){document.getElementById('bug-page-url').textContent=window.location.href;document.getElementById('bug-description').value='';document.getElementById('bug-msg').textContent='';document.getElementById('bug-modal').style.display='flex';document.getElementById('bug-submit-btn').disabled=false;}
-function closeBugReport(){document.getElementById('bug-modal').style.display='none';}
-function submitBugReport(){var d=document.getElementById('bug-description').value.trim();if(!d){document.getElementById('bug-msg').innerHTML='<span style="color:#ff4444;">Please describe the bug.</span>';return;}
-var b=document.getElementById('bug-submit-btn');b.disabled=true;document.getElementById('bug-msg').innerHTML='<span style="color:#888;">Submitting...</span>';
-fetch('https://fpvwpxtsrmrmdvnswrzx.supabase.co/rest/v1/bug_reports',{method:'POST',headers:{'apikey':'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY','Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY','Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({page_url:window.location.href,description:d})}).then(function(r){if(r.ok||r.status===201){document.getElementById('bug-msg').innerHTML='<span style="color:#44aa44;">Bug reported! Thank you.</span>';document.getElementById('bug-description').value='';setTimeout(closeBugReport,2000);}else{document.getElementById('bug-msg').innerHTML='<span style="color:#ff4444;">Error submitting. Try again later.</span>';b.disabled=false;}}).catch(function(){document.getElementById('bug-msg').innerHTML='<span style="color:#ff4444;">Network error. Try again later.</span>';b.disabled=false;});}
-</script>
 </body>
 </html>

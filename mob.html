@@ -167,11 +167,44 @@
   </div>
 </div>
 <script>
-function openBugReport(){document.getElementById('bug-page-url').textContent=window.location.href;document.getElementById('bug-description').value='';document.getElementById('bug-msg').textContent='';document.getElementById('bug-modal').style.display='flex';document.getElementById('bug-submit-btn').disabled=false;}
-function closeBugReport(){document.getElementById('bug-modal').style.display='none';}
-function submitBugReport(){var d=document.getElementById('bug-description').value.trim();if(!d){document.getElementById('bug-msg').innerHTML='<span style="color:#ff4444;">Please describe the bug.</span>';return;}
-var b=document.getElementById('bug-submit-btn');b.disabled=true;document.getElementById('bug-msg').innerHTML='<span style="color:#888;">Submitting...</span>';
-fetch('https://fpvwpxtsrmrmdvnswrzx.supabase.co/rest/v1/bug_reports',{method:'POST',headers:{'apikey':'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY','Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY','Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({page_url:window.location.href,description:d})}).then(function(r){if(r.ok||r.status===201){document.getElementById('bug-msg').innerHTML='<span style="color:#44aa44;">Bug reported! Thank you.</span>';document.getElementById('bug-description').value='';setTimeout(closeBugReport,2000);}else{document.getElementById('bug-msg').innerHTML='<span style="color:#ff4444;">Error submitting. Try again later.</span>';b.disabled=false;}}).catch(function(){document.getElementById('bug-msg').innerHTML='<span style="color:#ff4444;">Network error. Try again later.</span>';b.disabled=false;});}
+    var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
+    var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
+    window.openBugReport = function() {
+        document.getElementById('bug-page-url').textContent = window.location.href;
+        document.getElementById('bug-description').value = '';
+        document.getElementById('bug-msg').textContent = '';
+        document.getElementById('bug-modal').style.display = 'flex';
+        document.getElementById('bug-submit-btn').disabled = false;
+    };
+    window.closeBugReport = function() {
+        document.getElementById('bug-modal').style.display = 'none';
+    };
+    window.submitBugReport = async function() {
+        var d = document.getElementById('bug-description').value.trim();
+        if (!d) { document.getElementById('bug-msg').innerHTML = '<span style="color:#ff4444;">Please describe the bug.</span>'; return; }
+        var b = document.getElementById('bug-submit-btn');
+        b.disabled = true;
+        document.getElementById('bug-msg').innerHTML = '<span style="color:#888;">Submitting...</span>';
+        try {
+            var r = await fetch(SUPABASE_URL + '/rest/v1/bug_reports', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'Prefer': 'return=representation' },
+                body: JSON.stringify({ page_url: window.location.href, description: d })
+            });
+            if (r.ok || r.status === 201) {
+                document.getElementById('bug-msg').innerHTML = '<span style="color:#44aa44;">Bug reported! Thank you.</span>';
+                document.getElementById('bug-description').value = '';
+                setTimeout(window.closeBugReport, 2000);
+            } else {
+                var txt = await r.text();
+                document.getElementById('bug-msg').innerHTML = '<span style="color:#ff4444;">Error: ' + (txt || r.statusText) + '</span>';
+                b.disabled = false;
+            }
+        } catch(e) {
+            document.getElementById('bug-msg').innerHTML = '<span style="color:#ff4444;">Error: ' + e.message + '</span>';
+            b.disabled = false;
+        }
+    };
 </script>
 </body>
 </html>

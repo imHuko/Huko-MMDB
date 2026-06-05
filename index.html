@@ -20,16 +20,6 @@
         .search-bar button { cursor: pointer; background: #8787FF; color: #000; border: none; }
         #advanced-filters { margin: 10px 0; padding: 10px; background: #222; border-radius: 5px; }
         #advanced-filters select, #advanced-filters input { padding: 6px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; margin: 3px; }
-        .leaderboard { margin: 30px 0; }
-        .leaderboard table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        .leaderboard th { color: #888; text-align: left; padding: 8px; border-bottom: 2px solid #444; font-size: 12px; }
-        .leaderboard td { padding: 8px; border-bottom: 1px solid #333; }
-        .leaderboard tr:hover td { background: #222; }
-        .leaderboard .medal { font-size: 18px; }
-        .leaderboard .count-eqdb { color: #44aa44; }
-        .leaderboard .count-personal { color: #ffaa00; }
-        .leaderboard-loading { color: #888; padding: 20px; text-align: center; }
-        .leaderboard-error { color: #ff4444; padding: 20px; text-align: center; }
     </style>
 </head>
 <body>
@@ -38,7 +28,6 @@
         <a href="index.html">Search</a>
         <a href="info.html">About</a>
         <a href="ideas.html">Ideas</a>
-        <a href="leaderboard.html">Leaderboard</a>
         <span id="editor-links" style="display:none;">
             <a href="import.html">Add Equipment</a>
             <a href="batch.html">Batch Import</a>
@@ -141,8 +130,12 @@
                 <option value="eqdb">EQDB Only</option>
                 <option value="personal">Personal Only</option>
             </select>
-			<input type="text" id="filter-affect" placeholder="Affect (e.g. hp-regen)" style="width:150px;" list="affect-list">
-<datalist id="affect-list"></datalist>
+            <div id="affect-tag-area" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;background:#333;border:1px solid #555;border-radius:3px;padding:4px 6px;min-width:200px;max-width:400px;cursor:text;" onclick="document.getElementById('filter-affect').focus()">
+                <span style="color:#888;font-size:12px;white-space:nowrap;">Affects:</span>
+                <div id="affect-tags" style="display:flex;flex-wrap:wrap;gap:3px;"></div>
+                <input type="text" id="filter-affect" placeholder="add stat..." style="border:none;background:transparent;color:#ccc;outline:none;padding:2px;width:100px;font-size:13px;" list="affect-list" autocomplete="off">
+            </div>
+            <datalist id="affect-list"></datalist>
         </div>
     </div>
 
@@ -152,16 +145,6 @@
     <div id="results">
         <p style="color:#888;">Use the search bar above or click Search to browse all items.</p>
     </div>
-
-    <hr>
-    <div class="leaderboard" id="leaderboard-section">
-        <h2 style="color:#C0C0C0;">Top Contributors</h2>
-        <p style="font-size:13px;color:#888;">Players who have submitted the most equipment data.</p>
-        <table><thead><tr><th></th><th>Contributor</th><th>Total</th><th class="count-eqdb">EQDB</th><th class="count-personal">Personal</th><th>First</th><th>Last</th></tr></thead>
-            <tbody id="leaderboard-body"><tr><td colspan="7" class="leaderboard-loading">Loading...</td></tr></tbody>
-        </table>
-    </div>
-
 	    <script type="module">
         var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
         var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
@@ -237,7 +220,7 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
                 filterMinLevel: document.getElementById('filter-min-level').value,
                 filterMaxLevel: document.getElementById('filter-max-level').value,
                 filterSource: document.getElementById('filter-source').value,
-                filterAffect: document.getElementById('filter-affect').value,
+                filterAffects: activeAffects.slice(),
                 filtersVisible: document.getElementById('advanced-filters').style.display !== 'none',
                 lastSearch: document.getElementById('results').querySelector('.item-card') ? 'equipment' : 'mobs'
             }));
@@ -257,7 +240,9 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
                 document.getElementById('filter-min-level').value = state.filterMinLevel || '';
                 document.getElementById('filter-max-level').value = state.filterMaxLevel || '';
                 document.getElementById('filter-source').value = state.filterSource || '';
-                document.getElementById('filter-affect').value = state.filterAffect || '';
+                if (state.filterAffects && state.filterAffects.length) {
+                    state.filterAffects.forEach(function(a) { addAffectTag(a); });
+                }
                 var filters = document.getElementById('advanced-filters');
                 if (state.filtersVisible) {
                     filters.style.display = 'block';
@@ -266,7 +251,7 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
                 if (state.filterType === 'weapon') {
                     document.getElementById('filter-weapon-type').style.display = 'inline';
                 }
-                return state.search || state.mobSearch || state.filterType || state.filterWearSlot || state.filterMaterial || state.filterMinLevel || state.filterMaxLevel || state.filterAffect;
+                return state.search || state.mobSearch || state.filterType || state.filterWearSlot || state.filterMaterial || state.filterMinLevel || state.filterMaxLevel || (state.filterAffects && state.filterAffects.length);
             } catch(e) { return false; }
         }
         
@@ -279,6 +264,8 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
             document.getElementById('filter-min-level').value = '';
             document.getElementById('filter-max-level').value = '';
             document.getElementById('filter-source').value = '';
+            activeAffects = [];
+            renderAffectTags();
             sessionStorage.removeItem('eqdb_search');
             searchEquipment();
         });
@@ -320,8 +307,12 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
             if (weaponType) query = query.ilike('description', '%type weapon ' + weaponType + '%');
 if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
             if (material) query = query.ilike('description', '%made of ' + material + '%');
-			            var affectFilter = document.getElementById('filter-affect').value.toLowerCase();
-            if (affectFilter) query = query.ilike('description', '%' + affectFilter + '%');
+			            if (activeAffects.length > 0) {
+                console.log('Filtering by affects:', activeAffects);
+                for (var af = 0; af < activeAffects.length; af++) {
+                    query = query.ilike('description', '%Affects ' + activeAffects[af] + '%');
+                }
+            }
             if (minLevel) query = query.gte('level_req', minLevel);
             if (maxLevel) query = query.lte('level_req', maxLevel);
             if (source === 'eqdb') query = query.eq('verified', true);
@@ -404,60 +395,61 @@ if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
             return div.innerHTML;
         }
         
+
         // ============================================
-        // LEADERBOARD
+        // AFFECT TAG MANAGEMENT
         // ============================================
-        async function loadLeaderboard() {
-            var tbody = document.getElementById('leaderboard-body');
-            var allData = [];
-            var pageSize = 1000;
-            var from = 0;
-            var fetchMore = true;
-            while (fetchMore) {
-                var r = await supabase.from('submission_history').select('*').range(from, from + pageSize - 1).order('created_at', { ascending: true });
-                if (r.error) { tbody.innerHTML = '<tr><td colspan="7" class="leaderboard-error">Error: ' + r.error.message + '</td></tr>'; return; }
-                if (r.data && r.data.length > 0) { allData = allData.concat(r.data); from += pageSize; }
-                if (!r.data || r.data.length < pageSize) fetchMore = false;
-            }
-            var data = allData;
-            if (!data || data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;padding:20px;">No submissions yet. Be the first!</td></tr>';
-                return;
-            }
-            var contributors = {};
-            for (var i = 0; i < data.length; i++) {
-                var s = data[i];
-                var name = s.submitter || 'anonymous';
-                if (name === 'Huko') continue;
-                if (!contributors[name]) contributors[name] = { name: name, total: 0, eqdb: 0, personal: 0, first: s.created_at, last: s.created_at };
-                contributors[name].total++;
-                if (s.is_eqdb) contributors[name].eqdb++; else contributors[name].personal++;
-                if (s.created_at < contributors[name].first) contributors[name].first = s.created_at;
-                if (s.created_at > contributors[name].last) contributors[name].last = s.created_at;
-            }
-            var sorted = Object.values(contributors).sort(function(a, b) { return b.total - a.total; });
-            var html = '';
-            for (var r = 0; r < Math.min(sorted.length, 25); r++) {
-                var c = sorted[r];
-                var medal = r === 0 ? '🥇' : r === 1 ? '🥈' : r === 2 ? '🥉' : '';
-                var rankDisplay = medal || '<span style="color:#666;">' + (r + 1) + '</span>';
-                var barWidth = Math.round(c.total / sorted[0].total * 100);
-                html += '<tr>'
-                    + '<td class="medal">' + rankDisplay + '</td>'
-                    + '<td><strong>' + escapeHtml(c.name) + '</strong><div style="height:3px;background:#333;border-radius:2px;margin-top:3px;"><div style="height:100%;background:#8787FF;width:' + barWidth + '%;border-radius:2px;"></div></div></td>'
-                    + '<td>' + c.total + '</td>'
-                    + '<td class="count-eqdb">' + c.eqdb + '</td>'
-                    + '<td class="count-personal">' + c.personal + '</td>'
-                    + '<td style="color:#888;font-size:11px;">' + new Date(c.first).toLocaleDateString() + '</td>'
-                    + '<td style="color:#888;font-size:11px;">' + new Date(c.last).toLocaleDateString() + '</td>'
-                    + '</tr>';
-            }
-            if (sorted.length > 25) {
-                html += '<tr><td colspan="7" style="text-align:center;color:#666;padding:10px;font-size:12px;">... and ' + (sorted.length - 25) + ' more contributors</td></tr>';
-            }
-            tbody.innerHTML = html;
+        var activeAffects = [];
+        window.removeAffectTag = function(val) { activeAffects = activeAffects.filter(function(a) { return a !== val; }); renderAffectTags(); };
+
+        function addAffectTag(val) {
+            val = val.trim().toLowerCase();
+            if (!val || activeAffects.indexOf(val) >= 0) return;
+            activeAffects.push(val);
+            renderAffectTags();
         }
-        loadLeaderboard();
+
+        function removeAffectTag(val) {
+            activeAffects = activeAffects.filter(function(a) { return a !== val; });
+            renderAffectTags();
+        }
+
+        function renderAffectTags() {
+            var container = document.getElementById('affect-tags');
+            var html = '';
+            for (var i = 0; i < activeAffects.length; i++) {
+                var a = activeAffects[i];
+                html += '<span style="background:#4a4a7a;color:#ccc;padding:2px 6px;border-radius:3px;font-size:12px;display:inline-flex;align-items:center;gap:4px;">'
+                    + escapeHtml(a)
+                    + '<span data-affect="' + escapeHtml(a) + '" class="rm-tag" style="cursor:pointer;color:#aaa;font-weight:bold;padding-left:3px;">&times;</span>'
+                    + '</span>';
+            }
+            container.innerHTML = html;
+            // wire up remove buttons
+            container.querySelectorAll('.rm-tag').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    removeAffectTag(this.getAttribute('data-affect'));
+                });
+            });
+        }
+
+        document.getElementById('filter-affect').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ',') {
+                e.preventDefault();
+                addAffectTag(this.value);
+                this.value = '';
+            } else if (e.key === 'Backspace' && this.value === '' && activeAffects.length > 0) {
+                removeAffectTag(activeAffects[activeAffects.length - 1]);
+            }
+        });
+
+        // Also add tag when user picks from datalist
+        document.getElementById('filter-affect').addEventListener('change', function() {
+            if (affectList.indexOf(this.value) >= 0) {
+                addAffectTag(this.value);
+                this.value = '';
+            }
+        });
 
         if (restoreSearchState()) {
             var lastSearch = JSON.parse(sessionStorage.getItem('eqdb_search')).lastSearch;
@@ -480,41 +472,5 @@ if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
             location.reload();
         }
     </script>
-<style>
-#bug-btn-container{text-align:center;padding:10px 0;margin-top:20px;}
-#bug-btn{background:#ff4444;color:white;border:none;border-radius:3px;padding:8px 16px;cursor:pointer;font-size:13px;}
-#bug-btn:hover{background:#cc0000;}
-#bug-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:none;align-items:center;justify-content:center;}
-#bug-modal-content{background:#1a1a1a;border:2px solid #555;border-radius:10px;padding:20px;width:90%;max-width:500px;color:#ccc;}
-#bug-modal-content h3{margin:0 0 10px;color:#ff4444;}
-#bug-modal-content textarea{width:100%;height:120px;padding:8px;background:#333;color:#ccc;border:1px solid #555;border-radius:3px;box-sizing:border-box;margin:10px 0;font-family:Arial,sans-serif;}
-#bug-modal-content .bug-url{color:#888;font-size:12px;word-break:break-all;}
-#bug-modal-content .btn-row{display:flex;gap:10px;justify-content:flex-end;}
-#bug-modal-content .btn-submit{background:#ff4444;color:white;border:none;border-radius:3px;padding:8px 16px;cursor:pointer;}
-#bug-modal-content .btn-cancel{background:#666;color:white;border:none;border-radius:3px;padding:8px 16px;cursor:pointer;}
-#bug-modal-content .btn-submit:disabled{opacity:0.5;cursor:not-allowed;}
-#bug-modal-content .bug-msg{margin:10px 0 0;font-size:13px;}
-</style>
-<div id="bug-btn-container"><button id="bug-btn" onclick="openBugReport()">Report Bug</button></div>
-<div id="bug-modal" onclick="if(event.target===this)closeBugReport()">
-  <div id="bug-modal-content">
-    <h3>Report Bug</h3>
-    <p class="bug-url">Page: <span id="bug-page-url"></span></p>
-    <textarea id="bug-description" placeholder="Describe what went wrong..."></textarea>
-    <div class="btn-row">
-      <button class="btn-cancel" onclick="closeBugReport()">Cancel</button>
-      <button class="btn-submit" id="bug-submit-btn" onclick="submitBugReport()">Submit</button>
-    </div>
-    <p class="bug-msg" id="bug-msg"></p>
-  </div>
-</div>
-<script>
-function openBugReport(){document.getElementById('bug-page-url').textContent=window.location.href;document.getElementById('bug-description').value='';document.getElementById('bug-msg').textContent='';document.getElementById('bug-modal').style.display='flex';document.getElementById('bug-submit-btn').disabled=false;}
-function closeBugReport(){document.getElementById('bug-modal').style.display='none';}
-function submitBugReport(){var d=document.getElementById('bug-description').value.trim();if(!d){document.getElementById('bug-msg').innerHTML='<span style="color:#ff4444;">Please describe the bug.</span>';return;}
-var b=document.getElementById('bug-submit-btn');b.disabled=true;document.getElementById('bug-msg').innerHTML='<span style="color:#888;">Submitting...</span>';
-fetch('https://fpvwpxtsrmrmdvnswrzx.supabase.co/rest/v1/bug_reports',{method:'POST',headers:{'apikey':'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY','Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY','Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({page_url:window.location.href,description:d})}).then(function(r){if(r.ok||r.status===201){document.getElementById('bug-msg').innerHTML='<span style="color:#44aa44;">Bug reported! Thank you.</span>';document.getElementById('bug-description').value='';setTimeout(closeBugReport,2000);}else{document.getElementById('bug-msg').innerHTML='<span style="color:#ff4444;">Error submitting. Try again later.</span>';b.disabled=false;}}).catch(function(){document.getElementById('bug-msg').innerHTML='<span style="color:#ff4444;">Network error. Try again later.</span>';b.disabled=false;});}
-</script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"131579fcdf914a0f9aa2fb16db7f327e","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
