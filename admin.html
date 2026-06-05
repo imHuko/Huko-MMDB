@@ -64,7 +64,8 @@
     
     <div id="admin-content">
         <div class="tabs">
-            <span class="tab active" id="tab-equipment">Equipment</span>
+            <span class="tab active" id="tab-dashboard">Dashboard</span>
+            <span class="tab" id="tab-equipment">Equipment</span>
             <span class="tab" id="tab-comments">Comments</span>
             <span class="tab" id="tab-ideas">Ideas</span>
             <span class="tab" id="tab-eqdb-queue">EQDB Queue</span>
@@ -73,7 +74,30 @@
             <span class="tab" id="tab-bugs">Bug Reports</span>
         </div>
         
-        <div id="equipment-section" class="section active">
+        <div id="dashboard-section" class="section active">
+            <div id="dash-stats" style="display:flex;gap:12px;flex-wrap:wrap;margin:15px 0;"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-top:10px;">
+                <div>
+                    <h3 style="color:#C0C0C0;margin:0 0 8px 0;">Recent Equipment</h3>
+                    <div id="dash-equipment" style="font-size:13px;"></div>
+                </div>
+                <div>
+                    <h3 style="color:#C0C0C0;margin:0 0 8px 0;">Recent Bug Reports</h3>
+                    <div id="dash-bugs" style="font-size:13px;"></div>
+                </div>
+                <div>
+                    <h3 style="color:#C0C0C0;margin:0 0 8px 0;">Recent Ideas</h3>
+                    <div id="dash-ideas" style="font-size:13px;"></div>
+                </div>
+                <div>
+                    <h3 style="color:#C0C0C0;margin:0 0 8px 0;">Recent Comments</h3>
+                    <div id="dash-comments" style="font-size:13px;"></div>
+                </div>
+            </div>
+            <p style="font-size:12px;color:#555;margin-top:20px;">Click any tab above to manage that section.</p>
+        </div>
+
+        <div id="equipment-section" class="section">
             <div class="search-bar">
                 <input type="text" id="equipment-search" placeholder="Search by name, type, or uploader...">
                 <button id="equipment-search-btn">Search</button>
@@ -179,8 +203,9 @@
         var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         var PER_PAGE = 50, equipmentPage = 1, commentsPage = 1, equipmentTotal = 0, commentsTotal = 0, equipmentSearch = '', commentsSearch = '';
         var eqdbQueuePage = 1, eqdbQueueTotal = 0, scryingPage = 1, scryingTotal = 0;
-        loadEquipment();
+        loadDashboard();
         
+        document.getElementById('tab-dashboard').addEventListener('click', function() { switchTab('dashboard'); });
         document.getElementById('tab-equipment').addEventListener('click', function() { switchTab('equipment'); });
         document.getElementById('tab-comments').addEventListener('click', function() { switchTab('comments'); });
         document.getElementById('tab-ideas').addEventListener('click', function() { switchTab('ideas'); });
@@ -233,6 +258,7 @@
             if (tab === 'scrying') loadScrying();
             if (tab === 'contributors') loadContributors();
             if (tab === 'bugs') loadBugReports();
+            if (tab === 'dashboard') loadDashboard();
         }
         
         document.getElementById('equipment-search-btn').addEventListener('click', function() { equipmentSearch = document.getElementById('equipment-search').value.trim(); equipmentPage = 1; loadEquipment(); });
@@ -592,6 +618,90 @@
             btn.disabled = false;
             loadContributors();
         });
+
+        // ============================================
+        // DASHBOARD
+        // ============================================
+        async function loadDashboard() {
+            // Fire all queries in parallel
+            var [equipResult, bugResult, ideaResult, commentResult,
+                 equipCount, bugCount, ideaCount, commentCount, eqdbCount] = await Promise.all([
+                supabase.from('equipment').select('name,verified,created_at,properties').order('created_at', { ascending: false }).limit(6),
+                supabase.from('bug_reports').select('description,page_url,created_at').order('created_at', { ascending: false }).limit(6),
+                supabase.from('ideas').select('idea_text,submitted_by,created_at').order('created_at', { ascending: false }).limit(6),
+                supabase.from('comments').select('comment_text,display_name,item_name,created_at').order('created_at', { ascending: false }).limit(6),
+                supabase.from('equipment').select('*', { count: 'exact', head: true }),
+                supabase.from('bug_reports').select('*', { count: 'exact', head: true }),
+                supabase.from('ideas').select('*', { count: 'exact', head: true }),
+                supabase.from('comments').select('*', { count: 'exact', head: true }),
+                supabase.from('eqdb_queue').select('*', { count: 'exact', head: true }).eq('processed', false)
+            ]);
+
+            // Stats bar
+            var stats = [
+                { label: 'Equipment', count: equipCount.count || 0, tab: 'equipment', color: '#8787FF' },
+                { label: 'Bug Reports', count: bugCount.count || 0, tab: 'bugs', color: bugCount.count > 0 ? '#ff4444' : '#44aa44' },
+                { label: 'Ideas', count: ideaCount.count || 0, tab: 'ideas', color: '#ffaa00' },
+                { label: 'Comments', count: commentCount.count || 0, tab: 'comments', color: '#8787FF' },
+                { label: 'EQDB Queue', count: eqdbCount.count || 0, tab: 'eqdb-queue', color: eqdbCount.count > 0 ? '#ffaa00' : '#44aa44' }
+            ];
+            document.getElementById('dash-stats').innerHTML = stats.map(function(s) {
+                return '<div onclick="switchTabGlobal('' + s.tab + '')" style="background:#222;padding:15px 25px;border-radius:5px;text-align:center;cursor:pointer;border:1px solid #333;min-width:100px;flex:1;">'
+                    + '<div style="font-size:28px;font-weight:bold;color:' + s.color + ';">' + s.count.toLocaleString() + '</div>'
+                    + '<div style="font-size:12px;color:#888;margin-top:4px;">' + s.label + '</div>'
+                    + '</div>';
+            }).join('');
+
+            // Recent equipment
+            var eq = equipResult.data || [];
+            document.getElementById('dash-equipment').innerHTML = eq.length === 0 ? '<p style="color:#555;">None yet.</p>' :
+                eq.map(function(e) {
+                    var src = e.verified ? '<span style="color:#44aa44;font-size:11px;">EQDB</span>' : '<span style="color:#ffaa00;font-size:11px;">Personal</span>';
+                    var by = e.properties && e.properties.uploaded_by ? ' <span style="color:#555;font-size:11px;">by ' + escapeHtml(e.properties.uploaded_by) + '</span>' : '';
+                    return '<div style="padding:6px 0;border-bottom:1px solid #2a2a2a;">'
+                        + '<a href="item.html?name=' + encodeURIComponent(e.name) + '">' + escapeHtml(e.name) + '</a> '
+                        + src + by
+                        + '<span style="float:right;color:#555;font-size:11px;">' + new Date(e.created_at).toLocaleDateString() + '</span>'
+                        + '</div>';
+                }).join('');
+
+            // Recent bugs
+            var bugs = bugResult.data || [];
+            document.getElementById('dash-bugs').innerHTML = bugs.length === 0 ? '<p style="color:#44aa44;">No bug reports!</p>' :
+                bugs.map(function(b) {
+                    var shortUrl = (b.page_url || '').replace(/^https?:\/\/[^/]+/, '') || b.page_url || '';
+                    return '<div style="padding:6px 0;border-bottom:1px solid #2a2a2a;cursor:pointer;" onclick="switchTabGlobal('bugs')">'
+                        + '<span style="color:#ff4444;">⚠</span> ' + escapeHtml((b.description || '').substring(0, 60)) + (b.description && b.description.length > 60 ? '...' : '')
+                        + '<br><span style="color:#555;font-size:11px;">' + escapeHtml(shortUrl) + ' · ' + new Date(b.created_at).toLocaleDateString() + '</span>'
+                        + '</div>';
+                }).join('');
+
+            // Recent ideas
+            var ideas = ideaResult.data || [];
+            document.getElementById('dash-ideas').innerHTML = ideas.length === 0 ? '<p style="color:#555;">No ideas yet.</p>' :
+                ideas.map(function(i) {
+                    return '<div style="padding:6px 0;border-bottom:1px solid #2a2a2a;">'
+                        + escapeHtml((i.idea_text || '').substring(0, 70)) + (i.idea_text && i.idea_text.length > 70 ? '...' : '')
+                        + '<br><span style="color:#555;font-size:11px;">' + escapeHtml(i.submitted_by || 'anonymous') + ' · ' + new Date(i.created_at).toLocaleDateString() + '</span>'
+                        + '</div>';
+                }).join('');
+
+            // Recent comments
+            var comments = commentResult.data || [];
+            document.getElementById('dash-comments').innerHTML = comments.length === 0 ? '<p style="color:#555;">No comments yet.</p>' :
+                comments.map(function(c) {
+                    return '<div style="padding:6px 0;border-bottom:1px solid #2a2a2a;">'
+                        + escapeHtml((c.comment_text || '').substring(0, 60)) + (c.comment_text && c.comment_text.length > 60 ? '...' : '')
+                        + '<br><span style="color:#555;font-size:11px;">'
+                        + 'on <a href="item.html?name=' + encodeURIComponent(c.item_name || '') + '">' + escapeHtml(c.item_name || '') + '</a>'
+                        + ' by ' + escapeHtml(c.display_name || 'anonymous')
+                        + ' · ' + new Date(c.created_at).toLocaleDateString()
+                        + '</span></div>';
+                }).join('');
+        }
+
+        // Expose switchTab globally so dashboard stat cards can use onclick
+        window.switchTabGlobal = function(tab) { switchTab(tab); };
 
         // ============================================
         // BUG REPORTS
