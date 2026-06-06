@@ -112,7 +112,7 @@
                 for (var i = 0; i < uniqueLocs.length; i++) {
                     var loc = uniqueLocs[i];
                     html += '<tr>';
-                    html += '<td>' + escapeHtml(loc.area || '') + '</td>';
+                    html += '<td><a href="zone.html?area=' + encodeURIComponent(loc.area || '') + '">' + escapeHtml(loc.area || '') + '</a></td>';
                     html += '<td>' + escapeHtml(loc.room || '-') + '</td>';
                     html += '<td>' + hitBadge(loc.hits) + '</td>';
                     html += '</tr>';
@@ -152,7 +152,7 @@
                     var itemName = nameMap[String(drop.itemid)] || ('Item #' + drop.itemid);
                     html += '<tr>';
                     html += '<td><a href="item.html?name=' + encodeURIComponent(itemName) + '">' + escapeHtml(itemName) + '</a></td>';
-                    html += '<td>' + escapeHtml(drop.area || '') + '</td>';
+                    html += '<td><a href="zone.html?area=' + encodeURIComponent(drop.area || '') + '">' + escapeHtml(drop.area || '') + '</a></td>';
                     html += '<td>' + escapeHtml(drop.room && drop.room !== '-' ? drop.room : '-') + '</td>';
                     html += '</tr>';
                 }

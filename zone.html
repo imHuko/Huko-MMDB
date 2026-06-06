@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zone - MUD Equipment DB</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+        a { color: #8787FF; }
+        h1, h2 { color: #C0C0C0; }
+        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        nav a { margin-right: 15px; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th { background: #333; color: #888; padding: 8px; text-align: left; font-size: 13px; border: 1px solid #444; }
+        td { padding: 6px 8px; border-bottom: 1px solid #2a2a2a; font-size: 13px; }
+        tr:hover td { background: #222; }
+        .stat-row { display: flex; gap: 12px; flex-wrap: wrap; margin: 15px 0; }
+        .stat-box { background: #222; padding: 12px 20px; border-radius: 5px; text-align: center; border: 1px solid #333; min-width: 80px; }
+        .stat-box .num { font-size: 24px; font-weight: bold; color: #8787FF; }
+        .stat-box .lbl { font-size: 11px; color: #888; margin-top: 3px; }
+        .tab-bar { display: flex; gap: 6px; margin: 15px 0; }
+        .tab-bar button { background: #333; color: #888; border: 1px solid #444; border-radius: 3px; padding: 6px 14px; font-size: 13px; cursor: pointer; }
+        .tab-bar button.active { background: #8787FF; color: #000; border-color: #8787FF; }
+        .section { display: none; }
+        .section.active { display: block; }
+        .search-row { display: flex; gap: 8px; margin: 10px 0; }
+        .search-row input { padding: 7px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; width: 220px; }
+        .search-row button { padding: 7px 14px; background: #8787FF; color: #000; border: none; border-radius: 3px; cursor: pointer; }
+        .load-more { text-align: center; margin: 15px 0; }
+        .load-more button { padding: 8px 20px; background: #8787FF; color: #000; border: none; border-radius: 3px; cursor: pointer; }
+        .empty { color: #555; padding: 20px 0; }
+        .hits { color: #44aa44; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="index.html">Search</a>
+        <a href="zones.html">Zones</a>
+        <a href="info.html">About</a>
+        <a href="market.html">Market</a>
+        <a href="lfg.html">LFG</a>
+        <a href="leaderboard.html">Leaderboard</a>
+        <span id="editor-links" style="display:none;"><a href="admin.html">Admin</a></span>
+    </nav>
+    <hr>
+
+    <div id="page-content">Loading...</div>
+
+    <script type="module">
+        var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
+        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+        var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        var params  = new URLSearchParams(window.location.search);
+        var area    = params.get('area');
+
+        if (!area) {
+            document.getElementById('page-content').innerHTML = '<p>No zone specified. <a href="zones.html">Browse all zones</a></p>';
+        } else {
+            document.title = area + ' - MUD Equipment DB';
+            loadZone(area);
+        }
+
+        var mobOffset  = 0, itemOffset  = 0;
+        var mobSearch  = '',  itemSearch  = '';
+        var MOB_PAGE   = 50,  ITEM_PAGE   = 50;
+        var allMobIds  = [], allItemIds  = [];
+
+        async function loadZone(area) {
+            // Fire all initial queries in parallel
+            var [mobLocResult, itemLocResult, mobCountResult, itemCountResult] = await Promise.all([
+                supabase.from('mobsloc_db').select('mobid, room, hits').eq('area', area).order('hits', { ascending: false }).limit(500),
+                supabase.from('itemsloc_db').select('itemid').eq('area', area).limit(1000),
+                supabase.from('mobsloc_db').select('mobid', { count: 'exact', head: true }).eq('area', area),
+                supabase.from('itemsloc_db').select('itemid', { count: 'exact', head: true }).eq('area', area)
+            ]);
+
+            var mobLocs  = mobLocResult.data  || [];
+            var itemLocs = itemLocResult.data || [];
+
+            // Get unique mob and item IDs
+            var uniqueMobIds  = [...new Set(mobLocs.map(function(r) { return String(r.mobid); }))];
+            var uniqueItemIds = [...new Set(itemLocs.map(function(r) { return String(r.itemid); }))];
+            allMobIds  = uniqueMobIds;
+            allItemIds = uniqueItemIds;
+
+            var totalMobs  = new Set(mobLocs.map(function(r) { return r.mobid; })).size;
+            var totalItems = uniqueItemIds.length;
+
+            // Build page shell
+            var content = document.getElementById('page-content');
+            content.innerHTML = '';
+
+            var h1 = document.createElement('h1');
+            h1.textContent = area;
+            content.appendChild(h1);
+
+            // Stat boxes
+            var statRow = document.createElement('div');
+            statRow.className = 'stat-row';
+            statRow.innerHTML = '<div class="stat-box"><div class="num">' + totalMobs + '</div><div class="lbl">Mobs</div></div>'
+                + '<div class="stat-box"><div class="num">' + totalItems + '</div><div class="lbl">Items</div></div>';
+            content.appendChild(statRow);
+
+            // Tabs
+            var tabBar = document.createElement('div');
+            tabBar.className = 'tab-bar';
+            tabBar.innerHTML = '<button class="active" id="tab-mobs" onclick="switchZoneTab(\'mobs\')">Mobs (' + totalMobs + ')</button>'
+                + '<button id="tab-items" onclick="switchZoneTab(\'items\')">Items (' + totalItems + ')</button>';
+            content.appendChild(tabBar);
+
+            // Mobs section
+            var mobSection = document.createElement('div');
+            mobSection.id = 'section-mobs';
+            mobSection.className = 'section active';
+            mobSection.innerHTML = '<div class="search-row">'
+                + '<input type="text" id="mob-search" placeholder="Filter mobs..." onkeypress="if(event.key===\'Enter\')filterMobs()">'
+                + '<button onclick="filterMobs()">Filter</button>'
+                + '</div>'
+                + '<table><thead><tr><th>Mob</th><th>Room</th><th>Hits</th></tr></thead><tbody id="mob-tbody"></tbody></table>'
+                + '<div class="load-more" id="mob-load-more" style="display:none;"><button onclick="loadMoreMobs()">Load More</button></div>';
+            content.appendChild(mobSection);
+
+            // Items section
+            var itemSection = document.createElement('div');
+            itemSection.id = 'section-items';
+            itemSection.className = 'section';
+            itemSection.innerHTML = '<div class="search-row">'
+                + '<input type="text" id="item-search" placeholder="Filter items..." onkeypress="if(event.key===\'Enter\')filterItems()">'
+                + '<button onclick="filterItems()">Filter</button>'
+                + '</div>'
+                + '<table><thead><tr><th>Item</th></tr></thead><tbody id="item-tbody"></tbody></table>'
+                + '<div class="load-more" id="item-load-more" style="display:none;"><button onclick="loadMoreItems()">Load More</button></div>';
+            content.appendChild(itemSection);
+
+            // Initial data load for both tabs in parallel
+            await Promise.all([
+                loadMobs(false),
+                loadItems(false)
+            ]);
+        }
+
+        // ── Tab switching ────────────────────────────────────────
+        window.switchZoneTab = function(tab) {
+            document.querySelectorAll('.tab-bar button').forEach(function(b) { b.classList.remove('active'); });
+            document.querySelectorAll('.section').forEach(function(s) { s.classList.remove('active'); });
+            document.getElementById('tab-' + tab).classList.add('active');
+            document.getElementById('section-' + tab).classList.add('active');
+        };
+
+        // ── Mobs ─────────────────────────────────────────────────
+        window.filterMobs = function() {
+            mobSearch = document.getElementById('mob-search').value.trim();
+            mobOffset = 0;
+            loadMobs(false);
+        };
+
+        window.loadMoreMobs = function() { loadMobs(true); };
+
+        async function loadMobs(append) {
+            if (allMobIds.length === 0) return;
+
+            var q = supabase.from('mobs_db').select('mobid, name')
+                .in('mobid', allMobIds)
+                .order('name', { ascending: true })
+                .range(mobOffset, mobOffset + MOB_PAGE - 1);
+
+            if (mobSearch) q = q.ilike('name', '%' + mobSearch + '%');
+
+            var result = await q;
+            var rows = result.data || [];
+
+            var tbody = document.getElementById('mob-tbody');
+            if (!append) tbody.innerHTML = '';
+
+            if (rows.length === 0 && !append) {
+                tbody.innerHTML = '<tr><td colspan="3" class="empty">No mobs found.</td></tr>';
+                document.getElementById('mob-load-more').style.display = 'none';
+                return;
+            }
+
+            // Build a hits map from mobsloc for this area
+            var hitsResult = await supabase.from('mobsloc_db').select('mobid, room, hits')
+                .eq('area', area)
+                .in('mobid', rows.map(function(r) { return String(r.mobid); }));
+
+            var hitsMap = {};
+            if (hitsResult.data) {
+                hitsResult.data.forEach(function(h) {
+                    var key = String(h.mobid);
+                    if (!hitsMap[key] || (h.hits || 0) > (hitsMap[key].hits || 0)) {
+                        hitsMap[key] = h;
+                    }
+                });
+            }
+
+            rows.forEach(function(mob) {
+                var tr = document.createElement('tr');
+                var locInfo = hitsMap[String(mob.mobid)];
+                var room = locInfo && locInfo.room && locInfo.room !== '-' ? locInfo.room : '-';
+                var hits = locInfo && locInfo.hits ? locInfo.hits : '-';
+                tr.innerHTML = '<td><a href="mob.html?mobid=' + encodeURIComponent(mob.mobid) + '">' + escHtml(mob.name) + '</a></td>'
+                    + '<td style="color:#888;">' + escHtml(room) + '</td>'
+                    + '<td class="hits">' + hits + '</td>';
+                tbody.appendChild(tr);
+            });
+
+            mobOffset += rows.length;
+            document.getElementById('mob-load-more').style.display = rows.length === MOB_PAGE ? 'block' : 'none';
+        }
+
+        // ── Items ─────────────────────────────────────────────────
+        window.filterItems = function() {
+            itemSearch = document.getElementById('item-search').value.trim();
+            itemOffset = 0;
+            loadItems(false);
+        };
+
+        window.loadMoreItems = function() { loadItems(true); };
+
+        async function loadItems(append) {
+            if (allItemIds.length === 0) return;
+
+            var q = supabase.from('items_db').select('itemid, name')
+                .in('itemid', allItemIds)
+                .order('name', { ascending: true })
+                .range(itemOffset, itemOffset + ITEM_PAGE - 1);
+
+            if (itemSearch) q = q.ilike('name', '%' + itemSearch + '%');
+
+            var result = await q;
+            var rows = result.data || [];
+
+            var tbody = document.getElementById('item-tbody');
+            if (!append) tbody.innerHTML = '';
+
+            if (rows.length === 0 && !append) {
+                tbody.innerHTML = '<tr><td class="empty">No items found.</td></tr>';
+                document.getElementById('item-load-more').style.display = 'none';
+                return;
+            }
+
+            rows.forEach(function(item) {
+                var tr = document.createElement('tr');
+                tr.innerHTML = '<td><a href="item.html?name=' + encodeURIComponent(item.name) + '">' + escHtml(item.name) + '</a></td>';
+                tbody.appendChild(tr);
+            });
+
+            itemOffset += rows.length;
+            document.getElementById('item-load-more').style.display = rows.length === ITEM_PAGE ? 'block' : 'none';
+        }
+
+        function escHtml(s) {
+            if (!s) return '';
+            var d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+    </script>
+
+    <script>
+        if (sessionStorage.getItem('editor_logged_in') === 'true') {
+            document.getElementById('editor-links').style.display = 'inline';
+        }
+    </script>
+</body>
+</html>

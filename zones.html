@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zones - MUD Equipment DB</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+        a { color: #8787FF; }
+        h1 { color: #C0C0C0; }
+        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        nav a { margin-right: 15px; }
+        .search-row { display: flex; gap: 8px; margin: 15px 0; }
+        .search-row input { padding: 8px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; width: 250px; }
+        .search-row button { padding: 8px 14px; background: #8787FF; color: #000; border: none; border-radius: 3px; cursor: pointer; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #333; color: #888; padding: 8px; text-align: left; font-size: 13px; border: 1px solid #444; cursor: pointer; user-select: none; }
+        th:hover { color: #ccc; }
+        td { padding: 7px 8px; border-bottom: 1px solid #2a2a2a; font-size: 13px; }
+        tr:hover td { background: #222; }
+        .bar-wrap { background: #333; border-radius: 2px; height: 6px; width: 100px; display: inline-block; vertical-align: middle; }
+        .bar-fill { background: #8787FF; height: 6px; border-radius: 2px; }
+        .sort-arrow { font-size: 10px; color: #8787FF; margin-left: 3px; }
+        .empty { color: #555; padding: 30px 0; text-align: center; }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="index.html">Search</a>
+        <a href="zones.html">Zones</a>
+        <a href="info.html">About</a>
+        <a href="market.html">Market</a>
+        <a href="lfg.html">LFG</a>
+        <a href="leaderboard.html">Leaderboard</a>
+        <span id="editor-links" style="display:none;"><a href="admin.html">Admin</a></span>
+    </nav>
+    <hr>
+
+    <h1>Zones</h1>
+    <p style="color:#888;font-size:13px;">All zones with documented mobs or items. Click a zone to explore.</p>
+
+    <div class="search-row">
+        <input type="text" id="zone-search" placeholder="Filter zones..." oninput="filterZones(this.value)">
+    </div>
+
+    <p id="zone-count" style="color:#888;font-size:13px;"></p>
+    <table id="zone-table">
+        <thead>
+            <tr>
+                <th onclick="sortBy('area')">Zone <span class="sort-arrow" id="sort-area">▼</span></th>
+                <th onclick="sortBy('mobs')" style="width:120px;">Mobs <span class="sort-arrow" id="sort-mobs"></span></th>
+                <th onclick="sortBy('items')" style="width:120px;">Items <span class="sort-arrow" id="sort-items"></span></th>
+            </tr>
+        </thead>
+        <tbody id="zone-tbody"><tr><td colspan="3" class="empty">Loading...</td></tr></tbody>
+    </table>
+
+    <script type="module">
+        var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
+        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+        var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        var allZones = [];
+        var filtered = [];
+        var sortCol = 'mobs';
+        var sortDir = -1; // -1 = desc, 1 = asc
+        var maxMobs = 1, maxItems = 1;
+
+        async function loadZones() {
+            // Page through all mob areas and item areas in parallel
+            var [mobResult, itemResult] = await Promise.all([
+                supabase.rpc ? null : null, // placeholder
+                supabase.from('mobsloc_db').select('area, mobid').not('area', 'is', null).limit(100000),
+                supabase.from('itemsloc_db').select('area, itemid').not('area', 'is', null).limit(100000)
+            ].slice(1)); // remove placeholder
+
+            var [mr, ir] = await Promise.all([
+                supabase.from('mobsloc_db').select('area, mobid').not('area', 'is', null).neq('area', '').limit(100000),
+                supabase.from('itemsloc_db').select('area, itemid').not('area', 'is', null).neq('area', '').limit(100000)
+            ]);
+
+            // Aggregate mob counts per area
+            var mobCounts = {};
+            (mr.data || []).forEach(function(r) {
+                if (!mobCounts[r.area]) mobCounts[r.area] = new Set();
+                mobCounts[r.area].add(String(r.mobid));
+            });
+
+            // Aggregate item counts per area
+            var itemCounts = {};
+            (ir.data || []).forEach(function(r) {
+                if (!itemCounts[r.area]) itemCounts[r.area] = new Set();
+                itemCounts[r.area].add(String(r.itemid));
+            });
+
+            // Merge into one list
+            var areaSet = new Set([...Object.keys(mobCounts), ...Object.keys(itemCounts)]);
+            allZones = [];
+            areaSet.forEach(function(area) {
+                var mobs  = mobCounts[area]  ? mobCounts[area].size  : 0;
+                var items = itemCounts[area] ? itemCounts[area].size : 0;
+                allZones.push({ area: area, mobs: mobs, items: items });
+            });
+
+            maxMobs  = Math.max.apply(null, allZones.map(function(z) { return z.mobs; }));
+            maxItems = Math.max.apply(null, allZones.map(function(z) { return z.items; }));
+
+            filtered = allZones.slice();
+            sortAndRender();
+        }
+
+        window.filterZones = function(val) {
+            var lower = val.toLowerCase();
+            filtered = allZones.filter(function(z) { return z.area.toLowerCase().indexOf(lower) >= 0; });
+            sortAndRender();
+        };
+
+        window.sortBy = function(col) {
+            if (sortCol === col) { sortDir *= -1; }
+            else { sortCol = col; sortDir = col === 'area' ? 1 : -1; }
+            sortAndRender();
+        };
+
+        function sortAndRender() {
+            filtered.sort(function(a, b) {
+                if (sortCol === 'area') return sortDir * a.area.localeCompare(b.area);
+                return sortDir * (a[sortCol] - b[sortCol]);
+            });
+
+            // Update sort arrows
+            ['area','mobs','items'].forEach(function(c) {
+                var el = document.getElementById('sort-' + c);
+                if (el) el.textContent = sortCol === c ? (sortDir === -1 ? '▼' : '▲') : '';
+            });
+
+            var tbody = document.getElementById('zone-tbody');
+            tbody.innerHTML = '';
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" class="empty">No zones found.</td></tr>';
+                document.getElementById('zone-count').textContent = '';
+                return;
+            }
+
+            document.getElementById('zone-count').textContent = filtered.length + ' zones';
+
+            filtered.forEach(function(z) {
+                var tr = document.createElement('tr');
+                var mobPct  = maxMobs  > 0 ? Math.round(z.mobs  / maxMobs  * 100) : 0;
+                var itemPct = maxItems > 0 ? Math.round(z.items / maxItems * 100) : 0;
+                tr.innerHTML = '<td><a href="zone.html?area=' + encodeURIComponent(z.area) + '">' + escHtml(z.area) + '</a></td>'
+                    + '<td>' + z.mobs  + ' <span class="bar-wrap"><span class="bar-fill" style="width:' + mobPct  + '%;"></span></span></td>'
+                    + '<td>' + z.items + ' <span class="bar-wrap"><span class="bar-fill" style="width:' + itemPct + '%;background:#44aa44;"></span></span></td>';
+                tbody.appendChild(tr);
+            });
+        }
+
+        function escHtml(s) {
+            if (!s) return '';
+            var d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
+        loadZones();
+    </script>
+
+    <script>
+        if (sessionStorage.getItem('editor_logged_in') === 'true') {
+            document.getElementById('editor-links').style.display = 'inline';
+        }
+    </script>
+</body>
+</html>
