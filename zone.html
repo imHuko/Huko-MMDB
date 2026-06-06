@@ -168,13 +168,18 @@
                 .eq('area', area)
                 .limit(5000);
 
-            // Fetch all mob names for those IDs
-            var nameResult = await supabase.from('mobs_db')
-                .select('mobid, name')
-                .in('mobid', allMobIds);
+            // Get unique mobids from location data, then fetch their names
+            var locMobIds = [...new Set((locResult.data || []).map(function(r) { return String(r.mobid); }))];
 
             var nameMap = {};
-            (nameResult.data || []).forEach(function(m) { nameMap[String(m.mobid)] = m.name; });
+            if (locMobIds.length > 0) {
+                // Fetch in batches of 200 to avoid URL length limits
+                for (var ni = 0; ni < locMobIds.length; ni += 200) {
+                    var batch = locMobIds.slice(ni, ni + 200);
+                    var nr = await supabase.from('mobs_db').select('mobid, name').in('mobid', batch);
+                    (nr.data || []).forEach(function(m) { nameMap[String(m.mobid)] = m.name; });
+                }
+            }
 
             // Group locations by mob name, merging hash + integer IDs
             var byName = {};
@@ -185,9 +190,9 @@
                 var room = loc.room && loc.room !== '-' ? loc.room : null;
                 if (room) {
                     if (!byName[name].rooms[room]) byName[name].rooms[room] = 0;
-                    byName[name].rooms[room] += (loc.hits || 0);
+                    byName[name].rooms[room] += parseInt(loc.hits || 0);
                 }
-                byName[name].totalHits += (loc.hits || 0);
+                byName[name].totalHits += parseInt(loc.hits || 0);
             });
 
             // Sort by total hits desc
