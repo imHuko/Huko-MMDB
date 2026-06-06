@@ -68,43 +68,30 @@
         var maxMobs = 1, maxItems = 1;
 
         async function loadZones() {
-            // Page through all mob areas and item areas in parallel
+            // Use RPC to get proper distinct counts server-side
             var [mobResult, itemResult] = await Promise.all([
-                supabase.rpc ? null : null, // placeholder
-                supabase.from('mobsloc_db').select('area, mobid').not('area', 'is', null).limit(100000),
-                supabase.from('itemsloc_db').select('area, itemid').not('area', 'is', null).limit(100000)
-            ].slice(1)); // remove placeholder
-
-            var [mr, ir] = await Promise.all([
-                supabase.from('mobsloc_db').select('area, mobid').not('area', 'is', null).neq('area', '').limit(100000),
-                supabase.from('itemsloc_db').select('area, itemid').not('area', 'is', null).neq('area', '').limit(100000)
+                supabase.rpc('get_zone_mob_counts'),
+                supabase.rpc('get_zone_item_counts')
             ]);
 
-            // Aggregate mob counts per area
             var mobCounts = {};
-            (mr.data || []).forEach(function(r) {
-                if (!mobCounts[r.area]) mobCounts[r.area] = new Set();
-                mobCounts[r.area].add(String(r.mobid));
-            });
+            (mobResult.data || []).forEach(function(r) { mobCounts[r.area] = r.mobs; });
 
-            // Aggregate item counts per area
             var itemCounts = {};
-            (ir.data || []).forEach(function(r) {
-                if (!itemCounts[r.area]) itemCounts[r.area] = new Set();
-                itemCounts[r.area].add(String(r.itemid));
-            });
+            (itemResult.data || []).forEach(function(r) { itemCounts[r.area] = r.items; });
 
-            // Merge into one list
             var areaSet = new Set([...Object.keys(mobCounts), ...Object.keys(itemCounts)]);
             allZones = [];
             areaSet.forEach(function(area) {
-                var mobs  = mobCounts[area]  ? mobCounts[area].size  : 0;
-                var items = itemCounts[area] ? itemCounts[area].size : 0;
-                allZones.push({ area: area, mobs: mobs, items: items });
+                allZones.push({
+                    area:  area,
+                    mobs:  mobCounts[area]  || 0,
+                    items: itemCounts[area] || 0
+                });
             });
 
-            maxMobs  = Math.max.apply(null, allZones.map(function(z) { return z.mobs; }));
-            maxItems = Math.max.apply(null, allZones.map(function(z) { return z.items; }));
+            maxMobs  = Math.max.apply(null, allZones.map(function(z) { return z.mobs;  })) || 1;
+            maxItems = Math.max.apply(null, allZones.map(function(z) { return z.items; })) || 1;
 
             filtered = allZones.slice();
             sortAndRender();
@@ -173,3 +160,4 @@
     </script>
 </body>
 </html>
+<!-- placeholder - will be overwritten -->
