@@ -68,24 +68,18 @@
         var allMobIds  = [], allItemIds  = [];
 
         async function loadZone(area) {
-            // Fire all initial queries in parallel
-            var [mobLocResult, itemLocResult, mobCountResult, itemCountResult] = await Promise.all([
-                supabase.from('mobsloc_db').select('mobid, room, hits').eq('area', area).order('hits', { ascending: false }).limit(500),
-                supabase.from('itemsloc_db').select('itemid').eq('area', area).limit(1000),
-                supabase.from('mobsloc_db').select('mobid', { count: 'exact', head: true }).eq('area', area),
-                supabase.from('itemsloc_db').select('itemid', { count: 'exact', head: true }).eq('area', area)
+            // Get distinct counts and item IDs in parallel
+            var [mobCountResult, itemLocResult] = await Promise.all([
+                supabase.rpc('get_zone_mob_name_count', { zone_area: area }),
+                supabase.from('itemsloc_db').select('itemid').eq('area', area).limit(5000)
             ]);
 
-            var mobLocs  = mobLocResult.data  || [];
-            var itemLocs = itemLocResult.data || [];
-
-            // Get unique mob and item IDs
-            var uniqueMobIds  = [...new Set(mobLocs.map(function(r) { return String(r.mobid); }))];
+            var itemLocs     = itemLocResult.data || [];
             var uniqueItemIds = [...new Set(itemLocs.map(function(r) { return String(r.itemid); }))];
-            allMobIds  = uniqueMobIds;
             allItemIds = uniqueItemIds;
+            allMobIds  = ['placeholder']; // loadMobs fetches its own data, just needs non-empty
 
-            var totalMobs  = new Set(mobLocs.map(function(r) { return r.mobid; })).size;
+            var totalMobs  = (mobCountResult.data && mobCountResult.data[0]) ? mobCountResult.data[0].count : 0;
             var totalItems = uniqueItemIds.length;
 
             // Build page shell
@@ -150,64 +144,89 @@
         };
 
         // ── Mobs ─────────────────────────────────────────────────
+        var allMobLocs = []; // all location rows for this zone
+
         window.filterMobs = function() {
-            mobSearch = document.getElementById('mob-search').value.trim();
-            mobOffset = 0;
-            loadMobs(false);
+            mobSearch = document.getElementById('mob-search').value.trim().toLowerCase();
+            renderMobs(false);
         };
 
-        window.loadMoreMobs = function() { loadMobs(true); };
+        window.loadMoreMobs = function() {
+            mobOffset += MOB_PAGE;
+            renderMobs(true);
+        };
 
         async function loadMobs(append) {
-            if (allMobIds.length === 0) return;
+            if (allMobIds.length === 0) {
+                document.getElementById('mob-tbody').innerHTML = '<tr><td colspan="3" class="empty">No mobs found.</td></tr>';
+                return;
+            }
 
-            var q = supabase.from('mobs_db').select('mobid, name')
-                .in('mobid', allMobIds)
-                .order('name', { ascending: true })
-                .range(mobOffset, mobOffset + MOB_PAGE - 1);
+            // Fetch all location rows for this zone at once
+            var locResult = await supabase.from('mobsloc_db')
+                .select('mobid, room, hits')
+                .eq('area', area)
+                .limit(5000);
 
-            if (mobSearch) q = q.ilike('name', '%' + mobSearch + '%');
+            // Fetch all mob names for those IDs
+            var nameResult = await supabase.from('mobs_db')
+                .select('mobid, name')
+                .in('mobid', allMobIds);
 
-            var result = await q;
-            var rows = result.data || [];
+            var nameMap = {};
+            (nameResult.data || []).forEach(function(m) { nameMap[String(m.mobid)] = m.name; });
 
+            // Group locations by mob name, merging hash + integer IDs
+            var byName = {};
+            (locResult.data || []).forEach(function(loc) {
+                var name = nameMap[String(loc.mobid)] || ('Mob #' + loc.mobid);
+                var id   = String(loc.mobid);
+                if (!byName[name]) byName[name] = { name: name, id: id, rooms: {}, totalHits: 0 };
+                var room = loc.room && loc.room !== '-' ? loc.room : null;
+                if (room) {
+                    if (!byName[name].rooms[room]) byName[name].rooms[room] = 0;
+                    byName[name].rooms[room] += (loc.hits || 0);
+                }
+                byName[name].totalHits += (loc.hits || 0);
+            });
+
+            // Sort by total hits desc
+            allMobLocs = Object.values(byName).sort(function(a, b) { return b.totalHits - a.totalHits; });
+            mobOffset = 0;
+            renderMobs(false);
+        }
+
+        function renderMobs(append) {
             var tbody = document.getElementById('mob-tbody');
-            if (!append) tbody.innerHTML = '';
+            if (!append) { tbody.innerHTML = ''; mobOffset = 0; }
 
-            if (rows.length === 0 && !append) {
+            var filtered = mobSearch
+                ? allMobLocs.filter(function(m) { return m.name.toLowerCase().indexOf(mobSearch) >= 0; })
+                : allMobLocs;
+
+            var page = filtered.slice(mobOffset, mobOffset + MOB_PAGE);
+
+            if (page.length === 0 && !append) {
                 tbody.innerHTML = '<tr><td colspan="3" class="empty">No mobs found.</td></tr>';
                 document.getElementById('mob-load-more').style.display = 'none';
                 return;
             }
 
-            // Build a hits map from mobsloc for this area
-            var hitsResult = await supabase.from('mobsloc_db').select('mobid, room, hits')
-                .eq('area', area)
-                .in('mobid', rows.map(function(r) { return String(r.mobid); }));
+            page.forEach(function(mob) {
+                // Top room by hits
+                var rooms = Object.entries(mob.rooms).sort(function(a,b) { return b[1]-a[1]; });
+                var topRoom = rooms.length > 0 ? rooms[0][0] : '-';
+                var extraRooms = rooms.length > 1 ? ' <span style="color:#555;font-size:11px;">+' + (rooms.length-1) + ' rooms</span>' : '';
 
-            var hitsMap = {};
-            if (hitsResult.data) {
-                hitsResult.data.forEach(function(h) {
-                    var key = String(h.mobid);
-                    if (!hitsMap[key] || (h.hits || 0) > (hitsMap[key].hits || 0)) {
-                        hitsMap[key] = h;
-                    }
-                });
-            }
-
-            rows.forEach(function(mob) {
                 var tr = document.createElement('tr');
-                var locInfo = hitsMap[String(mob.mobid)];
-                var room = locInfo && locInfo.room && locInfo.room !== '-' ? locInfo.room : '-';
-                var hits = locInfo && locInfo.hits ? locInfo.hits : '-';
-                tr.innerHTML = '<td><a href="mob.html?mobid=' + encodeURIComponent(mob.mobid) + '">' + escHtml(mob.name) + '</a></td>'
-                    + '<td style="color:#888;">' + escHtml(room) + '</td>'
-                    + '<td class="hits">' + hits + '</td>';
+                tr.innerHTML = '<td><a href="mob.html?mobid=' + encodeURIComponent(mob.id) + '">' + escHtml(mob.name) + '</a></td>'
+                    + '<td style="color:#888;">' + escHtml(topRoom) + extraRooms + '</td>'
+                    + '<td class="hits">' + (mob.totalHits || '-') + '</td>';
                 tbody.appendChild(tr);
             });
 
-            mobOffset += rows.length;
-            document.getElementById('mob-load-more').style.display = rows.length === MOB_PAGE ? 'block' : 'none';
+            mobOffset = mobOffset + page.length;
+            document.getElementById('mob-load-more').style.display = (mobOffset < (mobSearch ? allMobLocs.filter(function(m){return m.name.toLowerCase().indexOf(mobSearch)>=0;}).length : allMobLocs.length)) ? 'block' : 'none';
         }
 
         // ── Items ─────────────────────────────────────────────────
