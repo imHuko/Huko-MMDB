@@ -3,15 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Data Cleanup - HukoDB</title>
+    <title>Data Cleanup - MUD Equipment DB</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+        body { font-family: "Inter", sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
         a { color: #8787FF; }
-        h1 { color: #C0C0C0; text-align: center; }
-        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; }
-        nav a { margin-right: 15px; }
+        h1, h2 { color: #C0C0C0; text-align: center; }
+        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; }
+        nav a { margin-right: 15px; color: #8787FF; text-decoration: none; }
+        nav a:hover { color: #C0C0C0; }
+        nav .dropdown { position: relative; display: inline-block; margin-right: 15px; }
+        nav .dropbtn { cursor: pointer; color: #8787FF; }
+        nav .dropdown-content { display: none; position: absolute; top: 100%; left: 0; background: #333; min-width: 160px; border: 1px solid #444; border-radius: 3px; z-index: 1000; }
+        nav .dropdown-content a { display: block; padding: 8px 12px; margin: 0; white-space: nowrap; }
+        nav .dropdown-content a:hover { background: #444; color: #C0C0C0; }
+        nav .dropdown:hover .dropdown-content { display: block; }
+        #sticky-header { position: sticky; top: 0; z-index: 100; background: #1a1a1a; }
+        .subtitle { text-align: center; color: #888; font-size: 13px; margin: -10px 0 20px; }
         hr { border-color: #333; }
-        .subtitle { text-align: center; color: #888; font-size: 13px; margin: -8px 0 15px; }
         .stats-row { display: flex; gap: 10px; justify-content: center; margin: 10px 0; flex-wrap: wrap; }
         .stat-box { background: #222; padding: 8px 16px; border-radius: 5px; text-align: center; border: 1px solid #333; min-width: 70px; }
         .stat-box .num { font-size: 20px; font-weight: bold; color: #8787FF; }
@@ -60,15 +71,53 @@
     </style>
 </head>
 <body>
+    <div style="margin-bottom:6px;text-align:center;"><img src="images/logo.png" alt="HukoDB" style="height:130px;"></div>
+    <div id="sticky-header">
     <nav>
         <a href="index.html">Search</a>
         <a href="zones.html">Zones</a>
-        <a href="admin.html">Admin</a>
+        <a href="leaderboard.html">Leaderboard</a>
+        <div class="dropdown">
+            <span class="dropbtn">Games ▼</span>
+            <div class="dropdown-content">
+                <a href="daily.html">Daily</a>
+                <a href="zonequiz.html">Zone Quiz</a>
+                <a href="mobguess.html">Mob Guess</a>
+            </div>
+        </div>
+        <div class="dropdown">
+            <span class="dropbtn">Community Tools ▼</span>
+            <div class="dropdown-content">
+                <a href="market.html">Market</a>
+                <a href="lfg.html">LFG</a>
+            </div>
+        </div>
+        <div class="dropdown">
+            <span class="dropbtn">More ▼</span>
+            <div class="dropdown-content">
+                <a href="info.html">About</a>
+                <a href="ideas.html">Ideas</a>
+            </div>
+        </div>
+        <div class="dropdown" id="editor-dropdown" style="display:none;">
+            <span class="dropbtn">Editor ▼</span>
+            <div class="dropdown-content">
+                <a href="import.html">Add Equipment</a>
+                <a href="batch.html">Batch Import</a>
+                <a href="import-db.html">Import Database</a>
+                <a href="cleanup.html">Data Cleanup</a>
+            </div>
+        </div>
+        <span id="login-link"><a href="login.html">Login</a></span>
+        <span id="signup-link"><a href="signup.html" style="color:#44aa44;">Sign Up</a></span>
+        <span id="admin-link" style="display:none;"><a href="admin.html" style="color:#FFD700;font-weight:bold;">Admin Panel</a></span>
+        <span id="logout-link" style="display:none;"><a href="#" onclick="logout()">Logout</a></span>
     </nav>
-    <hr>
+    <script>document.querySelectorAll('nav a').forEach(function(a){if(a.href&&a.href.split('/').pop()===location.pathname.split('/').pop())a.style.color='#00FFFF';});</script>
+    </div>
 
-    <h1>🧹 Data Cleanup</h1>
-    <p class="subtitle">Help clean bad entries from the database. Legit, Junk, or Skip.</p>
+    <h2>Data Cleanup</h2>
+    <p class="subtitle">Review items and mark them as legit, junk, or skip. Editor-only tool.</p>
 
     <div class="stats-row">
         <div class="stat-box"><div class="num" id="stat-reviewed">0</div><div class="lbl">Reviewed</div></div>
@@ -95,7 +144,6 @@
     <div class="feedback" id="feedback"></div>
     <p class="keyboard-hint">Keyboard: L = Legit &nbsp;·&nbsp; J = Junk &nbsp;·&nbsp; S / Space = Skip</p>
 
-    <!-- Flagged list (admin only) -->
     <div class="flagged-section" id="flagged-section" style="display:none;">
         <h3>All Flagged Items</h3>
         <div id="flagged-list"></div>
@@ -113,9 +161,8 @@
         var qIndex    = 0;
         var current   = null;
         var stats     = { reviewed: 0, legit: 0, junk: 0, skip: 0, streak: 0 };
-        var seen      = new Set(); // avoid showing same item twice in a session
+        var seen      = new Set();
 
-        // ── Mode ──────────────────────────────────────────────────
         window.setMode = function(m) {
             mode = m;
             document.querySelectorAll('.mode-btn').forEach(function(b) { b.classList.remove('active'); });
@@ -134,12 +181,10 @@
             renderCard();
         };
 
-        // ── Load queue ────────────────────────────────────────────
         async function loadQueue() {
             document.getElementById('game-area').innerHTML = '<p style="text-align:center;color:#555;">Loading...</p>';
 
             if (mode === 'flagged') {
-                // Show flagged items first
                 var r = await supabase.from('item_flags')
                     .select('item_name, area, mobid, flag_type')
                     .eq('flag_type', 'junk')
@@ -149,7 +194,6 @@
                     return { name: row.item_name, area: row.area, mobid: row.mobid, flagged: true };
                 });
             } else if (mode === 'suspect') {
-                // Items that look like junk
                 var r = await supabase.from('itemsloc_db')
                     .select('itemid, area, mobid')
                     .limit(500);
@@ -166,7 +210,6 @@
                         return { name: nameMap[String(row.itemid)] || 'Unknown', area: row.area, itemid: row.itemid, mobid: row.mobid };
                     });
             } else {
-                // Random items from itemsloc_db
                 var r = await supabase.from('itemsloc_db')
                     .select('itemid, area, mobid')
                     .limit(500);
@@ -178,7 +221,6 @@
                 queue = (r.data || []).map(function(row) {
                     return { name: nameMap[String(row.itemid)] || null, area: row.area, itemid: row.itemid, mobid: row.mobid };
                 }).filter(function(x) { return x.name; });
-                // Shuffle
                 queue.sort(function() { return Math.random() - 0.5; });
             }
 
@@ -188,10 +230,8 @@
         }
 
         function nextCard() {
-            // Skip already seen items
             while (qIndex < queue.length && seen.has(queue[qIndex].name)) qIndex++;
             if (qIndex >= queue.length) {
-                // Reload queue
                 loadQueue();
                 return;
             }
@@ -200,7 +240,6 @@
             updateProgress();
         }
 
-        // ── Render card ───────────────────────────────────────────
         function renderCard() {
             if (!current) return;
             var area = document.getElementById('game-area');
@@ -211,7 +250,7 @@
 
             var label = document.createElement('div');
             label.className = 'card-label';
-            label.textContent = current.flagged ? '⚠ Previously Flagged' : 'Item Entry';
+            label.textContent = current.flagged ? '&#9888; Previously Flagged' : 'Item Entry';
             card.appendChild(label);
 
             var name = document.createElement('div');
@@ -229,7 +268,7 @@
             if (current.flagged) {
                 var badge = document.createElement('div');
                 badge.className = 'flag-badge';
-                badge.textContent = '⚑ Flagged as junk';
+                badge.textContent = '&#9873; Flagged as junk';
                 card.appendChild(badge);
             }
 
@@ -237,18 +276,17 @@
             link.className = 'card-link';
             link.href = 'item.html?name=' + encodeURIComponent(current.name);
             link.target = '_blank';
-            link.textContent = 'View full item page →';
+            link.textContent = 'View full item page &rarr;';
             card.appendChild(link);
 
             area.appendChild(card);
 
-            // Buttons
             var btnRow = document.createElement('div');
             btnRow.className = 'btn-row';
 
             var legitBtn = document.createElement('button');
             legitBtn.className = 'btn-legit';
-            legitBtn.innerHTML = '✓ Legit';
+            legitBtn.innerHTML = '&#10003; Legit';
             legitBtn.addEventListener('click', function() { vote('legit'); });
 
             var skipBtn = document.createElement('button');
@@ -259,7 +297,7 @@
             if (adminMode && current.flagged) {
                 var delBtn = document.createElement('button');
                 delBtn.className = 'btn-delete';
-                delBtn.innerHTML = '🗑 Delete';
+                delBtn.innerHTML = '&#128465; Delete';
                 delBtn.addEventListener('click', function() { adminDelete(); });
                 btnRow.appendChild(legitBtn);
                 btnRow.appendChild(skipBtn);
@@ -267,7 +305,7 @@
             } else {
                 var junkBtn = document.createElement('button');
                 junkBtn.className = 'btn-junk';
-                junkBtn.innerHTML = '✗ Junk';
+                junkBtn.innerHTML = '&#10007; Junk';
                 junkBtn.addEventListener('click', function() { vote('junk'); });
                 btnRow.appendChild(legitBtn);
                 btnRow.appendChild(skipBtn);
@@ -277,7 +315,6 @@
             area.appendChild(btnRow);
         }
 
-        // ── Vote ──────────────────────────────────────────────────
         async function vote(type) {
             if (!current) return;
             var reviewer = document.getElementById('reviewer-name').value.trim() || 'anonymous';
@@ -290,7 +327,6 @@
             updateStatDisplay();
             showFeedback(type);
 
-            // Log to database
             await supabase.from('item_flags').insert({
                 item_name:  current.name,
                 itemid:     current.itemid || null,
@@ -311,7 +347,6 @@
 
             showFeedback('delete');
 
-            // Log removal
             await supabase.from('item_removals').insert({
                 item_name:  current.name,
                 itemid:     current.itemid || null,
@@ -320,12 +355,10 @@
                 removed_by: reviewer
             });
 
-            // Delete from itemsloc_db
             if (current.itemid) {
                 await supabase.from('itemsloc_db').delete().eq('itemid', String(current.itemid));
                 await supabase.from('items_db').delete().eq('itemid', String(current.itemid));
             } else {
-                // Delete by name if no itemid
                 var r = await supabase.from('items_db').select('itemid').eq('name', current.name).limit(1);
                 if (r.data && r.data.length > 0) {
                     var id = String(r.data[0].itemid);
@@ -334,7 +367,6 @@
                 }
             }
 
-            // Clear flags for this item
             await supabase.from('item_flags').delete().eq('item_name', current.name);
 
             stats.junk++;
@@ -358,7 +390,6 @@
                 return;
             }
 
-            // Group by item name
             var byName = {};
             (r.data || []).forEach(function(row) {
                 if (!byName[row.item_name]) byName[row.item_name] = { area: row.area, count: 0 };
@@ -372,7 +403,7 @@
                 row.className = 'flagged-row';
                 row.innerHTML = '<span class="fname"><a href="item.html?name=' + encodeURIComponent(name) + '" target="_blank">' + escHtml(name) + '</a></span>'
                     + '<span class="farea">' + escHtml(info.area || '') + '</span>'
-                    + '<span class="fcount">⚑ ' + info.count + 'x</span>';
+                    + '<span class="fcount">&#9873; ' + info.count + 'x</span>';
                 var delBtn = document.createElement('button');
                 delBtn.className = 'btn-sm btn-sm-delete';
                 delBtn.textContent = 'Delete';
@@ -403,11 +434,10 @@
             });
         }
 
-        // ── UI helpers ────────────────────────────────────────────
         function showFeedback(type) {
-            var msgs = { legit: '✓ Marked as legit', junk: '✗ Flagged as junk', skip: '→ Skipped', delete: '🗑 Deleted' };
+            var msgs = { legit: '&#10003; Marked as legit', junk: '&#10007; Flagged as junk', skip: '&rarr; Skipped', delete: '&#128465; Deleted' };
             var fb = document.getElementById('feedback');
-            fb.textContent = msgs[type] || '';
+            fb.innerHTML = msgs[type] || '';
             fb.className = 'feedback show ' + type;
             setTimeout(function() { fb.classList.remove('show'); }, 800);
         }
@@ -432,7 +462,6 @@
             return d.innerHTML;
         }
 
-        // ── Keyboard shortcuts ────────────────────────────────────
         document.addEventListener('keydown', function(e) {
             if (e.target.tagName === 'INPUT') return;
             if (e.key === 'l' || e.key === 'L') vote('legit');
@@ -441,6 +470,26 @@
         });
 
         loadQueue();
+    </script>
+
+    <script>
+        if (sessionStorage.getItem('editor_logged_in') === 'true') {
+            document.getElementById('editor-dropdown').style.display = 'inline-block';
+            document.getElementById('admin-link').style.display = 'inline';
+            document.getElementById('logout-link').style.display = 'inline';
+            document.getElementById('login-link').style.display = 'none';
+        }
+        if (localStorage.getItem('user_logged_in') === 'true') {
+            document.getElementById('login-link').style.display = 'none';
+            document.getElementById('signup-link').style.display = 'none';
+        }
+        function logout() {
+            sessionStorage.removeItem('editor_logged_in');
+            sessionStorage.removeItem('editor_name');
+            localStorage.removeItem('user_logged_in');
+            localStorage.removeItem('username');
+            location.reload();
+        }
     </script>
 </body>
 </html>

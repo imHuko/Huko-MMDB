@@ -1,530 +1,1140 @@
 <!DOCTYPE html>
+
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>Colorizer Training - MUD Equipment DB</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+
     <style>
-        body { font-family: Arial, sans-serif; max-width: 1400px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+
+        body { font-family: "Inter", sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+
+        #sticky-header { position: sticky; top: 0; z-index: 100; background: #1a1a1a; }
+
         a { color: #8787FF; }
+
         h1, h2, h3 { color: #C0C0C0; }
-        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; }
-        nav a { margin-right: 15px; }
+
+        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; }
+
+        nav a { margin-right: 15px; color: #8787FF; text-decoration: none; }
+
+        nav a:hover { color: #C0C0C0; }
+
+        nav .dropdown { position: relative; display: inline-block; margin-right: 15px; }
+
+        nav .dropbtn { cursor: pointer; color: #8787FF; }
+
+        nav .dropdown-content { display: none; position: absolute; top: 100%; left: 0; background: #333; min-width: 160px; border: 1px solid #444; border-radius: 3px; z-index: 1000; }
+
+        nav .dropdown-content a { display: block; padding: 8px 12px; margin: 0; white-space: nowrap; }
+
+        nav .dropdown-content a:hover { background: #444; color: #C0C0C0; }
+
+        nav .dropdown:hover .dropdown-content { display: block; }
+
         button { padding: 8px 16px; cursor: pointer; border: none; border-radius: 3px; margin: 4px; }
+
         .btn-train { background: #44aa44; color: white; }
+
         .btn-colorize { background: #4488ff; color: white; }
+
         .btn-clear { background: #ff4444; color: white; }
+
         .btn-export { background: #8888ff; color: white; }
+
         .btn-import { background: #666; color: white; }
+
         .btn-apply { background: #ff8800; color: white; }
+
         textarea { width: 100%; padding: 10px; background: #111; color: #ccc; border: 1px solid #555; border-radius: 3px; font-family: 'Courier New', monospace; font-size: 12px; box-sizing: border-box; }
+
         .row { display: flex; gap: 15px; margin: 15px 0; }
+
         .pane { flex: 1; }
+
         .pane h3 { margin-top: 0; }
+
         .output-box { background: #000; color: #C0C0C0; padding: 15px; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 12px; white-space: pre-wrap; min-height: 300px; max-height: 500px; overflow-y: auto; border: 1px solid #555; }
+
         .training-list { max-height: 400px; overflow-y: auto; }
+
         .training-item { background: #222; padding: 8px; margin: 4px 0; border-radius: 3px; font-size: 12px; }
+
         .training-item .line-type { color: #8787FF; font-weight: bold; }
+
         .training-item .count { color: #888; font-size: 11px; }
+
         .training-item .colors { font-size: 11px; }
+
         .training-item .colors span { padding: 2px 4px; border-radius: 2px; margin: 0 2px; }
+
         .color-picker-row { display: flex; gap: 8px; align-items: center; margin: 5px 0; }
+
         .color-picker-row label { width: 80px; font-size: 12px; }
+
         .color-picker-row input[type="text"] { width: 80px; }
+
         .color-picker-row input[type="color"] { width: 40px; height: 30px; padding: 0; }
+
         .stats { background: #222; padding: 15px; border-radius: 5px; margin: 10px 0; font-size: 13px; }
+
         .stats span { color: #8787FF; font-weight: bold; }
+
         .toolbar { margin: 10px 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
     </style>
+
 </head>
+
 <body>
+    <div style="margin-bottom:6px;text-align:center;"><img src="images/logo.png" alt="HukoDB" style="height:130px;"></div>
+    <div id="sticky-header">
+
     <nav>
+
         <a href="index.html">Search</a>
-        <a href="info.html">About</a>
-        <a href="ideas.html">Ideas</a>
+
+        <a href="zones.html">Zones</a>
+
         <a href="leaderboard.html">Leaderboard</a>
-        <span id="editor-links" style="display:none;">
-            <a href="import.html">Add Equipment</a>
-            <a href="batch.html">Batch Import</a>
-            <a href="import-db.html">Import Database</a>
-            <a href="admin.html">Admin</a>
-        </span>
-        <span id="login-link"><a href="login.html">Editor Login</a></span>
+
+        
+        <div class="dropdown">
+            <span class="dropbtn">Games ▼</span>
+            <div class="dropdown-content">
+                <a href="daily.html">Daily</a>
+                <a href="zonequiz.html">Zone Quiz</a>
+                <a href="mobguess.html">Mob Guess</a>
+            </div>
+        </div>
+
+
+        <div class="dropdown">
+
+            <span class="dropbtn">Community Tools ▼</span>
+
+            <div class="dropdown-content">
+
+                <a href="market.html">Market</a>
+
+                <a href="lfg.html">LFG</a>
+
+            </div>
+
+        </div>
+
+        <div class="dropdown">
+
+            <span class="dropbtn">More ▼</span>
+
+            <div class="dropdown-content">
+
+                <a href="info.html">About</a>
+
+                <a href="ideas.html">Ideas</a>
+
+            </div>
+
+        </div>
+
+        <div class="dropdown" id="editor-dropdown" style="display:none;">
+
+            <span class="dropbtn">Editor ▼</span>
+
+            <div class="dropdown-content">
+
+                <a href="import.html">Add Equipment</a>
+
+                <a href="batch.html">Batch Import</a>
+
+                <a href="import-db.html">Import Database</a>
+
+            </div>
+
+        </div>
+
+        <span id="login-link"><a href="login.html">Login</a></span>
+
+        
+        <span id="signup-link"><a href="signup.html" style="color:#44aa44;">Sign Up</a></span>
+        <span id="admin-link" style="display:none;"><a href="admin.html" style="color:#FFD700;font-weight:bold;">Admin Panel</a></span>
         <span id="logout-link" style="display:none;"><a href="#" onclick="logout()">Logout</a></span>
+
     </nav>
+
+    <script>document.querySelectorAll('nav a').forEach(function(a){if(a.href.split('/').pop()===location.pathname.split('/').pop())a.style.color='#00FFFF';});</script>
+
+    </div>
+
+    <h2>Colorizer Training</h2>
+
     <hr>
-    
-    <h1>Colorizer Training</h1>
+
     <p style="color:#888;">Paste correctly-colored MUSHclient HTML. The system learns line types and their color patterns.</p>
+
     
+
     <!-- TRAINING INPUT -->
+
     <div class="row">
+
         <div class="pane">
+
             <h3>1. Paste Correctly-Colored MUSHclient HTML</h3>
+
             <textarea id="training-html" rows="12" placeholder="Paste the colored HTML output from MUSHclient here..."></textarea>
+
             <button class="btn-train" id="train-btn">Train from this example</button>
+
             <span id="train-status" style="font-size:13px;color:#888;margin-left:10px;"></span>
+
         </div>
+
     </div>
+
     
+
     <!-- TEST AREA -->
+
     <div class="row">
+
         <div class="pane">
+
             <h3>2. Paste Plain Text to Test</h3>
+
             <textarea id="test-input" rows="10" placeholder="Paste plain text equipment here..."></textarea>
+
             <button class="btn-colorize" id="test-btn">Colorize with Training</button>
+
         </div>
+
         <div class="pane">
+
             <h3>3. Colored Output</h3>
+
             <div class="output-box" id="test-output"></div>
+
         </div>
+
     </div>
+
     
+
     <!-- COLOR MAP -->
+
     <h3>4. Color Map</h3>
+
     <div class="row">
+
         <div class="pane">
+
             <div class="color-picker-row"><label>Blue:</label><input type="text" id="color-blue" value="#8787FF"><input type="color" id="color-blue-picker" value="#8787FF"></div>
+
             <div class="color-picker-row"><label>White:</label><input type="text" id="color-white" value="#C0C0C0"><input type="color" id="color-white-picker" value="#C0C0C0"></div>
+
             <div class="color-picker-row"><label>Cyan:</label><input type="text" id="color-cyan" value="#00FFFF"><input type="color" id="color-cyan-picker" value="#00FFFF"></div>
+
             <div class="color-picker-row"><label>Yellow:</label><input type="text" id="color-yellow" value="#FFFF00"><input type="color" id="color-yellow-picker" value="#FFFF00"></div>
+
             <div class="color-picker-row"><label>Green:</label><input type="text" id="color-green" value="#00FF00"><input type="color" id="color-green-picker" value="#00FF00"></div>
+
             <div class="color-picker-row"><label>Pink:</label><input type="text" id="color-pink" value="#D78787"><input type="color" id="color-pink-picker" value="#D78787"></div>
+
         </div>
+
         <div class="pane">
+
             <div class="color-picker-row"><label>Magenta:</label><input type="text" id="color-magenta" value="#FF00FF"><input type="color" id="color-magenta-picker" value="#FF00FF"></div>
+
             <div class="color-picker-row"><label>Gray:</label><input type="text" id="color-gray" value="#808080"><input type="color" id="color-gray-picker" value="#808080"></div>
+
             <div class="color-picker-row"><label>Olive:</label><input type="text" id="color-olive" value="#808000"><input type="color" id="color-olive-picker" value="#808000"></div>
+
             <div class="color-picker-row"><label>Red:</label><input type="text" id="color-red" value="#FF0000"><input type="color" id="color-red-picker" value="#FF0000"></div>
+
             <div class="color-picker-row"><label>DarkGreen:</label><input type="text" id="color-darkgreen" value="#008000"><input type="color" id="color-darkgreen-picker" value="#008000"></div>
+
             <button class="btn-apply" id="apply-colors-btn">Apply Colors</button>
+
         </div>
+
     </div>
+
     
+
     <!-- LEARNED LINE TYPES -->
+
     <h3>5. Learned Line Types (<span id="type-count">0</span> types from <span id="example-count">0</span> examples)</h3>
+
     <div class="toolbar">
+
         <button class="btn-export" id="export-training-btn">Export Training Data</button>
+
         <button class="btn-import" id="import-training-btn">Import Training Data</button>
+
         <button class="btn-clear" id="clear-training-btn">Clear All Training</button>
+
         <input type="file" id="import-training-file" accept=".json" style="display:none;">
+
     </div>
+
     <div class="training-list" id="training-list"></div>
 
+
+
     <script>
+
         // ============================================
+
         // COLOR MAP
+
         // ============================================
+
         var C = {
+
             blue: '#8787FF', white: '#C0C0C0', cyan: '#00FFFF', yellow: '#FFFF00',
+
             green: '#00FF00', pink: '#D78787', magenta: '#FF00FF', gray: '#808080',
+
             olive: '#808000', red: '#FF0000', darkgreen: '#008000'
+
         };
+
         var savedColors = JSON.parse(localStorage.getItem('mmColors') || 'null');
+
         if (savedColors) { for (var k in savedColors) { C[k] = savedColors[k]; } }
+
         
+
         // ============================================
+
         // TRAINING DATA
+
         // ============================================
+
         var trainingData = { examples: [], lineTypes: {} };
+
 try {
+
     var saved = JSON.parse(localStorage.getItem('mmTraining') || 'null');
+
     if (saved && saved.examples && saved.lineTypes) {
+
         trainingData = saved;
+
     }
+
 } catch(e) {
+
     trainingData = { examples: [], lineTypes: {} };
+
 }
+
         
+
         // ============================================
+
         // INIT
+
         // ============================================
+
         function initColorPickers() {
+
             for (var key in C) {
+
                 var el = document.getElementById('color-' + key);
+
                 var picker = document.getElementById('color-' + key + '-picker');
+
                 if (el) el.value = C[key];
+
                 if (picker) picker.value = C[key];
+
             }
+
         }
+
         initColorPickers();
+
         updateStats();
+
         renderLineTypes();
+
         
+
         // Color picker sync
+
         document.querySelectorAll('.color-picker-row input[type="text"]').forEach(function(el) {
+
             el.addEventListener('input', function() {
+
                 var key = this.id.replace('color-', '');
+
                 var picker = document.getElementById('color-' + key + '-picker');
+
                 if (picker) picker.value = this.value;
+
             });
+
         });
+
         document.querySelectorAll('.color-picker-row input[type="color"]').forEach(function(el) {
+
             el.addEventListener('input', function() {
+
                 var key = this.id.replace('color-', '').replace('-picker', '');
+
                 var text = document.getElementById('color-' + key);
+
                 if (text) text.value = this.value;
+
             });
+
         });
+
         
+
         document.getElementById('apply-colors-btn').addEventListener('click', function() {
+
             for (var key in C) {
+
                 var el = document.getElementById('color-' + key);
+
                 if (el) C[key] = el.value;
+
             }
+
             localStorage.setItem('mmColors', JSON.stringify(C));
+
             document.getElementById('test-btn').click();
+
             alert('Colors applied!');
+
         });
+
         
+
         // ============================================
+
         // DETECT LINE TYPE from text content
+
         // ============================================
+
         function detectLineType(line) {
+
             var t = line.trim();
+
             if (!t) return 'blank';
+
             if (/^\+\+\+/.test(t)) return 'proc';
+
             if (/^Relics:/.test(t)) return 'relic-header';
+
             if (/^(Small|Medium|Large)\s*\(/.test(t)) return 'relic-size';
+
             if (/^\s*\(\d+\/\d+/.test(t)) return 'relic-slots';
+
             if (/^\*\s*Item\s+'/.test(t)) return 'set-star-item';
+
             if (/^-\s*Item\s+'/.test(t)) return 'set-dash-item';
+
             if (/^\*/.test(t)) return 'requirement';
+
             if (/^Affects\s+.+\s+by\s+/.test(t)) return 'affects';
+
             if (/^When casting.+has a/.test(t)) return 'darkgreen-proc';
+
             if (/^Adds resistance/.test(t)) return 'adds-resistance';
+
             if (/^Decreases/.test(t)) return 'decreases';
+
             if (/^Grants/.test(t)) return 'grants';
+
             if (/^When /.test(t)) return 'when-proc';
+
             if (/^Casts the level/.test(t)) return 'casts';
+
             if (/^Improves/.test(t)) return 'improves';
+
             if (/^Your weapon special/.test(t)) return 'weapon-special';
+
             if (/^Alters/.test(t)) return 'alters';
+
             if (/^Item\s+'/.test(t)) return 'item-name';
+
             if (/^Level\s+\d+\s+item\s+'/.test(t)) return 'level-item';
+
             if (/^has keywords/.test(t)) return 'keywords';
+
             if (/^(This item weighs|This level|This item has|This armor has|This item protects|This ward has|This relic|This item, when|This amulet|Your magical wand|This light source|Armor resistance|This item will have|This item will lose|This item is enchanted)/.test(t)) return 'stat-line';
+
             if (/^(This is part of|You are currently)/.test(t)) return 'set-info';
+
             if (/This item is beyond your power/.test(t)) return 'beyond-power';
+
             if (/^(Capacity:|Upon|Small )/.test(t)) return 'misc-stat';
+
             if (/^[A-Z]/.test(t)) return 'description';
+
             return 'unknown';
+
         }
+
         
+
         // ============================================
+
         // TRAIN BUTTON
+
         // ============================================
+
         document.getElementById('train-btn').addEventListener('click', function() {
+
             var html = document.getElementById('training-html').value.trim();
+
             if (!html) { document.getElementById('train-status').textContent = 'Paste HTML first.'; return; }
+
             
+
             // Parse HTML to get lines with color info
+
             var div = document.createElement('div');
+
             div.innerHTML = html;
+
             
+
             // Get all font-tagged text in order
+
             var allText = '';
+
             var fonts = div.querySelectorAll('font[color]');
+
             var segments = [];
+
             
+
             fonts.forEach(function(f) {
+
                 var color = f.getAttribute('color').toUpperCase();
+
                 var text = f.textContent || '';
+
                 segments.push({ color: color, text: text });
+
                 allText += text;
+
             });
+
             
+
             if (segments.length === 0) {
+
                 // Try extracting from <pre><code> block
+
                 var pre = div.querySelector('pre');
+
                 if (pre) {
+
                     allText = pre.textContent || '';
+
                     document.getElementById('train-status').textContent = 'No font tags found. Paste the HTML with <font color="..."> tags.';
+
                     return;
+
                 }
+
                 document.getElementById('train-status').textContent = 'No colored text found.';
+
                 return;
+
             }
+
             
+
             // Split into lines and track which segments belong to which line
+
             var lines = allText.split('\n');
+
             var lineMap = []; // line index -> list of segment indices
+
             
+
             var segIdx = 0;
+
             var charPos = 0;
+
             
+
             for (var li = 0; li < lines.length; li++) {
+
                 var lineStart = charPos;
+
                 var lineEnd = charPos + lines[li].length;
+
                 var lineSegs = [];
+
                 
+
                 var currentPos = 0;
+
                 for (var si = 0; si < segments.length; si++) {
+
                     var segStart = currentPos;
+
                     var segEnd = currentPos + segments[si].text.length;
+
                     
+
                     // Check if this segment overlaps with this line
+
                     if (segEnd > lineStart && segStart < lineEnd) {
+
                         lineSegs.push(si);
+
                     }
+
                     currentPos = segEnd;
+
                 }
+
                 
+
                 lineMap.push(lineSegs);
+
                 charPos = lineEnd + 1; // +1 for newline
+
             }
+
             
+
             // For each line, learn the color pattern
+
             var learned = 0;
+
             for (var li = 0; li < lines.length; li++) {
+
                 var line = lines[li];
+
                 var t = line.trim();
+
                 if (!t) continue;
+
                 
+
                 var lineType = detectLineType(t);
+
                 var segs = lineMap[li] || [];
+
                 
+
                 if (segs.length === 0) continue;
+
                 
+
                 // Build color pattern for this line
+
                 var colorPattern = {};
+
                 var mostCommonColor = null;
+
                 var colorCounts = {};
+
                 
+
                 for (var si = 0; si < segs.length; si++) {
+
                     var seg = segments[segs[si]];
+
                     var color = seg.color;
+
                     colorCounts[color] = (colorCounts[color] || 0) + seg.text.length;
+
                 }
+
                 
+
                 // Find the most common color (by text length)
+
                 var maxCount = 0;
+
                 for (var c in colorCounts) {
+
                     if (colorCounts[c] > maxCount) {
+
                         maxCount = colorCounts[c];
+
                         mostCommonColor = c;
+
                     }
+
                 }
+
                 
+
                 if (mostCommonColor) {
+
                     if (!trainingData.lineTypes[lineType]) {
+
                         trainingData.lineTypes[lineType] = { colors: {}, count: 0, examples: [] };
+
                     }
+
                     trainingData.lineTypes[lineType].colors[mostCommonColor] = (trainingData.lineTypes[lineType].colors[mostCommonColor] || 0) + 1;
+
                     trainingData.lineTypes[lineType].count++;
+
                     if (trainingData.lineTypes[lineType].examples.length < 3) {
+
                         trainingData.lineTypes[lineType].examples.push(t.substring(0, 80));
+
                     }
+
                     learned++;
+
                 }
+
             }
+
             
+
             trainingData.examples.push({ timestamp: new Date().toISOString(), lines: lines.length });
+
             saveTraining();
+
             updateStats();
+
             renderLineTypes();
+
             document.getElementById('train-status').textContent = 'Trained! ' + learned + ' lines learned across ' + Object.keys(trainingData.lineTypes).length + ' line types.';
+
             document.getElementById('training-html').value = '';
+
         });
+
         
+
         // ============================================
+
         // TEST BUTTON
+
         // ============================================
+
         document.getElementById('test-btn').addEventListener('click', function() {
+
             var input = document.getElementById('test-input').value;
+
             var output = colorizeWithTraining(input);
+
             document.getElementById('test-output').innerHTML = '<style>' +
+
                 '.c-blue{color:' + C.blue + '}.c-white{color:' + C.white + '}.c-cyan{color:' + C.cyan + '}' +
+
                 '.c-yellow{color:' + C.yellow + '}.c-green{color:' + C.green + '}.c-pink{color:' + C.pink + '}' +
+
                 '.c-magenta{color:' + C.magenta + '}.c-gray{color:' + C.gray + '}.c-olive{color:' + C.olive + '}' +
+
                 '.c-red{color:' + C.red + '}.c-darkgreen{color:' + C.darkgreen + '}' +
+
                 'body{font-family:Courier New,monospace;font-size:13px;white-space:pre-wrap}' +
+
                 '</style>' + output;
+
         });
+
         
+
         function colorizeWithTraining(text) {
+
             if (!text) return '';
+
             var lines = text.split('\n');
+
             var result = [];
+
             
+
             for (var i = 0; i < lines.length; i++) {
+
                 var line = lines[i];
+
                 var t = line.trim();
+
                 if (!t) { result.push(''); continue; }
+
                 
+
                 var lineType = detectLineType(t);
+
                 var typeData = trainingData.lineTypes[lineType];
+
                 
+
                 if (typeData) {
+
                     // Find the most common color for this line type
+
                     var bestColor = null;
+
                     var bestCount = 0;
+
                     for (var c in typeData.colors) {
+
                         if (typeData.colors[c] > bestCount) {
+
                             bestCount = typeData.colors[c];
+
                             bestColor = c;
+
                         }
+
                     }
+
                     
+
                     if (bestColor) {
+
                         var cls = getColorClass(bestColor);
+
                         result.push('<span class="' + cls + '">' + escapeHtml(line) + '</span>');
+
                         continue;
+
                     }
+
                 }
+
                 
+
                 // Fallback: basic heuristics
+
                 if (/^\+\+\+/.test(t)) { result.push('<span class="c-green">' + escapeHtml(line) + '</span>'); continue; }
+
                 if (/^\*/.test(t)) { result.push('<span class="c-yellow">' + escapeHtml(line) + '</span>'); continue; }
+
                 if (/^Item\s+'/.test(t)) { result.push('<span class="c-blue">' + escapeHtml(line) + '</span>'); continue; }
+
                 result.push('<span class="c-white">' + escapeHtml(line) + '</span>');
+
             }
+
             
+
             return result.join('\n');
+
         }
+
         
+
         function getColorClass(hex) {
+
             hex = hex.toUpperCase();
+
             for (var key in C) {
+
                 if (C[key].toUpperCase() === hex) return 'c-' + key;
+
             }
+
             var r = parseInt(hex.substr(1,2), 16), g = parseInt(hex.substr(3,2), 16), b = parseInt(hex.substr(5,2), 16);
+
             if (isNaN(r)) return 'c-white';
+
             if (r > 200 && g < 80 && b < 80) return 'c-red';
+
             if (r > 200 && g > 180 && b < 80) return 'c-yellow';
+
             if (r < 80 && g > 200 && b > 200) return 'c-cyan';
+
             if (r < 80 && g > 180 && b < 80) return 'c-green';
+
             if (r > 180 && g > 180 && b > 180) return 'c-white';
+
             return 'c-white';
+
         }
+
         
+
         // ============================================
+
         // EXPORT / IMPORT / CLEAR
+
         // ============================================
+
         document.getElementById('export-training-btn').addEventListener('click', function() {
+
             var blob = new Blob([JSON.stringify(trainingData, null, 2)], { type: 'application/json' });
+
             var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'colorizer-training.json'; a.click();
+
         });
+
         
+
         document.getElementById('import-training-btn').addEventListener('click', function() {
+
             document.getElementById('import-training-file').click();
+
         });
+
         
+
         document.getElementById('import-training-file').addEventListener('change', function(e) {
+
             var file = e.target.files[0]; if (!file) return;
+
             var reader = new FileReader();
+
             reader.onload = function(ev) {
+
                 try {
+
                     var data = JSON.parse(ev.target.result);
+
                     if (data.examples && data.lineTypes) {
+
                         trainingData = data; saveTraining(); updateStats(); renderLineTypes();
+
                         alert('Imported! ' + data.examples.length + ' examples, ' + Object.keys(data.lineTypes).length + ' line types.');
+
                     }
+
                 } catch(ex) { alert('Invalid file.'); }
+
             };
+
             reader.readAsText(file);
+
         });
+
         
+
         document.getElementById('clear-training-btn').addEventListener('click', function() {
+
             if (confirm('Delete ALL training data?')) {
+
                 trainingData = { examples: [], lineTypes: {} }; saveTraining(); updateStats(); renderLineTypes();
+
             }
+
         });
+
         
+
         // ============================================
+
         // HELPERS
+
         // ============================================
+
         function saveTraining() { localStorage.setItem('mmTraining', JSON.stringify(trainingData)); }
+
         
+
         function updateStats() {
+
             document.getElementById('type-count').textContent = Object.keys(trainingData.lineTypes).length;
+
             document.getElementById('example-count').textContent = trainingData.examples.length;
+
         }
+
         
+
         function renderLineTypes() {
+
             var list = document.getElementById('training-list');
+
             var types = Object.keys(trainingData.lineTypes).sort(function(a, b) {
+
                 return trainingData.lineTypes[b].count - trainingData.lineTypes[a].count;
+
             });
+
             
+
             if (types.length === 0) {
+
                 list.innerHTML = '<p style="color:#888;">No line types learned yet.</p>';
+
                 return;
+
             }
+
             
+
             var html = '';
+
             for (var i = 0; i < types.length; i++) {
+
                 var type = types[i];
+
                 var data = trainingData.lineTypes[type];
+
                 var bestColor = null, bestCount = 0;
+
                 for (var c in data.colors) { if (data.colors[c] > bestCount) { bestCount = data.colors[c]; bestColor = c; } }
+
                 var cls = getColorClass(bestColor || '#C0C0C0');
+
                 
+
                 var colorSpans = '';
+
                 for (var c in data.colors) {
+
                     var pct = Math.round(data.colors[c] / data.count * 100);
+
                     if (pct > 10) {
+
                         var ccls = getColorClass(c);
+
                         colorSpans += '<span class="' + ccls + '" style="background:' + c + ';color:#000;">' + c + ' (' + pct + '%)</span> ';
+
                     }
+
                 }
+
                 
+
                 html += '<div class="training-item">';
+
                 html += '<span class="line-type ' + cls + '">' + escapeHtml(type) + '</span> ';
+
                 html += '<span class="count">(' + data.count + ' examples)</span><br>';
+
                 html += '<span class="colors">' + colorSpans + '</span>';
+
                 if (data.examples.length > 0) {
+
                     html += '<br><span style="color:#666;font-size:11px;">e.g. ' + escapeHtml(data.examples[0]) + '</span>';
+
                 }
+
                 html += '</div>';
+
             }
+
             
+
             list.innerHTML = html;
+
         }
+
         
+
         function escapeHtml(text) {
+
             if (!text) return ''; var div = document.createElement('div'); div.textContent = text; return div.innerHTML;
+
         }
+
 		function isEditor() {
+
     return sessionStorage.getItem('editor_logged_in') === 'true';
+
 }
+
     </script>
+
     <script>
+
         if (sessionStorage.getItem('editor_logged_in') === 'true') {
-            document.getElementById('editor-links').style.display = 'inline';
+
+            document.getElementById('editor-dropdown').style.display = 'inline-block';
+
+            document.getElementById('admin-link').style.display = 'inline';
+
             document.getElementById('logout-link').style.display = 'inline';
+
             document.getElementById('login-link').style.display = 'none';
+            document.getElementById('signup-link').style.display = 'none';
+
         }
-        function logout() { sessionStorage.removeItem('editor_logged_in'); location.reload(); }
+
+                if (localStorage.getItem('user_logged_in') === 'true') {
+            document.getElementById('login-link').style.display = 'none';
+            document.getElementById('signup-link').style.display = 'none';
+        }
+        function logout() {
+            sessionStorage.removeItem('editor_logged_in');
+            sessionStorage.removeItem('editor_name');
+            localStorage.removeItem('user_logged_in');
+            localStorage.removeItem('username');
+            location.reload();
+        }
+
     </script>
+
 <style>
+
 #bug-btn-container{text-align:center;padding:10px 0;margin-top:20px;}
+
 #bug-btn{background:#ff4444;color:white;border:none;border-radius:3px;padding:8px 16px;cursor:pointer;font-size:13px;}
+
 #bug-btn:hover{background:#cc0000;}
+
 #bug-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:none;align-items:center;justify-content:center;}
+
 #bug-modal-content{background:#1a1a1a;border:2px solid #555;border-radius:10px;padding:20px;width:90%;max-width:500px;color:#ccc;}
+
 #bug-modal-content h3{margin:0 0 10px;color:#ff4444;}
+
 #bug-modal-content textarea{width:100%;height:120px;padding:8px;background:#333;color:#ccc;border:1px solid #555;border-radius:3px;box-sizing:border-box;margin:10px 0;font-family:Arial,sans-serif;}
+
 #bug-modal-content .bug-url{color:#888;font-size:12px;word-break:break-all;}
+
 #bug-modal-content .btn-row{display:flex;gap:10px;justify-content:flex-end;}
+
 #bug-modal-content .btn-submit{background:#ff4444;color:white;border:none;border-radius:3px;padding:8px 16px;cursor:pointer;}
+
 #bug-modal-content .btn-cancel{background:#666;color:white;border:none;border-radius:3px;padding:8px 16px;cursor:pointer;}
+
 #bug-modal-content .btn-submit:disabled{opacity:0.5;cursor:not-allowed;}
+
 #bug-modal-content .bug-msg{margin:10px 0 0;font-size:13px;}
+
 </style>
+
 <div id="bug-btn-container"><button id="bug-btn" onclick="openBugReport()">Report Bug</button></div>
+
 <div id="bug-modal" onclick="if(event.target===this)closeBugReport()">
+
   <div id="bug-modal-content">
+
     <h3>Report Bug</h3>
+
     <p class="bug-url">Page: <span id="bug-page-url"></span></p>
+
     <textarea id="bug-description" placeholder="Describe what went wrong..."></textarea>
+
     <div class="btn-row">
+
       <button class="btn-cancel" onclick="closeBugReport()">Cancel</button>
+
       <button class="btn-submit" id="bug-submit-btn" onclick="submitBugReport()">Submit</button>
+
     </div>
+
     <p class="bug-msg" id="bug-msg"></p>
+
   </div>
+
 </div>
+
 <script>
     var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
     var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
@@ -565,5 +1175,7 @@ try {
         }
     };
 </script>
+
 </body>
+
 </html>

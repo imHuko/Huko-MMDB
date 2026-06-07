@@ -7,65 +7,40 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { font-family: "Inter", sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+        body { font-family: "Inter", sans-serif; background: #1a1a1a; color: #ccc; }
         #sticky-header { position: sticky; top: 0; z-index: 100; background: #1a1a1a; }
         a { color: #8787FF; }
-        h1, h2 { color: #C0C0C0; }
-        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; }
-        nav a { margin-right: 15px; color: #8787FF; text-decoration: none; }
-        nav a:hover { color: #C0C0C0; }
-        nav .dropdown { position: relative; display: inline-block; margin-right: 15px; }
-        nav .dropbtn { cursor: pointer; color: #8787FF; }
-        nav .dropdown-content { display: none; position: absolute; top: 100%; left: 0; background: #333; min-width: 160px; border: 1px solid #444; border-radius: 3px; z-index: 1000; }
-        nav .dropdown-content a { display: block; padding: 8px 12px; margin: 0; white-space: nowrap; }
-        nav .dropdown-content a:hover { background: #444; color: #C0C0C0; }
-        nav .dropdown:hover .dropdown-content { display: block; }
-        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-        th, td { border: 1px solid #444; padding: 8px; text-align: left; font-size: 13px; }
-        th { background: #333; cursor: pointer; }
-        th:hover { background: #444; }
-        tr:hover { background: #222; }
-        button { padding: 6px 12px; cursor: pointer; border: none; border-radius: 3px; margin: 2px; }
-        .btn-delete { background: #ff4444; color: white; }
-        .btn-edit { background: #4488ff; color: white; }
-        .btn-approve { background: #44aa44; color: white; }
-        .btn-review { background: #44aa44; color: white; }
-        .btn-save { background: #44aa44; color: white; }
-        .btn-cancel { background: #666; color: white; }
-        .btn-recolor { background: #ff8800; color: white; }
-        input, select, textarea { padding: 8px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; }
-        .hidden { display: none !important; }
-        .tabs { margin: 15px 0; }
-        .tab { display: inline-block; padding: 8px 16px; cursor: pointer; background: #333; border-radius: 5px 5px 0 0; margin-right: 4px; }
-        .tab.active { background: #555; color: white; }
-        .section { display: none; }
-        .section.active { display: block; }
-        .search-bar { margin: 10px 0; display: flex; gap: 8px; align-items: center; }
-        .search-bar input { flex: 1; }
-        .toolbar { margin: 10px 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-        .pagination { margin: 15px 0; display: flex; gap: 5px; align-items: center; }
-        .pagination button { background: #333; color: #ccc; }
-        .pagination button.active { background: #8787FF; color: #000; }
-        .pagination button:disabled { opacity: 0.3; cursor: not-allowed; }
+        a:hover { color: #b5b5ff; }
+        .nav-pills .nav-link { color: #ccc; background: #333; margin-right: 4px; border-radius: 5px 5px 0 0; }
+        .nav-pills .nav-link.active { background: #555; color: white; }
+        .card { background: #222; border-color: #444; }
+        .preview-box { background: #000; color: #C0C0C0; padding: 15px; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 12px; white-space: pre-wrap; height: 400px; overflow-y: auto; border: 1px solid #555; }
         .uploader-tag { color: #8787FF; font-size: 12px; }
         .anon-tag { color: #888; font-size: 12px; font-style: italic; }
         .eqdb-label { color: #44aa44; font-weight: bold; }
         .personal-label { color: #ffaa00; }
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; display: flex; justify-content: center; align-items: center; }
-        .modal { background: #1a1a1a; border: 2px solid #555; border-radius: 10px; padding: 20px; width: 90%; max-width: 1000px; max-height: 90vh; overflow-y: auto; }
-        .modal h2 { margin-top: 0; }
-        .modal .editor-row { display: flex; gap: 15px; margin: 15px 0; }
-        .modal .editor-pane { flex: 1; }
-        .modal .editor-pane h4 { margin: 0 0 8px 0; color: #888; }
-        .modal textarea { width: 100%; height: 400px; font-family: 'Courier New', monospace; font-size: 12px; background: #111; color: #ccc; border: 1px solid #555; padding: 10px; box-sizing: border-box; }
-        .modal .preview-box { background: #000; color: #C0C0C0; padding: 15px; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 12px; white-space: pre-wrap; height: 400px; overflow-y: auto; border: 1px solid #555; }
-        .modal .btn-row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 15px; }
+        .hash-cell { font-family: monospace; font-size: 11px; cursor: pointer; }
+        .pagination .page-btn { background: #333; color: #ccc; border: 1px solid #555; padding: 4px 10px; cursor: pointer; }
+        .pagination .page-btn.active { background: #8787FF; color: #000; border-color: #8787FF; }
+        .pagination .page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        .tab-pane { display: none; }
+        .tab-pane.active { display: block; }
+        .modal-content { background: #1a1a1a; color: #ccc; border-color: #555; }
+        .modal-header { border-color: #333; }
+        .modal-footer { border-color: #333; }
+        .btn-close { filter: invert(1); }
+        .form-control, .form-select { background: #333; color: #ccc; border-color: #555; }
+        .form-control:focus, .form-select:focus { background: #444; color: #ccc; border-color: #8787FF; box-shadow: 0 0 0 0.2rem rgba(135,135,255,0.25); }
+        .table { font-size: 13px; }
+        .status-text { font-size: 13px; color: #888; }
     </style>
 </head>
-<body>
-    <div style="margin-bottom:6px;text-align:center;"><img src="images/logo.png" alt="HukoDB" style="height:130px;"></div>
-    <div id="sticky-header">
+<body class="p-3">
+    <div class="container-fluid" style="max-width:900px;">
+        <div style="margin-bottom:6px;text-align:center;"><img src="images/logo.png" alt="HukoDB" style="height:130px;"></div>
+        <div id="sticky-header">
     <nav>
         <a href="index.html">Search</a>
         <a href="zones.html">Zones</a>
@@ -107,178 +82,170 @@
         <span id="admin-link" style="display:none;"><a href="admin.html" style="color:#FFD700;font-weight:bold;">Admin Panel</a></span>
         <span id="logout-link" style="display:none;"><a href="#" onclick="logout()">Logout</a></span>
     </nav>
-    </div>
-    <h2>Admin Panel</h2>
-    <hr>
-    
-    <div id="admin-content">
-        <div class="tabs">
-            <span class="tab active" id="tab-dashboard">Dashboard</span>
-            <span class="tab" id="tab-equipment">Equipment</span>
-            <span class="tab" id="tab-comments">Comments</span>
-            <span class="tab" id="tab-ideas">Ideas</span>
-            <span class="tab" id="tab-eqdb-queue">EQDB Queue</span>
-            <span class="tab" id="tab-scrying">Scrying</span>
-            <span class="tab" id="tab-contributors">Contributors</span>
-            <span class="tab" id="tab-lfg">LFG Posts</span>
-            <span class="tab" id="tab-market">Market Listings</span>
-            <span class="tab" id="tab-bugs">Bug Reports</span>
         </div>
-        
-        <div id="dashboard-section" class="section active">
-            <div id="dash-stats" style="display:flex;gap:12px;flex-wrap:wrap;margin:15px 0;"></div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:15px;margin-top:10px;">
-                <div>
-                    <h3 style="color:#C0C0C0;margin:0 0 8px 0;">Recent Equipment</h3>
-                    <div id="dash-equipment" style="font-size:13px;"></div>
-                </div>
-                <div>
-                    <h3 style="color:#C0C0C0;margin:0 0 8px 0;">Recent Bug Reports</h3>
-                    <div id="dash-bugs" style="font-size:13px;"></div>
-                </div>
-                <div>
-                    <h3 style="color:#C0C0C0;margin:0 0 8px 0;">Recent Ideas</h3>
-                    <div id="dash-ideas" style="font-size:13px;"></div>
-                </div>
-                <div>
-                    <h3 style="color:#C0C0C0;margin:0 0 8px 0;">Recent Comments</h3>
-                    <div id="dash-comments" style="font-size:13px;"></div>
-                </div>
-                <div>
-                    <h3 style="color:#C0C0C0;margin:0 0 8px 0;">Recent LFG Posts</h3>
-                    <div id="dash-lfg" style="font-size:13px;"></div>
-                </div>
-                <div>
-                    <h3 style="color:#C0C0C0;margin:0 0 8px 0;">Recent Market Listings</h3>
-                    <div id="dash-market" style="font-size:13px;"></div>
-                </div>
-            </div>
-            <p style="font-size:12px;color:#555;margin-top:20px;">Click any tab above to manage that section.</p>
-        </div>
+        <h2 class="text-light mb-3">Admin Panel</h2>
 
-        <div id="equipment-section" class="section">
-            <div class="search-bar">
-                <input type="text" id="equipment-search" placeholder="Search by name, type, or uploader...">
-                <button id="equipment-search-btn">Search</button>
-                <button id="equipment-reset-btn">Reset</button>
-            </div>
-            <div class="toolbar">
-                <button class="btn-recolor" id="recolorize-all-btn">Update All Colors</button>
-                <button class="btn-recolor" id="cleanup-neverbeen-btn" style="background:#ff4444;color:white;">Cleanup Neverbeen Items</button>
-                <button class="btn-recolor" id="cleanup-archon-btn" style="background:#ff4444;color:white;">Cleanup Archon Hunter Corpses</button>
-                <span id="recolorize-status" style="font-size:13px;color:#888;"></span>
-                <span id="cleanup-neverbeen-status" style="font-size:13px;color:#888;"></span>
-                <span id="cleanup-archon-status" style="font-size:13px;color:#888;"></span>
-            </div>
-            <table>
-                <thead><tr><th>Name</th><th>Type</th><th>Source</th><th>Uploader</th><th>Added Via</th><th>Added</th><th>Actions</th></tr></thead>
-                <tbody id="equipment-table"></tbody>
-            </table>
-            <div class="pagination" id="equipment-pagination"></div>
-        </div>
-        
-        <div id="comments-section" class="section">
-            <div class="search-bar">
-                <input type="text" id="comments-search" placeholder="Search by comment text, name, or item...">
-                <button id="comments-search-btn">Search</button>
-                <button id="comments-reset-btn">Reset</button>
-            </div>
-            <table>
-                <thead><tr><th>Comment</th><th>By</th><th>On Item</th><th>Date</th><th>Actions</th></tr></thead>
-                <tbody id="comments-table"></tbody>
-            </table>
-            <div class="pagination" id="comments-pagination"></div>
-        </div>
-        
-        <div id="ideas-section" class="section">
-            <table>
-                <thead><tr><th>Idea</th><th>By</th><th>Date</th><th>Reviewed</th><th>Actions</th></tr></thead>
-                <tbody id="ideas-table"></tbody>
-            </table>
-        </div>
-        
-        <div id="eqdb-queue-section" class="section">
-            <button id="copy-eqdb-btn" style="background:#ff8800;color:white;margin:5px 0;">Copy All EQDB Hashes</button>
-            <button id="delete-page-eqdb-btn" style="background:#ff4444;color:white;margin:5px 0;">Delete This Page</button>
-            <table>
-                <thead><tr><th>Hash</th><th>Submitted By</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
-                <tbody id="eqdb-queue-table"></tbody>
-            </table>
-            <div class="pagination" id="eqdb-queue-pagination"></div>
-        </div>
-        
-        <div id="scrying-section" class="section">
-            <button id="copy-scrying-btn" style="background:#ff8800;color:white;margin:5px 0;">Copy All Scrying Hashes</button>
-            <button id="delete-page-scrying-btn" style="background:#ff4444;color:white;margin:5px 0;">Delete This Page</button>
-            <table>
-                <thead><tr><th>Hash</th><th>Submitted By</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
-                <tbody id="scrying-table"></tbody>
-            </table>
-            <div class="pagination" id="scrying-pagination"></div>
-        </div>
+        <div id="admin-content">
+            <ul class="nav nav-pills mb-3" id="admin-tabs">
+                <li class="nav-item"><span class="nav-link active" id="tab-dashboard">Dashboard</span></li>
+                <li class="nav-item"><span class="nav-link" id="tab-equipment">Equipment</span></li>
+                <li class="nav-item"><span class="nav-link" id="tab-comments">Comments</span></li>
+                <li class="nav-item"><span class="nav-link" id="tab-ideas">Ideas</span></li>
+                <li class="nav-item"><span class="nav-link" id="tab-eqdb-queue">EQDB Queue</span></li>
+                <li class="nav-item"><span class="nav-link" id="tab-scrying">Scrying</span></li>
+                <li class="nav-item"><span class="nav-link" id="tab-contributors">Contributors</span></li>
+                <li class="nav-item"><span class="nav-link" id="tab-bugs">Bug Reports</span></li>
+            </ul>
 
-        <div id="contributors-section" class="section">
-            <div class="toolbar">
-                <button id="refresh-contributors-btn" style="background:#4488ff;color:white;">Refresh</button>
-                <button id="backfill-contributors-btn" style="background:#ff8800;color:white;">Backfill from Equipment</button>
-                <span id="contributor-status" style="font-size:13px;color:#888;"></span>
+            <div id="dashboard-section" class="tab-pane active">
+                <div id="dash-stats" class="d-flex gap-3 flex-wrap mb-3"></div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="card"><div class="card-body"><h6 class="card-title text-secondary">Recent Equipment</h6><div id="dash-equipment" style="font-size:13px;"></div></div></div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card"><div class="card-body"><h6 class="card-title text-secondary">Recent Bug Reports</h6><div id="dash-bugs" style="font-size:13px;"></div></div></div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card"><div class="card-body"><h6 class="card-title text-secondary">Recent Ideas</h6><div id="dash-ideas" style="font-size:13px;"></div></div></div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card"><div class="card-body"><h6 class="card-title text-secondary">Recent Comments</h6><div id="dash-comments" style="font-size:13px;"></div></div></div>
+                    </div>
+                </div>
+                <p class="text-secondary mt-3" style="font-size:12px;">Click any tab above to manage that section.</p>
             </div>
-            <table>
-                <thead><tr><th>Rank</th><th>Contributor</th><th>Total Submissions</th><th>EQDB</th><th>Personal</th><th>First Submission</th><th>Last Submission</th></tr></thead>
-                <tbody id="contributors-table"></tbody>
-            </table>
-        </div>
-        <div id="lfg-section" class="section">
-            <div class="toolbar">
-                <button id="delete-all-lfg-btn" style="background:#ff4444;color:white;">Delete All Posts</button>
-                <span id="lfg-status" style="font-size:13px;color:#888;"></span>
+
+            <div id="equipment-section" class="tab-pane">
+                <div class="d-flex gap-2 mb-2 flex-wrap">
+                    <input type="text" id="equipment-search" class="form-control" placeholder="Search by name, type, or uploader..." style="flex:1;min-width:200px;">
+                    <button id="equipment-search-btn" class="btn btn-secondary">Search</button>
+                    <button id="equipment-reset-btn" class="btn btn-secondary">Reset</button>
+                </div>
+                <div class="d-flex gap-2 mb-2 flex-wrap align-items-center">
+                    <button class="btn btn-warning" id="recolorize-all-btn">Update All Colors</button>
+                    <button class="btn btn-danger" id="cleanup-neverbeen-btn">Cleanup Neverbeen Items</button>
+                    <button class="btn btn-danger" id="cleanup-archon-btn">Cleanup Archon Hunter Corpses</button>
+                    <span id="recolorize-status" class="status-text"></span>
+                    <span id="cleanup-neverbeen-status" class="status-text"></span>
+                    <span id="cleanup-archon-status" class="status-text"></span>
+                </div>
+                <table class="table table-dark table-striped table-hover table-sm">
+                    <thead><tr><th>Name</th><th>Type</th><th>Source</th><th>Uploader</th><th>Added Via</th><th>Added</th><th>Actions</th></tr></thead>
+                    <tbody id="equipment-table"></tbody>
+                </table>
+                <div class="pagination" id="equipment-pagination"></div>
             </div>
-            <table>
-                <thead><tr><th>Note</th><th>Character</th><th>Target</th><th>Type</th><th>Expires</th><th>Created</th><th>Actions</th></tr></thead>
-                <tbody id="lfg-table"></tbody>
-            </table>
-            <div class="pagination" id="lfg-pagination"></div>
-        </div>
-        <div id="market-section" class="section">
-            <div class="toolbar">
-                <button id="delete-all-market-btn" style="background:#ff4444;color:white;">Delete All Listings</button>
-                <span id="market-status" style="font-size:13px;color:#888;"></span>
+
+            <div id="comments-section" class="tab-pane">
+                <div class="d-flex gap-2 mb-2 flex-wrap">
+                    <input type="text" id="comments-search" class="form-control" placeholder="Search by comment text, name, or item..." style="flex:1;min-width:200px;">
+                    <button id="comments-search-btn" class="btn btn-secondary">Search</button>
+                    <button id="comments-reset-btn" class="btn btn-secondary">Reset</button>
+                </div>
+                <table class="table table-dark table-striped table-hover table-sm">
+                    <thead><tr><th>Comment</th><th>By</th><th>On Item</th><th>Date</th><th>Actions</th></tr></thead>
+                    <tbody id="comments-table"></tbody>
+                </table>
+                <div class="pagination" id="comments-pagination"></div>
             </div>
-            <table>
-                <thead><tr><th>Item Name</th><th>Price</th><th>By</th><th>Expires</th><th>Created</th><th>Actions</th></tr></thead>
-                <tbody id="market-table"></tbody>
-            </table>
-            <div class="pagination" id="market-pagination"></div>
-        </div>
-        <div id="bugs-section" class="section">
-            <div class="toolbar">
-                <button id="refresh-bugs-btn" style="background:#4488ff;color:white;">Refresh</button>
-                <button id="delete-all-bugs-btn" style="background:#ff4444;color:white;">Delete All</button>
-                <span id="bugs-status" style="font-size:13px;color:#888;"></span>
+
+            <div id="ideas-section" class="tab-pane">
+                <table class="table table-dark table-striped table-hover table-sm">
+                    <thead><tr><th>Idea</th><th>By</th><th>Date</th><th>Reviewed</th><th>Actions</th></tr></thead>
+                    <tbody id="ideas-table"></tbody>
+                </table>
             </div>
-            <table>
-                <thead><tr><th>Description</th><th>Page</th><th>Date</th><th>Actions</th></tr></thead>
-                <tbody id="bugs-table"></tbody>
-            </table>
-            <div class="pagination" id="bugs-pagination"></div>
-        </div>
-    </div>
-    
-    <div class="modal-overlay hidden" id="edit-modal" style="display:none;">
-        <div class="modal">
-            <h2 id="edit-title">Edit Item Colors</h2>
-            <div class="editor-row">
-                <div class="editor-pane"><h4>HTML</h4><textarea id="edit-html"></textarea></div>
-                <div class="editor-pane"><h4>Preview</h4><div class="preview-box" id="edit-preview"></div></div>
+
+            <div id="eqdb-queue-section" class="tab-pane">
+                <div class="d-flex gap-2 mb-2">
+                    <button id="copy-eqdb-btn" class="btn btn-warning">Copy All EQDB Hashes</button>
+                    <button id="delete-page-eqdb-btn" class="btn btn-danger">Delete This Page</button>
+                </div>
+                <table class="table table-dark table-striped table-hover table-sm">
+                    <thead><tr><th>Hash</th><th>Submitted By</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
+                    <tbody id="eqdb-queue-table"></tbody>
+                </table>
+                <div class="pagination" id="eqdb-queue-pagination"></div>
             </div>
-            <p style="font-size:12px; color:#888;">Colors: #8787FF(blue) #C0C0C0(white) #00FFFF(cyan) #FFFF00(yellow) #00FF00(green) #D78787(pink) #FF00FF(magenta) #808080(gray) #FF0000(red) #008000(darkgreen)</p>
-            <div class="btn-row"><button class="btn-cancel" id="btn-cancel-edit">Cancel</button><button class="btn-save" id="btn-save-edit">Save Changes</button></div>
-            <p id="edit-message" style="margin-top:10px;"></p>
+
+            <div id="scrying-section" class="tab-pane">
+                <div class="d-flex gap-2 mb-2">
+                    <button id="copy-scrying-btn" class="btn btn-warning">Copy All Scrying Hashes</button>
+                    <button id="delete-page-scrying-btn" class="btn btn-danger">Delete This Page</button>
+                </div>
+                <table class="table table-dark table-striped table-hover table-sm">
+                    <thead><tr><th>Hash</th><th>Submitted By</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
+                    <tbody id="scrying-table"></tbody>
+                </table>
+                <div class="pagination" id="scrying-pagination"></div>
+            </div>
+
+            <div id="contributors-section" class="tab-pane">
+                <div class="d-flex gap-2 mb-2 align-items-center">
+                    <button id="refresh-contributors-btn" class="btn btn-primary">Refresh</button>
+                    <button id="backfill-contributors-btn" class="btn btn-warning">Backfill from Equipment</button>
+                    <span id="contributor-status" class="status-text"></span>
+                </div>
+                <table class="table table-dark table-striped table-hover table-sm">
+                    <thead><tr><th>Rank</th><th>Contributor</th><th>Total Submissions</th><th>EQDB</th><th>Personal</th><th>First Submission</th><th>Last Submission</th></tr></thead>
+                    <tbody id="contributors-table"></tbody>
+                </table>
+            </div>
+
+            <div id="bugs-section" class="tab-pane">
+                <div class="d-flex gap-2 mb-2 align-items-center">
+                    <button id="refresh-bugs-btn" class="btn btn-primary">Refresh</button>
+                    <button id="delete-all-bugs-btn" class="btn btn-danger">Delete All</button>
+                    <span id="bugs-status" class="status-text"></span>
+                </div>
+                <table class="table table-dark table-striped table-hover table-sm">
+                    <thead><tr><th>Description</th><th>Page</th><th>Date</th><th>Actions</th></tr></thead>
+                    <tbody id="bugs-table"></tbody>
+                </table>
+                <div class="pagination" id="bugs-pagination"></div>
+            </div>
         </div>
     </div>
 
+    <!-- Edit Modal -->
+    <div class="modal fade" id="edit-modal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="edit-title">Edit Item Colors</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" onclick="closeEditModalBS()"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <h6 class="text-secondary">HTML</h6>
+                            <textarea id="edit-html" class="form-control" rows="20" style="height:400px;font-family:'Courier New',monospace;font-size:12px;background:#111;"></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-secondary">Preview</h6>
+                            <div class="preview-box" id="edit-preview"></div>
+                        </div>
+                    </div>
+                    <p class="text-secondary mt-2" style="font-size:12px;">Colors: #8787FF(blue) #C0C0C0(white) #00FFFF(cyan) #FFFF00(yellow) #00FF00(green) #D78787(pink) #FF00FF(magenta) #808080(gray) #FF0000(red) #008000(darkgreen)</p>
+                </div>
+                <div class="modal-footer">
+                    <span id="edit-message" class="me-auto"></span>
+                    <button class="btn btn-secondary" data-bs-dismiss="modal" onclick="closeEditModalBS()">Cancel</button>
+                    <button class="btn btn-success" id="btn-save-edit">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        (function() { var m = document.getElementById('edit-modal'); if (m) { m.style.display = 'none'; m.classList.add('hidden'); } })();
+        var editModalBS = null;
+        document.addEventListener('DOMContentLoaded', function() {
+            editModalBS = new bootstrap.Modal(document.getElementById('edit-modal'));
+        });
+        function closeEditModalBS() { if (editModalBS) editModalBS.hide(); }
+        (function() { var m = document.getElementById('edit-modal'); if (m) { m.classList.remove('show'); m.style.display = 'none'; } })();
     </script>
 
     <script type="module">
@@ -289,7 +256,7 @@
         var PER_PAGE = 50, equipmentPage = 1, commentsPage = 1, equipmentTotal = 0, commentsTotal = 0, equipmentSearch = '', commentsSearch = '';
         var eqdbQueuePage = 1, eqdbQueueTotal = 0, scryingPage = 1, scryingTotal = 0;
         loadDashboard();
-        
+
         document.getElementById('tab-dashboard').addEventListener('click', function() { switchTab('dashboard'); });
         document.getElementById('tab-equipment').addEventListener('click', function() { switchTab('equipment'); });
         document.getElementById('tab-comments').addEventListener('click', function() { switchTab('comments'); });
@@ -297,24 +264,22 @@
         document.getElementById('tab-eqdb-queue').addEventListener('click', function() { switchTab('eqdb-queue'); });
         document.getElementById('tab-scrying').addEventListener('click', function() { switchTab('scrying'); });
         document.getElementById('tab-contributors').addEventListener('click', function() { switchTab('contributors'); });
-        document.getElementById('tab-lfg').addEventListener('click', function() { switchTab('lfg'); });
-        document.getElementById('tab-market').addEventListener('click', function() { switchTab('market'); });
         document.getElementById('tab-bugs').addEventListener('click', function() { switchTab('bugs'); });
-        
+
         document.getElementById('copy-eqdb-btn').addEventListener('click', function() {
             if (window.eqdbHashes && window.eqdbHashes.length > 0) {
                 navigator.clipboard.writeText(window.eqdbHashes.join('\n'));
                 alert('Copied ' + window.eqdbHashes.length + ' EQDB hashes!');
             }
         });
-        
+
         document.getElementById('copy-scrying-btn').addEventListener('click', function() {
             if (window.scryingHashes && window.scryingHashes.length > 0) {
                 navigator.clipboard.writeText(window.scryingHashes.join('\n'));
                 alert('Copied ' + window.scryingHashes.length + ' scrying hashes!');
             }
         });
-        
+
         document.getElementById('delete-page-eqdb-btn').addEventListener('click', async function() {
             if (!confirm('Delete all hashes on this page?')) return;
             var rows = document.querySelectorAll('#eqdb-queue-table .btn-delete');
@@ -323,7 +288,7 @@
             }
             loadEqdbQueue();
         });
-        
+
         document.getElementById('delete-page-scrying-btn').addEventListener('click', async function() {
             if (!confirm('Delete all hashes on this page?')) return;
             var rows = document.querySelectorAll('#scrying-table .btn-delete');
@@ -332,10 +297,10 @@
             }
             loadScrying();
         });
-        
+
         function switchTab(tab) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.nav-pills .nav-link').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-pane').forEach(s => s.classList.remove('active'));
             var tabEl = document.getElementById('tab-' + tab);
             var secEl = document.getElementById(tab + '-section');
             if (!tabEl || !secEl) { console.error('switchTab: unknown tab', tab); return; }
@@ -347,27 +312,24 @@
             if (tab === 'eqdb-queue') loadEqdbQueue();
             if (tab === 'scrying') loadScrying();
             if (tab === 'contributors') loadContributors();
-            if (tab === 'lfg') loadLfgPosts();
-            if (tab === 'market') loadMarketListings();
             if (tab === 'bugs') loadBugReports();
             if (tab === 'dashboard') loadDashboard();
         }
-        
+
         document.getElementById('equipment-search-btn').addEventListener('click', function() { equipmentSearch = document.getElementById('equipment-search').value.trim(); equipmentPage = 1; loadEquipment(); });
         document.getElementById('equipment-reset-btn').addEventListener('click', function() { document.getElementById('equipment-search').value = ''; equipmentSearch = ''; equipmentPage = 1; loadEquipment(); });
         document.getElementById('comments-search-btn').addEventListener('click', function() { commentsSearch = document.getElementById('comments-search').value.trim(); commentsPage = 1; loadComments(); });
         document.getElementById('comments-reset-btn').addEventListener('click', function() { document.getElementById('comments-search').value = ''; commentsSearch = ''; commentsPage = 1; loadComments(); });
-        
-        function closeEditModal() { var m = document.getElementById('edit-modal'); m.style.display = 'none'; m.classList.add('hidden'); }
-        
-        document.getElementById('btn-cancel-edit').addEventListener('click', closeEditModal);
+
+        function closeEditModal() { closeEditModalBS(); }
+
         document.getElementById('btn-save-edit').addEventListener('click', saveEdit);
         document.getElementById('edit-html').addEventListener('input', function() { updatePreview(this.value); });
-        
+
         function updatePreview(html) {
             document.getElementById('edit-preview').innerHTML = '<style>body{background:#000;font-family:Courier New,monospace;font-size:13px;white-space:pre-wrap;color:#C0C0C0}</style>' + html;
         }
-        
+
         document.getElementById('recolorize-all-btn').addEventListener('click', function() {
             if (confirm('Re-run colorizer on all items with latest rules?')) { recolorizeAll(); }
         });
@@ -401,9 +363,7 @@
             var deleted = 0, errors = 0;
             for (var i = 0; i < allItems.length; i++) {
                 var item = allItems[i];
-                // Delete submission history entries for this item
                 await supabase.from('submission_history').delete().eq('item_name', item.name);
-                // Delete the equipment entry
                 var dr = await supabase.from('equipment').delete().eq('id', item.id);
                 if (dr.error) errors++; else deleted++;
                 if (i % 25 === 0) status.textContent = 'Deleting... ' + i + '/' + allItems.length + ' (' + deleted + ' deleted, ' + errors + ' errors)';
@@ -453,7 +413,7 @@
             btn.disabled = false;
             loadEquipment();
         });
-        
+
         async function recolorizeAll() {
             var status = document.getElementById('recolorize-status');
             var btn = document.getElementById('recolorize-all-btn');
@@ -480,7 +440,7 @@
             btn.disabled = false;
             loadEquipment();
         }
-        
+
         async function loadEquipment() {
             var q = supabase.from('equipment').select('*', { count: 'exact' });
             if (equipmentSearch) q = q.or('name.ilike.%' + equipmentSearch + '%,type.ilike.%' + equipmentSearch + '%');
@@ -497,7 +457,7 @@
                     var uploaderDisplay = (item.properties && item.properties.uploaded_by) ? '<span class="uploader-tag">' + escapeHtml(item.properties.uploaded_by) + '</span>' : '<span class="anon-tag">anonymous</span>';
                     var sourceDisplay = item.verified ? '<span class="eqdb-label">EQDB</span>' : '<span class="personal-label">Personal</span>';
                     var viaDisplay = (item.properties && item.properties.source) ? escapeHtml(item.properties.source) : '<span class="anon-tag">unknown</span>';
-                    rows.push('<tr><td><a href="item.html?name=' + encodeURIComponent(item.name) + '" target="_blank">' + escapeHtml(item.name) + '</a></td><td>' + escapeHtml(item.type) + '</td><td>' + sourceDisplay + '</td><td>' + uploaderDisplay + '</td><td>' + viaDisplay + '</td><td>' + new Date(item.created_at).toLocaleDateString() + '</td><td><button class="btn-delete" data-id="' + item.id + '">Delete</button> <button class="btn-edit" data-id="' + item.id + '">Edit</button></td></tr>');
+                    rows.push('<tr><td><a href="item.html?name=' + encodeURIComponent(item.name) + '" target="_blank">' + escapeHtml(item.name) + '</a></td><td>' + escapeHtml(item.type) + '</td><td>' + sourceDisplay + '</td><td>' + uploaderDisplay + '</td><td>' + viaDisplay + '</td><td>' + new Date(item.created_at).toLocaleDateString() + '</td><td><button class="btn btn-danger btn-sm btn-delete" data-id="' + item.id + '">Delete</button> <button class="btn btn-primary btn-sm btn-edit" data-id="' + item.id + '">Edit</button></td></tr>');
                 }
                 tbody.innerHTML = rows.join('');
             }
@@ -505,7 +465,7 @@
             document.querySelectorAll('#equipment-table .btn-edit').forEach(function(b) { b.addEventListener('click', function() { openEditModal(this.getAttribute('data-id')); }); });
             renderPagination('equipment', equipmentPage, Math.ceil(equipmentTotal / PER_PAGE));
         }
-        
+
         async function loadComments() {
             var q = supabase.from('comments').select('*', { count: 'exact' });
             if (commentsSearch) q = q.or('comment_text.ilike.%' + commentsSearch + '%,display_name.ilike.%' + commentsSearch + '%');
@@ -520,14 +480,14 @@
                 for (var c = 0; c < data.length; c++) {
                     var comment = data[c], itemName = '(deleted)';
                     if (comment.equipment_id) { var eq = await supabase.from('equipment').select('name').eq('id', comment.equipment_id).single(); if (eq.data) itemName = eq.data.name; }
-                    rows.push('<tr><td>' + escapeHtml(comment.comment_text).substring(0, 80) + '</td><td>' + escapeHtml(comment.display_name) + '</td><td>' + escapeHtml(itemName) + '</td><td>' + new Date(comment.created_at).toLocaleDateString() + '</td><td><button class="btn-delete" data-id="' + comment.id + '">Delete</button></td></tr>');
+                    rows.push('<tr><td>' + escapeHtml(comment.comment_text).substring(0, 80) + '</td><td>' + escapeHtml(comment.display_name) + '</td><td>' + escapeHtml(itemName) + '</td><td>' + new Date(comment.created_at).toLocaleDateString() + '</td><td><button class="btn btn-danger btn-sm btn-delete" data-id="' + comment.id + '">Delete</button></td></tr>');
                 }
                 tbody.innerHTML = rows.join('');
             }
             document.querySelectorAll('#comments-table .btn-delete').forEach(function(b) { b.addEventListener('click', async function() { if (!confirm('Delete?')) return; await supabase.from('comments').delete().eq('id', this.getAttribute('data-id')); loadComments(); }); });
             renderPagination('comments', commentsPage, Math.ceil(commentsTotal / PER_PAGE));
         }
-        
+
         async function loadIdeas() {
             var result = await supabase.from('ideas').select('*').order('created_at', { ascending: false }).limit(50);
             var data = result.data;
@@ -543,8 +503,8 @@
                         '<td>' + escapeHtml(idea.submitted_by) + '</td>' +
                         '<td>' + new Date(idea.created_at).toLocaleDateString() + '</td>' +
                         '<td>' + (idea.reviewed ? '✅' : '👀') + '</td>' +
-                        '<td><button class="btn-delete" data-id="' + idea.id + '">Delete</button> ' +
-                        '<button class="btn-review" data-id="' + idea.id + '">' + (idea.reviewed ? 'Unmark' : 'Mark Reviewed') + '</button></td>' +
+                        '<td><button class="btn btn-danger btn-sm btn-delete" data-id="' + idea.id + '">Delete</button> ' +
+                        '<button class="btn btn-success btn-sm btn-review" data-id="' + idea.id + '">' + (idea.reviewed ? 'Unmark' : 'Mark Reviewed') + '</button></td>' +
                         '</tr>');
                 }
                 tbody.innerHTML = rows.join('');
@@ -561,7 +521,7 @@
                 });
             });
         }
-        
+
         async function loadEqdbQueue() {
             var from = (eqdbQueuePage - 1) * 100;
             var to = from + 99;
@@ -570,7 +530,7 @@
             eqdbQueueTotal = result.count || 0;
             var tbody = document.getElementById('eqdb-queue-table');
             window.eqdbHashes = data ? data.map(function(s) { return 'check eqlookup ' + s.hash; }) : [];
-            
+
             if (result.error) { tbody.innerHTML = '<tr><td colspan="5">Error: ' + result.error.message + '</td></tr>'; return; }
             if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="5">No EQDB hashes queued.</td></tr>'; }
             else {
@@ -578,11 +538,11 @@
                 for (var i = 0; i < data.length; i++) {
                     var s = data[i];
                     rows.push('<tr>' +
-                        '<td style="font-family:monospace;font-size:11px;cursor:pointer;" onclick="navigator.clipboard.writeText(\'' + s.hash + '\')">' + s.hash.substring(0, 20) + '...</td>' +
+                        '<td class="hash-cell" onclick="navigator.clipboard.writeText(\'' + s.hash + '\')">' + s.hash.substring(0, 20) + '...</td>' +
                         '<td>' + escapeHtml(s.submitted_by) + '</td>' +
                         '<td>' + new Date(s.created_at).toLocaleDateString() + '</td>' +
-                        '<td>' + (s.processed ? '<span style="color:#44aa44;">Processed</span>' : '<span style="color:#ffaa00;">Pending</span>') + '</td>' +
-                        '<td><button class="btn-delete" data-id="' + s.id + '">Delete</button></td>' +
+                        '<td>' + (s.processed ? '<span class="eqdb-label">Processed</span>' : '<span class="personal-label">Pending</span>') + '</td>' +
+                        '<td><button class="btn btn-danger btn-sm btn-delete" data-id="' + s.id + '">Delete</button></td>' +
                         '</tr>');
                 }
                 tbody.innerHTML = rows.join('');
@@ -592,7 +552,7 @@
             });
             renderPagination('eqdb-queue', eqdbQueuePage, Math.ceil(eqdbQueueTotal / 100));
         }
-        
+
         async function loadScrying() {
             var from = (scryingPage - 1) * 100;
             var to = from + 99;
@@ -601,7 +561,7 @@
             scryingTotal = result.count || 0;
             var tbody = document.getElementById('scrying-table');
             window.scryingHashes = data ? data.map(function(s) { return 'check equipment scrying ' + s.hash; }) : [];
-            
+
             if (result.error) { tbody.innerHTML = '<tr><td colspan="5">Error: ' + result.error.message + '</td></tr>'; return; }
             if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="5">No scrying hashes submitted yet.</td></tr>'; }
             else {
@@ -609,13 +569,13 @@
                 for (var i = 0; i < data.length; i++) {
                     var s = data[i];
                     rows.push('<tr>' +
-                        '<td style="font-family:monospace;font-size:11px;cursor:pointer;" onclick="navigator.clipboard.writeText(\'' + s.hash + '\')">' + s.hash.substring(0, 20) + '...</td>' +
+                        '<td class="hash-cell" onclick="navigator.clipboard.writeText(\'' + s.hash + '\')">' + s.hash.substring(0, 20) + '...</td>' +
                         '<td>' + escapeHtml(s.submitted_by) + '</td>' +
                         '<td>' + new Date(s.created_at).toLocaleDateString() + '</td>' +
-                        '<td>' + (s.approved ? '<span style="color:#44aa44;">Approved</span>' : (s.reviewed ? '<span style="color:#ffaa00;">Reviewed</span>' : '<span style="color:#888;">Pending</span>')) + '</td>' +
+                        '<td>' + (s.approved ? '<span class="eqdb-label">Approved</span>' : (s.reviewed ? '<span class="personal-label">Reviewed</span>' : '<span style="color:#888;">Pending</span>')) + '</td>' +
                         '<td>' +
-                        '<button class="btn-approve" data-id="' + s.id + '"' + (s.approved ? ' disabled' : '') + '>Approve</button> ' +
-                        '<button class="btn-delete" data-id="' + s.id + '">Delete</button></td>' +
+                        '<button class="btn btn-success btn-sm btn-approve" data-id="' + s.id + '"' + (s.approved ? ' disabled' : '') + '>Approve</button> ' +
+                        '<button class="btn btn-danger btn-sm btn-delete" data-id="' + s.id + '">Delete</button></td>' +
                         '</tr>');
                 }
                 tbody.innerHTML = rows.join('');
@@ -636,7 +596,7 @@
             });
             renderPagination('scrying', scryingPage, Math.ceil(scryingTotal / 100));
         }
-        
+
         function renderPagination(type, current, total) {
             var div = document.getElementById(type + '-pagination');
             if (total <= 1) { div.innerHTML = ''; return; }
@@ -649,32 +609,29 @@
             div.innerHTML = html;
             div.querySelectorAll('.page-btn').forEach(function(b) { b.addEventListener('click', function() { changePage(type, parseInt(this.getAttribute('data-page'))); }); });
         }
-        
+
         function changePage(type, page) {
             if (type === 'equipment') { equipmentPage = page; loadEquipment(); }
             else if (type === 'comments') { commentsPage = page; loadComments(); }
             else if (type === 'eqdb-queue') { eqdbQueuePage = page; loadEqdbQueue(); }
             else if (type === 'scrying') { scryingPage = page; loadScrying(); }
-            else if (type === 'lfg') { lfgPage = page; loadLfgPosts(); }
-            else if (type === 'market') { marketPage = page; loadMarketListings(); }
             else if (type === 'bugs') { bugsPage = page; loadBugReports(); }
         }
-        
+
         async function openEditModal(id) {
             var r = await supabase.from('equipment').select('*').eq('id', id).single();
             if (r.error || !r.data) return;
             var item = r.data;
-            var modal = document.getElementById('edit-modal');
-            modal.setAttribute('data-item-id', id);
+            document.getElementById('edit-modal').setAttribute('data-item-id', id);
             document.getElementById('edit-title').textContent = 'Edit: ' + item.name;
             var desc = item.description || '';
             if (desc.indexOf('<font color=') < 0 && desc.indexOf('<span class=') < 0) { desc = colorizeMM(desc); }
             document.getElementById('edit-html').value = desc;
             updatePreview(desc);
             document.getElementById('edit-message').textContent = '';
-            modal.style.display = 'flex'; modal.classList.remove('hidden');
+            if (editModalBS) editModalBS.show();
         }
-        
+
         async function saveEdit() {
             var id = document.getElementById('edit-modal').getAttribute('data-item-id');
             if (!id) return;
@@ -682,19 +639,14 @@
             var r = await supabase.from('equipment').update({ description: newDesc }).eq('id', id);
             var msg = document.getElementById('edit-message');
             if (r.error) { msg.innerHTML = '<span style="color:#ff4444;">Error: ' + r.error.message + '</span>'; }
-            else { msg.innerHTML = '<span style="color:#44aa44;">Saved!</span>'; setTimeout(closeEditModal, 1500); loadEquipment(); }
+            else { msg.innerHTML = '<span style="color:#44aa44;">Saved!</span>'; setTimeout(function() { closeEditModalBS(); }, 1500); loadEquipment(); }
         }
-        
+
         function escapeHtml(text) { if (!text) return ''; var div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
 
-        // ============================================
-        // CONTRIBUTORS
-        // ============================================
         async function loadContributors() {
             var status = document.getElementById('contributor-status');
             status.textContent = 'Loading...';
-
-            // Page through all submission_history — no 1000 row cap
             var data = [];
             var page = 0, pageSize = 1000;
             while (true) {
@@ -705,11 +657,9 @@
                 if (r.data.length < pageSize) break;
                 page++;
             }
-
             if (data.length === 0) {
                 document.getElementById('contributors-table').innerHTML = '<tr><td colspan="7">No submissions recorded yet.</td></tr>';
-                status.textContent = '';
-                return;
+                status.textContent = ''; return;
             }
             var contributors = {};
             for (var i = 0; i < data.length; i++) {
@@ -747,8 +697,6 @@
             var btn = this;
             btn.disabled = true;
             var status = document.getElementById('contributor-status');
-
-            // Page through ALL equipment — no source filter, no cap
             var allItems = [];
             var page = 0, pageSize = 1000;
             while (true) {
@@ -760,8 +708,6 @@
                 if (r.data.length < pageSize) break;
                 page++;
             }
-
-            // Get all existing history item names (also paginated)
             status.textContent = 'Loaded ' + allItems.length + ' items. Checking existing history...';
             var existingNames = new Set();
             var hPage = 0;
@@ -772,10 +718,8 @@
                 if (hr.data.length < pageSize) break;
                 hPage++;
             }
-
             var missing = allItems.filter(function(i) { return !existingNames.has(i.name); });
             status.textContent = missing.length + ' items need history entries, ' + (allItems.length - missing.length) + ' already have them.';
-
             var imported = 0, errors = 0;
             for (var i = 0; i < missing.length; i++) {
                 var item = missing[i];
@@ -795,9 +739,6 @@
             loadContributors();
         });
 
-        // ============================================
-        // DASHBOARD
-        // ============================================
         async function loadDashboard() {
             var results = await Promise.all([
                 supabase.from('equipment').select('name,verified,created_at,properties').order('created_at', { ascending: false }).limit(6),
@@ -808,31 +749,24 @@
                 supabase.from('bug_reports').select('*', { count: 'exact', head: true }),
                 supabase.from('ideas').select('*', { count: 'exact', head: true }),
                 supabase.from('comments').select('*', { count: 'exact', head: true }),
-                supabase.from('eqdb_queue').select('*', { count: 'exact', head: true }).eq('processed', false),
-                supabase.from('lfg_posts').select('*', { count: 'exact', head: true }).eq('is_deleted', false),
-                supabase.from('market_listings').select('*', { count: 'exact', head: true }).eq('is_deleted', false),
-                supabase.from('lfg_posts').select('id,character_name,target,note,created_at').eq('is_deleted', false).order('created_at', { ascending: false }).limit(6),
-                supabase.from('market_listings').select('id,item_name,character_name,price,created_at').eq('is_deleted', false).order('created_at', { ascending: false }).limit(6)
+                supabase.from('eqdb_queue').select('*', { count: 'exact', head: true }).eq('processed', false)
             ]);
             var equipResult = results[0], bugResult = results[1], ideaResult = results[2], commentResult = results[3];
             var equipCount = results[4], bugCount = results[5], ideaCount = results[6], commentCount = results[7], eqdbCount = results[8];
-            var lfgCount = results[9], marketCount = results[10], lfgRecent = results[11], marketRecent = results[12];
 
-            // Stats cards
             var stats = [
                 { label: 'Equipment',  count: equipCount.count  || 0, tab: 'equipment', color: '#8787FF' },
                 { label: 'Bug Reports',count: bugCount.count    || 0, tab: 'bugs',      color: (bugCount.count  || 0) > 0 ? '#ff4444' : '#44aa44' },
                 { label: 'Ideas',      count: ideaCount.count   || 0, tab: 'ideas',     color: '#ffaa00' },
                 { label: 'Comments',   count: commentCount.count|| 0, tab: 'comments',  color: '#8787FF' },
-                { label: 'EQDB Queue', count: eqdbCount.count   || 0, tab: 'scrying',   color: (eqdbCount.count || 0) > 0 ? '#ffaa00' : '#44aa44' },
-                { label: 'LFG Posts',  count: lfgCount.count    || 0, tab: 'lfg',       color: (lfgCount.count  || 0) > 0 ? '#8787FF' : '#555' },
-                { label: 'Market',     count: marketCount.count  || 0, tab: 'market',    color: (marketCount.count|| 0) > 0 ? '#44aa44' : '#555' }
+                { label: 'EQDB Queue', count: eqdbCount.count   || 0, tab: 'scrying',   color: (eqdbCount.count || 0) > 0 ? '#ffaa00' : '#44aa44' }
             ];
             var statsEl = document.getElementById('dash-stats');
             statsEl.innerHTML = '';
             for (var si = 0; si < stats.length; si++) {
                 var card = document.createElement('div');
-                card.style.cssText = 'background:#222;padding:15px 25px;border-radius:5px;text-align:center;cursor:pointer;border:1px solid #333;min-width:100px;flex:1;';
+                card.className = 'card text-center p-3';
+                card.style.cssText += 'min-width:100px;flex:1;cursor:pointer;';
                 card.innerHTML = '<div style="font-size:28px;font-weight:bold;color:' + stats[si].color + ';">' + (stats[si].count).toLocaleString() + '</div>'
                     + '<div style="font-size:12px;color:#888;margin-top:4px;">' + stats[si].label + '</div>';
                 card.setAttribute('data-tab', stats[si].tab);
@@ -840,10 +774,9 @@
                 statsEl.appendChild(card);
             }
 
-            // Recent equipment
             var eq = equipResult.data || [];
             var eqEl = document.getElementById('dash-equipment');
-            if (eq.length === 0) { eqEl.innerHTML = '<p style="color:#555;">None yet.</p>'; }
+            if (eq.length === 0) { eqEl.innerHTML = '<p class="text-secondary">None yet.</p>'; }
             else {
                 eqEl.innerHTML = '';
                 for (var i = 0; i < eq.length; i++) {
@@ -858,7 +791,6 @@
                 }
             }
 
-            // Recent bugs
             var bugs = bugResult.data || [];
             var bugsEl = document.getElementById('dash-bugs');
             if (bugs.length === 0) { bugsEl.innerHTML = '<p style="color:#44aa44;">No bug reports!</p>'; }
@@ -877,10 +809,9 @@
                 }
             }
 
-            // Recent ideas
             var ideas = ideaResult.data || [];
             var ideasEl = document.getElementById('dash-ideas');
-            if (ideas.length === 0) { ideasEl.innerHTML = '<p style="color:#555;">No ideas yet.</p>'; }
+            if (ideas.length === 0) { ideasEl.innerHTML = '<p class="text-secondary">No ideas yet.</p>'; }
             else {
                 ideasEl.innerHTML = '';
                 for (var i = 0; i < ideas.length; i++) {
@@ -894,10 +825,9 @@
                 }
             }
 
-            // Recent comments
             var comments = commentResult.data || [];
             var commEl = document.getElementById('dash-comments');
-            if (comments.length === 0) { commEl.innerHTML = '<p style="color:#555;">No comments yet.</p>'; }
+            if (comments.length === 0) { commEl.innerHTML = '<p class="text-secondary">No comments yet.</p>'; }
             else {
                 var ids = comments.filter(function(c) { return c.equipment_id; }).map(function(c) { return c.equipment_id; });
                 var nameMap = {};
@@ -919,154 +849,10 @@
                     commEl.appendChild(row);
                 }
             }
-
-            // Recent LFG
-            var lfgData = lfgRecent.data || [];
-            var lfgEl = document.getElementById('dash-lfg');
-            if (lfgData.length === 0) { lfgEl.innerHTML = '<p style="color:#555;">None yet.</p>'; }
-            else {
-                lfgEl.innerHTML = '';
-                for (var i = 0; i < lfgData.length; i++) {
-                    var p = lfgData[i];
-                    var row = document.createElement('div');
-                    row.style.cssText = 'padding:6px 0;border-bottom:1px solid #2a2a2a;cursor:pointer;';
-                    var txt = (p.note || '').substring(0, 50) || (p.target || '');
-                    row.innerHTML = '<span style="color:#8787FF;">[LFG]</span> ' + escapeHtml(p.character_name)
-                        + ': <span style="color:#ccc;">' + escapeHtml(txt) + '</span>'
-                        + '<span style="float:right;color:#555;font-size:11px;">' + new Date(p.created_at).toLocaleDateString() + '</span>';
-                    row.addEventListener('click', function() { switchTab('lfg'); });
-                    lfgEl.appendChild(row);
-                }
-            }
-
-            // Recent Market
-            var marketData = marketRecent.data || [];
-            var marketEl = document.getElementById('dash-market');
-            if (marketData.length === 0) { marketEl.innerHTML = '<p style="color:#555;">None yet.</p>'; }
-            else {
-                marketEl.innerHTML = '';
-                for (var i = 0; i < marketData.length; i++) {
-                    var p = marketData[i];
-                    var row = document.createElement('div');
-                    row.style.cssText = 'padding:6px 0;border-bottom:1px solid #2a2a2a;cursor:pointer;';
-                    row.innerHTML = '<span style="color:#44aa44;">[Market]</span> ' + escapeHtml(p.item_name)
-                        + (p.price ? ' <span style="color:#ffaa00;">(' + escapeHtml(p.price) + ')</span>' : '')
-                        + ' <span style="color:#555;font-size:11px;">by ' + escapeHtml(p.character_name) + '</span>'
-                        + '<span style="float:right;color:#555;font-size:11px;">' + new Date(p.created_at).toLocaleDateString() + '</span>';
-                    row.addEventListener('click', function() { switchTab('market'); });
-                    marketEl.appendChild(row);
-                }
-            }
         }
 
-        // Expose switchTab globally so dashboard stat cards can use onclick
         window.switchTabGlobal = function(tab) { switchTab(tab); };
 
-        // ============================================
-        // LFG POSTS
-        // ============================================
-        var lfgPage = 1, lfgTotal = 0;
-
-        async function lfgDelete(id) {
-            var r = await supabase.from('lfg_posts').update({ is_deleted: true }).eq('id', id);
-            if (r.error) { alert('Delete failed: ' + r.error.message); return false; }
-            return true;
-        }
-
-        async function loadLfgPosts() {
-            var status = document.getElementById('lfg-status');
-            status.textContent = 'Loading...';
-            var from = (lfgPage - 1) * PER_PAGE, to = from + PER_PAGE - 1;
-            var r = await supabase.from('lfg_posts').select('*', { count: 'exact' }).eq('is_deleted', false).order('created_at', { ascending: false }).range(from, to);
-            lfgTotal = r.count || 0;
-            var tbody = document.getElementById('lfg-table');
-            if (r.error) { tbody.innerHTML = '<tr><td colspan="7">Error: ' + r.error.message + '</td></tr>'; status.textContent = ''; return; }
-            if (!r.data || r.data.length === 0) { tbody.innerHTML = '<tr><td colspan="7">No LFG posts.</td></tr>'; status.textContent = '0 posts'; return; }
-            var rows = [];
-            for (var i = 0; i < r.data.length; i++) {
-                var p = r.data[i];
-                rows.push('<tr>' +
-                    '<td>' + escapeHtml(p.note || '').substring(0, 100) + '</td>' +
-                    '<td>' + escapeHtml(p.character_name || 'anonymous') + '</td>' +
-                    '<td>' + escapeHtml(p.target || '') + '</td>' +
-                    '<td>' + escapeHtml(p.post_type || '') + '</td>' +
-                    '<td>' + (p.expires_at ? new Date(p.expires_at).toLocaleDateString() : 'Never') + '</td>' +
-                    '<td>' + new Date(p.created_at).toLocaleDateString() + '</td>' +
-                    '<td><button class="btn-delete" data-id="' + p.id + '">Delete</button></td>' +
-                    '</tr>');
-            }
-            tbody.innerHTML = rows.join('');
-            status.textContent = lfgTotal + ' total posts';
-            document.querySelectorAll('#lfg-table .btn-delete').forEach(function(b) {
-                b.addEventListener('click', async function() {
-                    if (!confirm('Delete this LFG post?')) return;
-                    if (await lfgDelete(this.getAttribute('data-id'))) loadLfgPosts();
-                });
-            });
-            renderPagination('lfg', lfgPage, Math.ceil(lfgTotal / PER_PAGE));
-        }
-
-        document.getElementById('delete-all-lfg-btn').addEventListener('click', async function() {
-            if (!confirm('Delete ALL LFG posts? This cannot be undone.')) return;
-            var r = await supabase.from('lfg_posts').update({ is_deleted: true }).neq('is_deleted', true);
-            if (r.error) { document.getElementById('lfg-status').textContent = 'Error: ' + r.error.message; }
-            else { loadLfgPosts(); }
-        });
-
-        // ============================================
-        // MARKET LISTINGS
-        // ============================================
-        var marketPage = 1, marketTotal = 0;
-
-        async function marketDelete(id) {
-            console.log('marketDelete called with id:', id);
-            var r = await supabase.from('market_listings').update({ is_deleted: true }).eq('id', id);
-            if (r.error) { alert('Delete failed: ' + r.error.message); return false; }
-            return true;
-        }
-
-        async function loadMarketListings() {
-            var status = document.getElementById('market-status');
-            status.textContent = 'Loading...';
-            var from = (marketPage - 1) * PER_PAGE, to = from + PER_PAGE - 1;
-            var r = await supabase.from('market_listings').select('*', { count: 'exact' }).eq('is_deleted', false).order('created_at', { ascending: false }).range(from, to);
-            marketTotal = r.count || 0;
-            var tbody = document.getElementById('market-table');
-            if (r.error) { tbody.innerHTML = '<tr><td colspan="6">Error: ' + r.error.message + '</td></tr>'; status.textContent = ''; return; }
-            if (!r.data || r.data.length === 0) { tbody.innerHTML = '<tr><td colspan="6">No market listings.</td></tr>'; status.textContent = '0 listings'; return; }
-            var rows = [];
-            for (var i = 0; i < r.data.length; i++) {
-                var p = r.data[i];
-                rows.push('<tr>' +
-                    '<td>' + escapeHtml(p.item_name || '') + '</td>' +
-                    '<td>' + escapeHtml(p.price || '') + '</td>' +
-                    '<td>' + escapeHtml(p.character_name || 'anonymous') + '</td>' +
-                    '<td>' + (p.expires_at ? new Date(p.expires_at).toLocaleDateString() : 'Never') + '</td>' +
-                    '<td>' + new Date(p.created_at).toLocaleDateString() + '</td>' +
-                    '<td><button class="btn-delete" data-id="' + p.id + '">Delete</button></td>' +
-                    '</tr>');
-            }
-            tbody.innerHTML = rows.join('');
-            status.textContent = marketTotal + ' total listings';
-            document.querySelectorAll('#market-table .btn-delete').forEach(function(b) {
-                b.addEventListener('click', async function() {
-                    if (!confirm('Delete this market listing?')) return;
-                    if (await marketDelete(this.getAttribute('data-id'))) loadMarketListings();
-                });
-            });
-            renderPagination('market', marketPage, Math.ceil(marketTotal / PER_PAGE));
-        }
-
-        document.getElementById('delete-all-market-btn').addEventListener('click', async function() {
-            if (!confirm('Delete ALL market listings? This cannot be undone.')) return;
-            var r = await supabase.from('market_listings').update({ is_deleted: true }).neq('is_deleted', true);
-            if (r.error) { document.getElementById('market-status').textContent = 'Error: ' + r.error.message; }
-            else { loadMarketListings(); }
-        });
-
-        // ============================================
-        // BUG REPORTS
-        // ============================================
         var bugsPage = 1, bugsTotal = 0;
 
         async function loadBugReports() {
@@ -1086,7 +872,7 @@
                     '<td>' + escapeHtml(b.description || '') + '</td>' +
                     '<td style="font-size:12px;color:#888;" title="' + escapeHtml(b.page_url || '') + '">' + escapeHtml(shortUrl || b.page_url || '') + '</td>' +
                     '<td>' + new Date(b.created_at).toLocaleDateString() + '</td>' +
-                    '<td><button class="btn-delete" data-id="' + b.id + '">Delete</button></td>' +
+                    '<td><button class="btn btn-danger btn-sm btn-delete" data-id="' + b.id + '">Delete</button></td>' +
                     '</tr>');
             }
             tbody.innerHTML = rows.join('');
@@ -1109,12 +895,9 @@
             else { loadBugReports(); }
         });
 
-        // ============================================
-        // MM COLORIZER ENGINE
-        // ============================================
         var C = { blue:'#8787FF', white:'#C0C0C0', cyan:'#00FFFF', yellow:'#FFFF00', green:'#00FF00', pink:'#D78787', magenta:'#FF00FF', gray:'#808080', olive:'#808000', red:'#FF0000', darkgreen:'#008000' };
         function tag(color, text) { return '<font color="' + color + '">' + text + '</font>'; }
-        
+
         function colorizeMM(text) {
             if (!text) return '';
             text = text.replace(/\n?.*\d+hp\s+\d+sp\s+\d+st[^\n]*\n?/g, '\n');
@@ -1169,7 +952,7 @@
             }
             return result.join('\n');
         }
-        
+
         function colorizeItemLine(line) {
             var h = tag(C.blue, 'Item \''); var nm = line.match(/^Item\s+'(.+?)'\s+is type/); if (nm) h += tag(C.white, escapeHtml(nm[1])) + tag(C.blue, '\' is type ');
             var tm = line.match(/is type\s+(\S+)/); if (tm) h += tag(C.white, escapeHtml(tm[1].replace(',',''))) + tag(C.blue, ',');
@@ -1199,7 +982,6 @@
             return h;
         }
     </script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"131579fcdf914a0f9aa2fb16db7f327e","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 <script>
     if (sessionStorage.getItem('editor_logged_in') === 'true') {
         document.getElementById('editor-dropdown').style.display = 'inline-block';

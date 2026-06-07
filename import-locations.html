@@ -1,258 +1,600 @@
 <!DOCTYPE html>
+
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>Import Locations - MUD Equipment DB</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+
     <style>
-        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+
+        body { font-family: "Inter", sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+
+        #sticky-header { position: sticky; top: 0; z-index: 100; background: #1a1a1a; }
+
+        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; }
+
+        nav a { margin-right: 15px; color: #8787FF; text-decoration: none; }
+
+        nav a:hover { color: #C0C0C0; }
+
+        nav .dropdown { position: relative; display: inline-block; margin-right: 15px; }
+
+        nav .dropbtn { cursor: pointer; color: #8787FF; }
+
+        nav .dropdown-content { display: none; position: absolute; top: 100%; left: 0; background: #333; min-width: 160px; border: 1px solid #444; border-radius: 3px; z-index: 1000; }
+
+        nav .dropdown-content a { display: block; padding: 8px 12px; margin: 0; white-space: nowrap; }
+
+        nav .dropdown-content a:hover { background: #444; color: #C0C0C0; }
+
+        nav .dropdown:hover .dropdown-content { display: block; }
+
         a { color: #8787FF; }
+
         h1, h2, h3 { color: #C0C0C0; }
+
         input, button { padding: 8px; margin: 5px; }
+
         button { background: #8787FF; color: #000; border: none; border-radius: 3px; cursor: pointer; }
+
         button:disabled { opacity: 0.5; cursor: not-allowed; }
+
         .status { margin: 10px 0; padding: 10px; background: #222; border-radius: 5px; }
+
         .preview-table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 12px; }
+
         .preview-table th, .preview-table td { border: 1px solid #444; padding: 4px 8px; text-align: left; }
+
         .preview-table th { background: #333; }
+
         .hidden { display: none; }
+
         .col-input { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0; }
+
         .col-input label { font-size: 12px; color: #888; }
+
         .col-input input { width: 100px; }
+
     </style>
+
 </head>
+
 <body>
-    <h1>Import Locations from .db File</h1>
+    <div style="margin-bottom:6px;text-align:center;"><img src="images/logo.png" alt="HukoDB" style="height:130px;"></div>
+    <div id="sticky-header">
+
     <nav>
+
         <a href="index.html">Search</a>
-        <a href="info.html">About</a>
-        <a href="ideas.html">Ideas</a>
+
+        <a href="zones.html">Zones</a>
+
         <a href="leaderboard.html">Leaderboard</a>
-        <span id="editor-links" style="display:none;">
-            <a href="import.html">Add Equipment</a>
-            <a href="batch.html">Batch Import</a>
-            <a href="import-db.html">Import Database</a>
-            <a href="admin.html">Admin</a>
-        </span>
-        <span id="login-link"><a href="login.html">Editor Login</a></span>
-        <span id="logout-link" style="display:none;"><a href="#" onclick="logout()">Logout</a></span>
-    </nav>
-    <hr>
-    
-    <p>Select a SQLite .db file containing location data. The file is processed in your browser — nothing is uploaded to any server until you click Import.</p>
-    
-    <input type="file" id="file-input" accept=".db,.sqlite,.sqlite3">
-    <button id="import-btn" disabled>Import to Supabase</button>
-    
-    <div class="status hidden" id="status"></div>
-    
-    <div class="hidden" id="preview-section">
-        <h3>Preview (first 20 rows)</h3>
-        <p style="color:#888;">Map the columns from your database to the location fields:</p>
-        <div class="col-input">
-            <label>Equipment Name:<br><input type="text" id="name-col" value="name"></label>
-            <label>Zone:<br><input type="text" id="zone-col" value="zone"></label>
-            <label>Mob (optional):<br><input type="text" id="mob-col" value="mob"></label>
-            <label>Notes (optional):<br><input type="text" id="notes-col" value="notes"></label>
+
+        
+        <div class="dropdown">
+            <span class="dropbtn">Games ▼</span>
+            <div class="dropdown-content">
+                <a href="daily.html">Daily</a>
+                <a href="zonequiz.html">Zone Quiz</a>
+                <a href="mobguess.html">Mob Guess</a>
+            </div>
         </div>
-        <table class="preview-table" id="preview-table"></table>
+
+
+        <div class="dropdown">
+
+            <span class="dropbtn">Community Tools ▼</span>
+
+            <div class="dropdown-content">
+
+                <a href="market.html">Market</a>
+
+                <a href="lfg.html">LFG</a>
+
+            </div>
+
+        </div>
+
+        <div class="dropdown">
+
+            <span class="dropbtn">More ▼</span>
+
+            <div class="dropdown-content">
+
+                <a href="info.html">About</a>
+
+                <a href="ideas.html">Ideas</a>
+
+            </div>
+
+        </div>
+
+        <div class="dropdown" id="editor-dropdown" style="display:none;">
+
+            <span class="dropbtn">Editor ▼</span>
+
+            <div class="dropdown-content">
+
+                <a href="import.html">Add Equipment</a>
+
+                <a href="batch.html">Batch Import</a>
+
+                <a href="import-db.html">Import Database</a>
+
+            </div>
+
+        </div>
+
+        <span id="login-link"><a href="login.html">Login</a></span>
+
+        
+        <span id="signup-link"><a href="signup.html" style="color:#44aa44;">Sign Up</a></span>
+        <span id="admin-link" style="display:none;"><a href="admin.html" style="color:#FFD700;font-weight:bold;">Admin Panel</a></span>
+        <span id="logout-link" style="display:none;"><a href="#" onclick="logout()">Logout</a></span>
+
+    </nav>
+
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
-    <script type="module">
-        var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
-        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
-        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-        var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        
-        var db = null;
-        var allRows = [];
-        var allColumns = [];
-        
-        var SQL = await initSqlJs({ locateFile: function(file) { return 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/' + file; } });
-        
-        document.getElementById('file-input').addEventListener('change', async function(e) {
-            var file = e.target.files[0];
-            if (!file) return;
-            
-            var status = document.getElementById('status');
-            status.classList.remove('hidden');
-            status.textContent = 'Loading database...';
-            
-            var buffer = await file.arrayBuffer();
-            db = new SQL.Database(new Uint8Array(buffer));
-            
-            // Get table names
-            var tables = [];
-            try {
-                tables = db.exec("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
-            } catch(ex) {
-                status.textContent = 'Error reading tables: ' + ex.message;
-                return;
-            }
-            
-            if (tables.length === 0 || tables[0].values.length === 0) {
-                status.textContent = 'No tables found in database.';
-                return;
-            }
-            
-            var tableName = tables[0].values[0][0];
-            
-            // Get columns
-            try {
-                var colResult = db.exec("PRAGMA table_info('" + tableName + "')");
-                if (colResult.length > 0) {
-                    for (var r = 0; r < colResult[0].values.length; r++) {
-                        allColumns.push(colResult[0].values[r][1]);
-                    }
-                }
-            } catch(ex) {
-                status.textContent = 'Error reading columns: ' + ex.message;
-                return;
-            }
-            
-            status.textContent = 'Found table: ' + tableName + '. ' + allColumns.length + ' columns: ' + allColumns.join(', ');
-            
-            // Get all rows
-            var result;
-            try {
-                result = db.exec("SELECT * FROM [" + tableName + "]");
-            } catch(ex) {
-                try {
-                    result = db.exec("SELECT * FROM `" + tableName + "`");
-                } catch(ex2) {
-                    status.textContent = 'Could not read table data.';
-                    return;
-                }
-            }
-            
-            if (!result || result.length === 0) {
-                status.textContent = 'Table is empty.';
-                return;
-            }
-            
-            allRows = result[0].values;
-            
-            status.textContent = 'Loaded ' + allRows.length + ' rows.';
-            
-            // Show preview
-            document.getElementById('preview-section').classList.remove('hidden');
-            
-            var table = document.getElementById('preview-table');
-            var html = '<tr>' + allColumns.map(function(c) { return '<th>' + c + '</th>'; }).join('') + '</tr>';
-            var previewRows = allRows.slice(0, 20);
-            for (var r = 0; r < previewRows.length; r++) {
-                html += '<tr>';
-                for (var c = 0; c < allColumns.length; c++) {
-                    var val = previewRows[r][c];
-                    val = val !== null && val !== undefined ? val.toString().substring(0, 100) : '';
-                    html += '<td>' + val + '</td>';
-                }
-                html += '</tr>';
-            }
-            table.innerHTML = html;
-            
-            // Auto-detect columns
-            for (var c = 0; c < allColumns.length; c++) {
-                var col = allColumns[c].toLowerCase();
-                if (col.indexOf('name') >= 0 || col.indexOf('item') >= 0 || col.indexOf('equip') >= 0) document.getElementById('name-col').value = allColumns[c];
-                if (col.indexOf('zone') >= 0 || col.indexOf('area') >= 0 || col.indexOf('location') >= 0) document.getElementById('zone-col').value = allColumns[c];
-                if (col.indexOf('mob') >= 0 || col.indexOf('monster') >= 0 || col.indexOf('npc') >= 0 || col.indexOf('drop') >= 0) document.getElementById('mob-col').value = allColumns[c];
-                if (col.indexOf('note') >= 0 || col.indexOf('desc') >= 0 || col.indexOf('comment') >= 0) document.getElementById('notes-col').value = allColumns[c];
-            }
-            
-            document.getElementById('import-btn').disabled = false;
-        });
-        
-        document.getElementById('import-btn').addEventListener('click', async function() {
-            if (allRows.length === 0) return;
-            
-            var nameCol = document.getElementById('name-col').value;
-            var zoneCol = document.getElementById('zone-col').value;
-            var mobCol = document.getElementById('mob-col').value;
-            var notesCol = document.getElementById('notes-col').value;
-            
-            var nameIdx = allColumns.indexOf(nameCol);
-            var zoneIdx = allColumns.indexOf(zoneCol);
-            var mobIdx = allColumns.indexOf(mobCol);
-            var notesIdx = allColumns.indexOf(notesCol);
-            
-            if (nameIdx < 0 || zoneIdx < 0) {
-                alert('Please set Equipment Name and Zone columns.');
-                return;
-            }
-            
-            var status = document.getElementById('status');
-            status.textContent = 'Importing ' + allRows.length + ' rows...';
-            
-            var imported = 0;
-            var errors = 0;
-            
-            for (var i = 0; i < allRows.length; i++) {
-                var row = allRows[i];
-                var locationData = {
-                    equipment_name: (row[nameIdx] || '').toString().trim(),
-                    zone: (row[zoneIdx] || '').toString().trim(),
-                    mob: mobIdx >= 0 ? (row[mobIdx] || '').toString().trim() : '',
-                    notes: notesIdx >= 0 ? (row[notesIdx] || '').toString().trim() : '',
-                    submitted_by: 'db_import',
-                    verified: false
-                };
-                
-                if (!locationData.equipment_name || !locationData.zone) { errors++; continue; }
-                
-                var insertResult = await supabase.from('locations').insert(locationData);
-                if (insertResult.error) { errors++; }
-                else { imported++; }
-                
-                if (i % 100 === 0) {
-                    status.textContent = 'Importing... ' + i + '/' + allRows.length + ' (' + imported + ' done)';
-                }
-            }
-            
-            status.textContent = 'Done! Imported: ' + imported + ', Errors: ' + errors;
-            document.getElementById('import-btn').disabled = true;
-        });
-		function isEditor() {
-    return sessionStorage.getItem('editor_logged_in') === 'true';
-}
-    </script>
-    <script>
-        if (sessionStorage.getItem('editor_logged_in') === 'true') {
-            document.getElementById('editor-links').style.display = 'inline';
-            document.getElementById('logout-link').style.display = 'inline';
-            document.getElementById('login-link').style.display = 'none';
-        }
-        function logout() { sessionStorage.removeItem('editor_logged_in'); location.reload(); }
-    </script>
-<style>
-#bug-btn-container{text-align:center;padding:10px 0;margin-top:20px;}
-#bug-btn{background:#ff4444;color:white;border:none;border-radius:3px;padding:8px 16px;cursor:pointer;font-size:13px;}
-#bug-btn:hover{background:#cc0000;}
-#bug-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:none;align-items:center;justify-content:center;}
-#bug-modal-content{background:#1a1a1a;border:2px solid #555;border-radius:10px;padding:20px;width:90%;max-width:500px;color:#ccc;}
-#bug-modal-content h3{margin:0 0 10px;color:#ff4444;}
-#bug-modal-content textarea{width:100%;height:120px;padding:8px;background:#333;color:#ccc;border:1px solid #555;border-radius:3px;box-sizing:border-box;margin:10px 0;font-family:Arial,sans-serif;}
-#bug-modal-content .bug-url{color:#888;font-size:12px;word-break:break-all;}
-#bug-modal-content .btn-row{display:flex;gap:10px;justify-content:flex-end;}
-#bug-modal-content .btn-submit{background:#ff4444;color:white;border:none;border-radius:3px;padding:8px 16px;cursor:pointer;}
-#bug-modal-content .btn-cancel{background:#666;color:white;border:none;border-radius:3px;padding:8px 16px;cursor:pointer;}
-#bug-modal-content .btn-submit:disabled{opacity:0.5;cursor:not-allowed;}
-#bug-modal-content .bug-msg{margin:10px 0 0;font-size:13px;}
-</style>
-<div id="bug-btn-container"><button id="bug-btn" onclick="openBugReport()">Report Bug</button></div>
-<div id="bug-modal" onclick="if(event.target===this)closeBugReport()">
-  <div id="bug-modal-content">
-    <h3>Report Bug</h3>
-    <p class="bug-url">Page: <span id="bug-page-url"></span></p>
-    <textarea id="bug-description" placeholder="Describe what went wrong..."></textarea>
-    <div class="btn-row">
-      <button class="btn-cancel" onclick="closeBugReport()">Cancel</button>
-      <button class="btn-submit" id="bug-submit-btn" onclick="submitBugReport()">Submit</button>
+    <h2>Import Locations from .db File</h2>
+
+    <hr>
+
+    
+
+    <p>Select a SQLite .db file containing location data. The file is processed in your browser — nothing is uploaded to any server until you click Import.</p>
+
+    
+
+    <input type="file" id="file-input" accept=".db,.sqlite,.sqlite3">
+
+    <button id="import-btn" disabled>Import to Supabase</button>
+
+    
+
+    <div class="status hidden" id="status"></div>
+
+    
+
+    <div class="hidden" id="preview-section">
+
+        <h3>Preview (first 20 rows)</h3>
+
+        <p style="color:#888;">Map the columns from your database to the location fields:</p>
+
+        <div class="col-input">
+
+            <label>Equipment Name:<br><input type="text" id="name-col" value="name"></label>
+
+            <label>Zone:<br><input type="text" id="zone-col" value="zone"></label>
+
+            <label>Mob (optional):<br><input type="text" id="mob-col" value="mob"></label>
+
+            <label>Notes (optional):<br><input type="text" id="notes-col" value="notes"></label>
+
+        </div>
+
+        <table class="preview-table" id="preview-table"></table>
+
     </div>
+
+
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+
+    <script type="module">
+
+        var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
+
+        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
+
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+        var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        
+
+        var db = null;
+
+        var allRows = [];
+
+        var allColumns = [];
+
+        
+
+        var SQL = await initSqlJs({ locateFile: function(file) { return 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/' + file; } });
+
+        
+
+        document.getElementById('file-input').addEventListener('change', async function(e) {
+
+            var file = e.target.files[0];
+
+            if (!file) return;
+
+            
+
+            var status = document.getElementById('status');
+
+            status.classList.remove('hidden');
+
+            status.textContent = 'Loading database...';
+
+            
+
+            var buffer = await file.arrayBuffer();
+
+            db = new SQL.Database(new Uint8Array(buffer));
+
+            
+
+            // Get table names
+
+            var tables = [];
+
+            try {
+
+                tables = db.exec("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
+
+            } catch(ex) {
+
+                status.textContent = 'Error reading tables: ' + ex.message;
+
+                return;
+
+            }
+
+            
+
+            if (tables.length === 0 || tables[0].values.length === 0) {
+
+                status.textContent = 'No tables found in database.';
+
+                return;
+
+            }
+
+            
+
+            var tableName = tables[0].values[0][0];
+
+            
+
+            // Get columns
+
+            try {
+
+                var colResult = db.exec("PRAGMA table_info('" + tableName + "')");
+
+                if (colResult.length > 0) {
+
+                    for (var r = 0; r < colResult[0].values.length; r++) {
+
+                        allColumns.push(colResult[0].values[r][1]);
+
+                    }
+
+                }
+
+            } catch(ex) {
+
+                status.textContent = 'Error reading columns: ' + ex.message;
+
+                return;
+
+            }
+
+            
+
+            status.textContent = 'Found table: ' + tableName + '. ' + allColumns.length + ' columns: ' + allColumns.join(', ');
+
+            
+
+            // Get all rows
+
+            var result;
+
+            try {
+
+                result = db.exec("SELECT * FROM [" + tableName + "]");
+
+            } catch(ex) {
+
+                try {
+
+                    result = db.exec("SELECT * FROM `" + tableName + "`");
+
+                } catch(ex2) {
+
+                    status.textContent = 'Could not read table data.';
+
+                    return;
+
+                }
+
+            }
+
+            
+
+            if (!result || result.length === 0) {
+
+                status.textContent = 'Table is empty.';
+
+                return;
+
+            }
+
+            
+
+            allRows = result[0].values;
+
+            
+
+            status.textContent = 'Loaded ' + allRows.length + ' rows.';
+
+            
+
+            // Show preview
+
+            document.getElementById('preview-section').classList.remove('hidden');
+
+            
+
+            var table = document.getElementById('preview-table');
+
+            var html = '<tr>' + allColumns.map(function(c) { return '<th>' + c + '</th>'; }).join('') + '</tr>';
+
+            var previewRows = allRows.slice(0, 20);
+
+            for (var r = 0; r < previewRows.length; r++) {
+
+                html += '<tr>';
+
+                for (var c = 0; c < allColumns.length; c++) {
+
+                    var val = previewRows[r][c];
+
+                    val = val !== null && val !== undefined ? val.toString().substring(0, 100) : '';
+
+                    html += '<td>' + val + '</td>';
+
+                }
+
+                html += '</tr>';
+
+            }
+
+            table.innerHTML = html;
+
+            
+
+            // Auto-detect columns
+
+            for (var c = 0; c < allColumns.length; c++) {
+
+                var col = allColumns[c].toLowerCase();
+
+                if (col.indexOf('name') >= 0 || col.indexOf('item') >= 0 || col.indexOf('equip') >= 0) document.getElementById('name-col').value = allColumns[c];
+
+                if (col.indexOf('zone') >= 0 || col.indexOf('area') >= 0 || col.indexOf('location') >= 0) document.getElementById('zone-col').value = allColumns[c];
+
+                if (col.indexOf('mob') >= 0 || col.indexOf('monster') >= 0 || col.indexOf('npc') >= 0 || col.indexOf('drop') >= 0) document.getElementById('mob-col').value = allColumns[c];
+
+                if (col.indexOf('note') >= 0 || col.indexOf('desc') >= 0 || col.indexOf('comment') >= 0) document.getElementById('notes-col').value = allColumns[c];
+
+            }
+
+            
+
+            document.getElementById('import-btn').disabled = false;
+
+        });
+
+        
+
+        document.getElementById('import-btn').addEventListener('click', async function() {
+
+            if (allRows.length === 0) return;
+
+            
+
+            var nameCol = document.getElementById('name-col').value;
+
+            var zoneCol = document.getElementById('zone-col').value;
+
+            var mobCol = document.getElementById('mob-col').value;
+
+            var notesCol = document.getElementById('notes-col').value;
+
+            
+
+            var nameIdx = allColumns.indexOf(nameCol);
+
+            var zoneIdx = allColumns.indexOf(zoneCol);
+
+            var mobIdx = allColumns.indexOf(mobCol);
+
+            var notesIdx = allColumns.indexOf(notesCol);
+
+            
+
+            if (nameIdx < 0 || zoneIdx < 0) {
+
+                alert('Please set Equipment Name and Zone columns.');
+
+                return;
+
+            }
+
+            
+
+            var status = document.getElementById('status');
+
+            status.textContent = 'Importing ' + allRows.length + ' rows...';
+
+            
+
+            var imported = 0;
+
+            var errors = 0;
+
+            
+
+            for (var i = 0; i < allRows.length; i++) {
+
+                var row = allRows[i];
+
+                var locationData = {
+
+                    equipment_name: (row[nameIdx] || '').toString().trim(),
+
+                    zone: (row[zoneIdx] || '').toString().trim(),
+
+                    mob: mobIdx >= 0 ? (row[mobIdx] || '').toString().trim() : '',
+
+                    notes: notesIdx >= 0 ? (row[notesIdx] || '').toString().trim() : '',
+
+                    submitted_by: 'db_import',
+
+                    verified: false
+
+                };
+
+                
+
+                if (!locationData.equipment_name || !locationData.zone) { errors++; continue; }
+
+                
+
+                var insertResult = await supabase.from('locations').insert(locationData);
+
+                if (insertResult.error) { errors++; }
+
+                else { imported++; }
+
+                
+
+                if (i % 100 === 0) {
+
+                    status.textContent = 'Importing... ' + i + '/' + allRows.length + ' (' + imported + ' done)';
+
+                }
+
+            }
+
+            
+
+            status.textContent = 'Done! Imported: ' + imported + ', Errors: ' + errors;
+
+            document.getElementById('import-btn').disabled = true;
+
+        });
+
+		function isEditor() {
+
+    return sessionStorage.getItem('editor_logged_in') === 'true';
+
+}
+
+    </script>
+
+    <script>
+
+        if (sessionStorage.getItem('editor_logged_in') === 'true') {
+
+            document.getElementById('editor-dropdown').style.display = 'inline-block';
+
+            document.getElementById('admin-link').style.display = 'inline';
+
+            document.getElementById('logout-link').style.display = 'inline';
+
+            document.getElementById('login-link').style.display = 'none';
+            document.getElementById('signup-link').style.display = 'none';
+
+        }
+
+                if (localStorage.getItem('user_logged_in') === 'true') {
+            document.getElementById('login-link').style.display = 'none';
+            document.getElementById('signup-link').style.display = 'none';
+        }
+        function logout() {
+            sessionStorage.removeItem('editor_logged_in');
+            sessionStorage.removeItem('editor_name');
+            localStorage.removeItem('user_logged_in');
+            localStorage.removeItem('username');
+            location.reload();
+        }
+
+    </script>
+
+<style>
+
+#bug-btn-container{text-align:center;padding:10px 0;margin-top:20px;}
+
+#bug-btn{background:#ff4444;color:white;border:none;border-radius:3px;padding:8px 16px;cursor:pointer;font-size:13px;}
+
+#bug-btn:hover{background:#cc0000;}
+
+#bug-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:none;align-items:center;justify-content:center;}
+
+#bug-modal-content{background:#1a1a1a;border:2px solid #555;border-radius:10px;padding:20px;width:90%;max-width:500px;color:#ccc;}
+
+#bug-modal-content h3{margin:0 0 10px;color:#ff4444;}
+
+#bug-modal-content textarea{width:100%;height:120px;padding:8px;background:#333;color:#ccc;border:1px solid #555;border-radius:3px;box-sizing:border-box;margin:10px 0;font-family:Arial,sans-serif;}
+
+#bug-modal-content .bug-url{color:#888;font-size:12px;word-break:break-all;}
+
+#bug-modal-content .btn-row{display:flex;gap:10px;justify-content:flex-end;}
+
+#bug-modal-content .btn-submit{background:#ff4444;color:white;border:none;border-radius:3px;padding:8px 16px;cursor:pointer;}
+
+#bug-modal-content .btn-cancel{background:#666;color:white;border:none;border-radius:3px;padding:8px 16px;cursor:pointer;}
+
+#bug-modal-content .btn-submit:disabled{opacity:0.5;cursor:not-allowed;}
+
+#bug-modal-content .bug-msg{margin:10px 0 0;font-size:13px;}
+
+</style>
+
+<div id="bug-btn-container"><button id="bug-btn" onclick="openBugReport()">Report Bug</button></div>
+
+<div id="bug-modal" onclick="if(event.target===this)closeBugReport()">
+
+  <div id="bug-modal-content">
+
+    <h3>Report Bug</h3>
+
+    <p class="bug-url">Page: <span id="bug-page-url"></span></p>
+
+    <textarea id="bug-description" placeholder="Describe what went wrong..."></textarea>
+
+    <div class="btn-row">
+
+      <button class="btn-cancel" onclick="closeBugReport()">Cancel</button>
+
+      <button class="btn-submit" id="bug-submit-btn" onclick="submitBugReport()">Submit</button>
+
+    </div>
+
     <p class="bug-msg" id="bug-msg"></p>
+
   </div>
+
 </div>
+
 <script>
     var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
     var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
@@ -293,5 +635,7 @@
         }
     };
 </script>
+
 </body>
+
 </html>

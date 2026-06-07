@@ -4,12 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zone - MUD Equipment DB</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+        body { font-family: "Inter", sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
         a { color: #8787FF; }
         h1, h2 { color: #C0C0C0; }
-        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; }
-        nav a { margin-right: 15px; }
+        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; }
+        nav a { margin-right: 15px; color: #8787FF; text-decoration: none; }
+        nav a:hover { color: #C0C0C0; }
+        nav .dropdown { position: relative; display: inline-block; margin-right: 15px; }
+        nav .dropbtn { cursor: pointer; color: #8787FF; }
+        nav .dropdown-content { display: none; position: absolute; top: 100%; left: 0; background: #333; min-width: 160px; border: 1px solid #444; border-radius: 3px; z-index: 1000; }
+        nav .dropdown-content a { display: block; padding: 8px 12px; margin: 0; white-space: nowrap; }
+        nav .dropdown-content a:hover { background: #444; color: #C0C0C0; }
+        nav .dropdown:hover .dropdown-content { display: block; }
         table { width: 100%; border-collapse: collapse; margin: 10px 0; }
         th { background: #333; color: #888; padding: 8px; text-align: left; font-size: 13px; border: 1px solid #444; }
         td { padding: 6px 8px; border-bottom: 1px solid #2a2a2a; font-size: 13px; }
@@ -30,19 +40,55 @@
         .load-more button { padding: 8px 20px; background: #8787FF; color: #000; border: none; border-radius: 3px; cursor: pointer; }
         .empty { color: #555; padding: 20px 0; }
         .hits { color: #44aa44; font-size: 12px; }
+        #sticky-header { position: sticky; top: 0; z-index: 100; background: #1a1a1a; }
     </style>
 </head>
 <body>
+    <div style="margin-bottom:6px;text-align:center;"><img src="images/logo.png" alt="HukoDB" style="height:130px;"></div>
+    <div id="sticky-header">
     <nav>
         <a href="index.html">Search</a>
         <a href="zones.html">Zones</a>
-        <a href="info.html">About</a>
-        <a href="market.html">Market</a>
-        <a href="lfg.html">LFG</a>
         <a href="leaderboard.html">Leaderboard</a>
-        <span id="editor-links" style="display:none;"><a href="admin.html">Admin</a></span>
+        
+        <div class="dropdown">
+            <span class="dropbtn">Games ▼</span>
+            <div class="dropdown-content">
+                <a href="daily.html">Daily</a>
+                <a href="zonequiz.html">Zone Quiz</a>
+                <a href="mobguess.html">Mob Guess</a>
+            </div>
+        </div>
+
+        <div class="dropdown">
+            <span class="dropbtn">Community Tools ▼</span>
+            <div class="dropdown-content">
+                <a href="market.html">Market</a>
+                <a href="lfg.html">LFG</a>
+            </div>
+        </div>
+        <div class="dropdown">
+            <span class="dropbtn">More ▼</span>
+            <div class="dropdown-content">
+                <a href="info.html">About</a>
+                <a href="ideas.html">Ideas</a>
+            </div>
+        </div>
+        <div class="dropdown" id="editor-dropdown" style="display:none;">
+            <span class="dropbtn">Editor ▼</span>
+            <div class="dropdown-content">
+                <a href="import.html">Add Equipment</a>
+                <a href="batch.html">Batch Import</a>
+                <a href="import-db.html">Import Database</a>
+            </div>
+        </div>
+        <span id="login-link"><a href="login.html">Login</a></span>
+        <span id="signup-link"><a href="signup.html" style="color:#44aa44;">Sign Up</a></span>
+        <span id="admin-link" style="display:none;"><a href="admin.html" style="color:#FFD700;font-weight:bold;">Admin Panel</a></span>
+        <span id="logout-link" style="display:none;"><a href="#" onclick="logout()">Logout</a></span>
     </nav>
-    <hr>
+    <script>document.querySelectorAll('nav a').forEach(function(a){if(a.href.split('/').pop()===location.pathname.split('/').pop())a.style.color='#00FFFF';});</script>
+    </div>
 
     <div id="page-content">Loading...</div>
 
@@ -68,7 +114,6 @@
         var allMobData = [], allItemData = [];
 
         async function loadZone(area) {
-            // Single RPC call for both mobs and items
             var [mobResult, itemResult] = await Promise.all([
                 supabase.rpc('get_zone_mobs',  { zone_area: area }),
                 supabase.rpc('get_zone_items', { zone_area: area })
@@ -80,7 +125,6 @@
             var totalMobs  = allMobData.length;
             var totalItems = allItemData.length;
 
-            // Build page shell
             var content = document.getElementById('page-content');
             content.innerHTML = '';
 
@@ -88,21 +132,18 @@
             h1.textContent = area;
             content.appendChild(h1);
 
-            // Stat boxes
             var statRow = document.createElement('div');
             statRow.className = 'stat-row';
             statRow.innerHTML = '<div class="stat-box"><div class="num">' + totalMobs + '</div><div class="lbl">Mobs</div></div>'
                 + '<div class="stat-box"><div class="num">' + totalItems + '</div><div class="lbl">Items</div></div>';
             content.appendChild(statRow);
 
-            // Tabs
             var tabBar = document.createElement('div');
             tabBar.className = 'tab-bar';
             tabBar.innerHTML = '<button class="active" id="tab-mobs" onclick="switchZoneTab(\'mobs\')">Mobs (' + totalMobs + ')</button>'
                 + '<button id="tab-items" onclick="switchZoneTab(\'items\')">Items (' + totalItems + ')</button>';
             content.appendChild(tabBar);
 
-            // Mobs section
             var mobSection = document.createElement('div');
             mobSection.id = 'section-mobs';
             mobSection.className = 'section active';
@@ -114,7 +155,6 @@
                 + '<div class="load-more" id="mob-load-more" style="display:none;"><button onclick="loadMoreMobs()">Load More</button></div>';
             content.appendChild(mobSection);
 
-            // Items section
             var itemSection = document.createElement('div');
             itemSection.id = 'section-items';
             itemSection.className = 'section';
@@ -126,12 +166,10 @@
                 + '<div class="load-more" id="item-load-more" style="display:none;"><button onclick="loadMoreItems()">Load More</button></div>';
             content.appendChild(itemSection);
 
-            // Render both tabs (data already loaded above)
             renderMobs(false);
             renderItems(false);
         }
 
-        // ── Tab switching ────────────────────────────────────────
         window.switchZoneTab = function(tab) {
             document.querySelectorAll('.tab-bar button').forEach(function(b) { b.classList.remove('active'); });
             document.querySelectorAll('.section').forEach(function(s) { s.classList.remove('active'); });
@@ -139,7 +177,6 @@
             document.getElementById('section-' + tab).classList.add('active');
         };
 
-        // ── Mobs ─────────────────────────────────────────────────
         window.filterMobs = function() {
             mobSearch = document.getElementById('mob-search').value.trim().toLowerCase();
             mobOffset = 0;
@@ -178,9 +215,6 @@
             mobOffset += page.length;
             document.getElementById('mob-load-more').style.display = (mobOffset < filtered.length) ? 'block' : 'none';
         }
-
-        // ── Items ─────────────────────────────────────────────────
-        var allItemList = []; // all unique item names for this zone
 
         window.filterItems = function() {
             itemSearch = document.getElementById('item-search').value.trim().toLowerCase();
@@ -229,7 +263,21 @@
 
     <script>
         if (sessionStorage.getItem('editor_logged_in') === 'true') {
-            document.getElementById('editor-links').style.display = 'inline';
+            document.getElementById('editor-dropdown').style.display = 'inline-block';
+            document.getElementById('admin-link').style.display = 'inline';
+            document.getElementById('logout-link').style.display = 'inline';
+            document.getElementById('login-link').style.display = 'none';
+        }
+                if (localStorage.getItem('user_logged_in') === 'true') {
+            document.getElementById('login-link').style.display = 'none';
+            document.getElementById('signup-link').style.display = 'none';
+        }
+        function logout() {
+            sessionStorage.removeItem('editor_logged_in');
+            sessionStorage.removeItem('editor_name');
+            localStorage.removeItem('user_logged_in');
+            localStorage.removeItem('username');
+            location.reload();
         }
     </script>
 </body>

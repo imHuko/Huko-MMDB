@@ -4,10 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Item Details - MUD Equipment DB</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+        body { font-family: "Inter", sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+        #sticky-header { position: sticky; top: 0; z-index: 100; background: #1a1a1a; }
         a { color: #8787FF; }
         h1, h2 { color: #C0C0C0; }
+        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; }
+        nav a { margin-right: 15px; color: #8787FF; text-decoration: none; }
+        nav a:hover { color: #C0C0C0; }
+        nav .dropdown { position: relative; display: inline-block; margin-right: 15px; }
+        nav .dropbtn { cursor: pointer; color: #8787FF; }
+        nav .dropdown-content { display: none; position: absolute; top: 100%; left: 0; background: #333; min-width: 160px; border: 1px solid #444; border-radius: 3px; z-index: 1000; }
+        nav .dropdown-content a { display: block; padding: 8px 12px; margin: 0; white-space: nowrap; }
+        nav .dropdown-content a:hover { background: #444; color: #C0C0C0; }
+        nav .dropdown:hover .dropdown-content { display: block; }
         .mm-output { background: #000; color: #C0C0C0; padding: 15px; margin: 15px 0; border-radius: 5px;
                      font-family: 'Courier New', monospace; font-size: 13px; white-space: pre-wrap; line-height: 1.5; word-wrap: break-word; }
         .comment { border: 1px solid #444; padding: 10px; margin: 10px 0; border-radius: 5px; background: #222; }
@@ -21,23 +34,57 @@
     </style>
 </head>
 <body>
-
-<nav style="background:#222;padding:10px;margin:10px 0;border-radius:5px;">
+    <div style="margin-bottom:6px;text-align:center;"><img src="images/logo.png" alt="HukoDB" style="height:130px;"></div>
+<div id="sticky-header">
+<nav>
     <a href="index.html">Search</a>
-    <span id="editor-links" style="display:none;">
-        <a href="import.html">Add Equipment</a>
-        <a href="batch.html">Batch Import</a>
-        <a href="import-db.html">Import Database</a>
-        <a href="admin.html">Admin</a>
-    </span>
-    <span id="login-link">
-        <a href="login.html">Editor Login</a>
-    </span>
-    <span id="logout-link" style="display:none;">
-        <a href="#" onclick="logout()">Logout</a>
-    </span>
+    <a href="zones.html">Zones</a>
+    <a href="leaderboard.html">Leaderboard</a>
+    
+        <div class="dropdown">
+            <span class="dropbtn">Games ▼</span>
+            <div class="dropdown-content">
+                <a href="daily.html">Daily</a>
+                <a href="zonequiz.html">Zone Quiz</a>
+                <a href="mobguess.html">Mob Guess</a>
+            </div>
+        </div>
+
+    <div class="dropdown">
+        <span class="dropbtn">Community Tools ▼</span>
+        <div class="dropdown-content">
+            <a href="market.html">Market</a>
+            <a href="lfg.html">LFG</a>
+        </div>
+    </div>
+    <div class="dropdown">
+        <span class="dropbtn">More ▼</span>
+        <div class="dropdown-content">
+            <a href="info.html">About</a>
+            <a href="ideas.html">Ideas</a>
+        </div>
+    </div>
+    <div class="dropdown" id="editor-dropdown" style="display:none;">
+        <span class="dropbtn">Editor ▼</span>
+        <div class="dropdown-content">
+            <a href="import.html">Add Equipment</a>
+            <a href="batch.html">Batch Import</a>
+            <a href="import-db.html">Import Database</a>
+        </div>
+    </div>
+    <span id="login-link"><a href="login.html">Login</a></span>
+    
+        <span id="signup-link"><a href="signup.html" style="color:#44aa44;">Sign Up</a></span>
+        <span id="admin-link" style="display:none;"><a href="admin.html" style="color:#FFD700;font-weight:bold;">Admin Panel</a></span>
+        <span id="logout-link" style="display:none;"><a href="#" onclick="logout()">Logout</a></span>
 </nav>
+<script>document.querySelectorAll('nav a').forEach(function(a){if(a.href.split('/').pop()===location.pathname.split('/').pop())a.style.color='#00FFFF';});</script>
+</div>
 <hr>
+
+<div style="color:#888;font-size:13px;margin-bottom:10px;">
+    <a href="index.html">Search</a> &gt; <span id="breadcrumb-item">Item</span>
+</div>
 
 <div id="item-details">Loading...</div>
 
@@ -68,12 +115,20 @@
     function isEditor() {
         return sessionStorage.getItem('editor_logged_in') === 'true';
     }
-    function logout() {
-        sessionStorage.removeItem('editor_logged_in');
-        location.reload();
-    }
+            if (localStorage.getItem('user_logged_in') === 'true') {
+            document.getElementById('login-link').style.display = 'none';
+            document.getElementById('signup-link').style.display = 'none';
+        }
+        function logout() {
+            sessionStorage.removeItem('editor_logged_in');
+            sessionStorage.removeItem('editor_name');
+            localStorage.removeItem('user_logged_in');
+            localStorage.removeItem('username');
+            location.reload();
+        }
     if (isEditor()) {
-        document.getElementById('editor-links').style.display = 'inline';
+        document.getElementById('editor-dropdown').style.display = 'inline-block';
+        document.getElementById('admin-link').style.display = 'inline';
         document.getElementById('logout-link').style.display = 'inline';
         document.getElementById('login-link').style.display = 'none';
     }
@@ -192,13 +247,16 @@
             html += '<p style="color:#ffaa00;margin-top:10px;">Stats not yet available — awaiting capture from the MUD.</p>';
         }
 
-        // --- Submitter credit ---
-        html += await buildSubmitterCredit(item.name);
-
-        // --- Locations ---
-        html += await buildLocationsHtml(item.name);
+        // --- Submitter credit and locations in parallel ---
+        const [creditHtml, locationsHtml] = await Promise.all([
+            buildSubmitterCredit(item.name),
+            buildLocationsHtml(item.name)
+        ]);
+        html += creditHtml;
+        html += locationsHtml;
 
         document.getElementById('item-details').innerHTML = html;
+        document.getElementById('breadcrumb-item').textContent = escapeHtml(item.name);
 
         // Show editor controls only after item is rendered (and pass name to avoid closure issues)
         if (isEditor()) {
@@ -245,31 +303,20 @@
         uniqueLocations.sort((a, b) => (b.hits || 0) - (a.hits || 0));
         if (uniqueLocations.length === 0) return '';
 
-        // Resolve room names and mob names — all locations in parallel
-        const resolved = await Promise.all(uniqueLocations.map(async loc => {
-            let roomNum = '', roomName = '';
+        // Batch-resolve all mob names in one query instead of one per location
+        const allMobIds = [...new Set(uniqueLocations.map(l => l.mobid).filter(Boolean).map(String))];
+        const mobNameMap = {};
+        if (allMobIds.length > 0) {
+            const { data: mobRows } = await supabase.from('mobs_db').select('mobid, name').in('mobid', allMobIds);
+            if (mobRows) mobRows.forEach(m => { mobNameMap[String(m.mobid)] = m.name; });
+        }
 
-            if (loc.room) {
-                roomName = String(loc.room);
-                const { data: rr } = await supabase.from('rooms_db').select('uid').ilike('name', '%' + roomName.trim() + '%').limit(1);
-                if (rr && rr.length > 0) roomNum = '#' + rr[0].uid;
-            } else if (loc.mobid) {
-                const { data: ml } = await supabase.from('mobsloc_db').select('room').eq('mobid', String(loc.mobid)).limit(1);
-                if (ml && ml.length > 0 && ml[0].room) {
-                    roomName = String(ml[0].room);
-                    const { data: rr } = await supabase.from('rooms_db').select('uid').ilike('name', '%' + roomName.trim() + '%').limit(1);
-                    if (rr && rr.length > 0) roomNum = '#' + rr[0].uid;
-                }
-            }
-
-            let mobName = '';
-            if (loc.mobid) {
-                const { data: mob } = await supabase.from('mobs_db').select('name').eq('mobid', String(loc.mobid)).limit(1);
-                if (mob && mob.length > 0) mobName = mob[0].name;
-            }
-
-            return { loc, roomNum, roomName, mobName };
-        }));
+        // Build resolved list — room name comes directly from itemsloc_db row, no extra queries needed
+        const resolved = uniqueLocations.map(loc => {
+            const roomName = (loc.room && loc.room !== '-') ? String(loc.room) : '';
+            const mobName  = loc.mobid ? (mobNameMap[String(loc.mobid)] || '') : '';
+            return { loc, roomNum: '', roomName, mobName };
+        });
 
         let html = '<h2 style="color:#C0C0C0;margin-top:20px;">Known Locations (' + uniqueLocations.length + ')</h2>';
         html += '<p style="font-size:12px;color:#888;">🟢 5+ hits = confirmed | 🟡 2-4 hits = likely | 🔴 1 hit = possible player drop</p>';
@@ -287,7 +334,7 @@
                 ? '<a href="mob.html?mobid=' + escapeHtml(String(loc.mobid)) + '">' + escapeHtml(mobName) + '</a>'
                 : '-';
             html += '<tr>'
-                + '<td style="padding:5px;border-bottom:1px solid #333;"><a href="zone.html?area=' + encodeURIComponent(loc.area || '') + '">' + escapeHtml(loc.area || '') + '</a></td>'
+                + '<td style="padding:5px;border-bottom:1px solid #333;">' + escapeHtml(loc.area || '') + '</td>'
                 + '<td style="padding:5px;border-bottom:1px solid #333;">' + (roomNum  || '-') + '</td>'
                 + '<td style="padding:5px;border-bottom:1px solid #333;">' + (roomName || '-') + '</td>'
                 + '<td style="padding:5px;border-bottom:1px solid #333;">' + mobCell           + '</td>'

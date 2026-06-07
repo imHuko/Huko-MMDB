@@ -1,105 +1,289 @@
 <!DOCTYPE html>
+
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>Submit Ideas - MUD Equipment DB</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+
     <style>
-        body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+
+        body { font-family: "Inter", sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+
         a { color: #8787FF; }
+
         h1 { color: #C0C0C0; }
-        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; }
-        nav a { margin-right: 15px; }
-        textarea { width: 100%; height: 150px; padding: 10px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; font-family: Arial, sans-serif; box-sizing: border-box; }
+
+        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; }
+
+        nav a { margin-right: 15px; color: #8787FF; text-decoration: none; }
+
+        nav a:hover { color: #C0C0C0; }
+
+        nav .dropdown { position: relative; display: inline-block; margin-right: 15px; }
+
+        nav .dropbtn { cursor: pointer; color: #8787FF; }
+
+        nav .dropdown-content { display: none; position: absolute; top: 100%; left: 0; background: #333; min-width: 160px; border: 1px solid #444; border-radius: 3px; z-index: 1000; }
+
+        nav .dropdown-content a { display: block; padding: 8px 12px; margin: 0; white-space: nowrap; }
+
+        nav .dropdown-content a:hover { background: #444; color: #C0C0C0; }
+
+        nav .dropdown:hover .dropdown-content { display: block; }
+
+        #sticky-header { position: sticky; top: 0; z-index: 100; background: #1a1a1a; }
+
+        textarea { width: 100%; height: 150px; padding: 10px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; font-family: "Inter", sans-serif; box-sizing: border-box; }
+
         input { padding: 8px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; width: 250px; }
+
         button { padding: 8px 16px; background: #8787FF; color: #000; border: none; border-radius: 3px; cursor: pointer; margin-top: 10px; }
+
         .success { color: #44aa44; }
+
     </style>
+
 </head>
+
 <body>
+    <div style="margin-bottom:6px;text-align:center;"><img src="images/logo.png" alt="HukoDB" style="height:130px;"></div>
+    <div id="sticky-header">
+
     <nav>
+
         <a href="index.html">Search</a>
-        <a href="info.html">About</a>
-        <a href="ideas.html">Ideas</a>
+
+        <a href="zones.html">Zones</a>
+
         <a href="leaderboard.html">Leaderboard</a>
-        <span id="editor-links" style="display:none;">
-            <a href="import.html">Add Equipment</a>
-            <a href="batch.html">Batch Import</a>
-            <a href="import-db.html">Import Database</a>
-            <a href="admin.html">Admin</a>
-        </span>
-        <span id="login-link"><a href="login.html">Editor Login</a></span>
+
+        
+        <div class="dropdown">
+            <span class="dropbtn">Games ▼</span>
+            <div class="dropdown-content">
+                <a href="daily.html">Daily</a>
+                <a href="zonequiz.html">Zone Quiz</a>
+                <a href="mobguess.html">Mob Guess</a>
+            </div>
+        </div>
+
+
+        <div class="dropdown">
+
+            <span class="dropbtn">Community Tools ▼</span>
+
+            <div class="dropdown-content">
+
+                <a href="market.html">Market</a>
+
+                <a href="lfg.html">LFG</a>
+
+            </div>
+
+        </div>
+
+        <div class="dropdown">
+
+            <span class="dropbtn">More ▼</span>
+
+            <div class="dropdown-content">
+
+                <a href="info.html">About</a>
+
+                <a href="ideas.html">Ideas</a>
+
+            </div>
+
+        </div>
+
+        <div class="dropdown" id="editor-dropdown" style="display:none;">
+
+            <span class="dropbtn">Editor ▼</span>
+
+            <div class="dropdown-content">
+
+                <a href="import.html">Add Equipment</a>
+
+                <a href="batch.html">Batch Import</a>
+
+                <a href="import-db.html">Import Database</a>
+
+            </div>
+
+        </div>
+
+        <span id="login-link"><a href="login.html">Login</a></span>
+
+        
+        <span id="signup-link"><a href="signup.html" style="color:#44aa44;">Sign Up</a></span>
+        <span id="admin-link" style="display:none;"><a href="admin.html" style="color:#FFD700;font-weight:bold;">Admin Panel</a></span>
         <span id="logout-link" style="display:none;"><a href="#" onclick="logout()">Logout</a></span>
+
     </nav>
+
+    <script>document.querySelectorAll('nav a').forEach(function(a){if(a.href.split('/').pop()===location.pathname.split('/').pop())a.style.color='#00FFFF';});</script>
+
+    </div>
+
+    <h2>Submit Ideas</h2>
+
     <hr>
 
-    <h1>Submit Ideas</h1>
     <p>Have a feature request, bug report, or suggestion? Submit it here!</p>
+
     
+
     <input type="text" id="submitter-name" placeholder="Your name (optional)" maxlength="50"><br>
+
     <textarea id="idea-text" placeholder="Describe your idea..."></textarea><br>
+
     <button id="submit-btn">Submit Idea</button>
+
     <p id="message"></p>
+
     <p><a href="index.html">← Back to search</a></p>
 
+
+
     <script type="module">
+
         var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
+
         var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
+
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
         var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
         
+
         document.getElementById('submit-btn').addEventListener('click', async function() {
+
             var text = document.getElementById('idea-text').value.trim();
+
             var name = document.getElementById('submitter-name').value.trim() || 'anonymous';
+
             
+
             if (!text) { document.getElementById('message').textContent = 'Please enter your idea.'; return; }
+
             
+
             var result = await supabase.from('ideas').insert({ idea_text: text, submitted_by: name });
+
             if (result.error) {
+
                 document.getElementById('message').innerHTML = '<span style="color:#ff4444;">Error: ' + result.error.message + '</span>';
+
             } else {
+
                 document.getElementById('idea-text').value = '';
+
                 document.getElementById('message').innerHTML = '<span class="success">Idea submitted! Thank you.</span>';
+
             }
+
         });
+
     </script>
+
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"131579fcdf914a0f9aa2fb16db7f327e","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
     <script>
+
         if (sessionStorage.getItem('editor_logged_in') === 'true') {
-            document.getElementById('editor-links').style.display = 'inline';
+
+            document.getElementById('editor-dropdown').style.display = 'inline-block';
+
+            document.getElementById('admin-link').style.display = 'inline';
+
             document.getElementById('logout-link').style.display = 'inline';
+
             document.getElementById('login-link').style.display = 'none';
+            document.getElementById('signup-link').style.display = 'none';
+
         }
-        function logout() { sessionStorage.removeItem('editor_logged_in'); location.reload(); }
+
+                if (localStorage.getItem('user_logged_in') === 'true') {
+            document.getElementById('login-link').style.display = 'none';
+            document.getElementById('signup-link').style.display = 'none';
+        }
+        function logout() {
+            sessionStorage.removeItem('editor_logged_in');
+            sessionStorage.removeItem('editor_name');
+            localStorage.removeItem('user_logged_in');
+            localStorage.removeItem('username');
+            location.reload();
+        }
+
     </script>
+
 <style>
+
 #bug-btn-container{text-align:center;padding:10px 0;margin-top:20px;}
+
 #bug-btn{background:#ff4444;color:white;border:none;border-radius:3px;padding:8px 16px;cursor:pointer;font-size:13px;}
+
 #bug-btn:hover{background:#cc0000;}
+
 #bug-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:none;align-items:center;justify-content:center;}
+
 #bug-modal-content{background:#1a1a1a;border:2px solid #555;border-radius:10px;padding:20px;width:90%;max-width:500px;color:#ccc;}
+
 #bug-modal-content h3{margin:0 0 10px;color:#ff4444;}
+
 #bug-modal-content textarea{width:100%;height:120px;padding:8px;background:#333;color:#ccc;border:1px solid #555;border-radius:3px;box-sizing:border-box;margin:10px 0;font-family:Arial,sans-serif;}
+
 #bug-modal-content .bug-url{color:#888;font-size:12px;word-break:break-all;}
+
 #bug-modal-content .btn-row{display:flex;gap:10px;justify-content:flex-end;}
+
 #bug-modal-content .btn-submit{background:#ff4444;color:white;border:none;border-radius:3px;padding:8px 16px;cursor:pointer;}
+
 #bug-modal-content .btn-cancel{background:#666;color:white;border:none;border-radius:3px;padding:8px 16px;cursor:pointer;}
+
 #bug-modal-content .btn-submit:disabled{opacity:0.5;cursor:not-allowed;}
+
 #bug-modal-content .bug-msg{margin:10px 0 0;font-size:13px;}
+
 </style>
+
 <div id="bug-btn-container"><button id="bug-btn" onclick="openBugReport()">Report Bug</button></div>
+
 <div id="bug-modal" onclick="if(event.target===this)closeBugReport()">
+
   <div id="bug-modal-content">
+
     <h3>Report Bug</h3>
+
     <p class="bug-url">Page: <span id="bug-page-url"></span></p>
+
     <textarea id="bug-description" placeholder="Describe what went wrong..."></textarea>
+
     <div class="btn-row">
+
       <button class="btn-cancel" onclick="closeBugReport()">Cancel</button>
+
       <button class="btn-submit" id="bug-submit-btn" onclick="submitBugReport()">Submit</button>
+
     </div>
+
     <p class="bug-msg" id="bug-msg"></p>
+
   </div>
+
 </div>
+
 <script>
     var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
     var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
@@ -140,5 +324,7 @@
         }
     };
 </script>
+
 </body>
+
 </html>

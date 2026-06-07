@@ -3,138 +3,202 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Editor Login - MUD Equipment DB</title>
+    <title>Login - MUD Equipment DB</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: Arial, sans-serif; max-width: 400px; margin: 100px auto; padding: 20px; background: #1a1a1a; color: #ccc; text-align: center; }
+        body { font-family: "Inter", sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; text-align: center; }
         a { color: #8787FF; }
-        h1 { color: #C0C0C0; }
-        input { padding: 8px; width: 250px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; margin: 5px; }
+        h1, h2 { color: #C0C0C0; }
+        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; }
+        nav a { margin-right: 15px; color: #8787FF; text-decoration: none; }
+        nav a:hover { color: #C0C0C0; }
+        nav .dropdown { position: relative; display: inline-block; margin-right: 15px; }
+        nav .dropbtn { cursor: pointer; color: #8787FF; }
+        nav .dropdown-content { display: none; position: absolute; top: 100%; left: 0; background: #333; min-width: 160px; border: 1px solid #444; border-radius: 3px; z-index: 1000; }
+        nav .dropdown-content a { display: block; padding: 8px 12px; margin: 0; white-space: nowrap; }
+        nav .dropdown-content a:hover { background: #444; color: #C0C0C0; }
+        nav .dropdown:hover .dropdown-content { display: block; }
+        #sticky-header { position: sticky; top: 0; z-index: 100; background: #1a1a1a; }
+        input { padding: 8px; width: 250px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; margin: 5px; box-sizing: border-box; }
         button { padding: 8px 16px; background: #8787FF; color: #000; border: none; border-radius: 3px; cursor: pointer; margin: 5px; }
         .error { color: #ff4444; }
         .success { color: #44aa44; }
+        .tab-bar { display: flex; gap: 0; margin: 15px 0; border-bottom: 1px solid #444; }
+        .tab-bar button { flex: 1; background: #222; color: #888; border: 1px solid #444; border-bottom: none; border-radius: 5px 5px 0 0; padding: 10px; cursor: pointer; font-size: 14px; margin: 0; }
+        .tab-bar button.active { background: #333; color: #ccc; border-color: #8787FF; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        hr { border: none; border-top: 1px solid #333; margin: 20px 0; }
     </style>
 </head>
 <body>
-    <h1>Editor Login</h1>
-    <p>Enter the editor password to access admin features.</p>
-    <input type="text" id="editor-name" placeholder="Your name (optional)" style="width:250px;"><br>
-    <input type="password" id="password" placeholder="Editor password" onkeypress="if(event.key==='Enter')document.getElementById('login-btn').click()"><br>
-    <button id="login-btn">Login</button>
-    <p id="message"></p>
+    <div style="margin-bottom:6px;text-align:center;"><img src="images/logo.png" alt="HukoDB" style="height:130px;"></div>
+    <div id="sticky-header">
     <nav>
         <a href="index.html">Search</a>
-        <a href="info.html">About</a>
-        <a href="ideas.html">Ideas</a>
+        <a href="zones.html">Zones</a>
         <a href="leaderboard.html">Leaderboard</a>
-        <span id="editor-links" style="display:none;">
-            <a href="import.html">Add Equipment</a>
-            <a href="batch.html">Batch Import</a>
-            <a href="import-db.html">Import Database</a>
-            <a href="admin.html">Admin</a>
-        </span>
-        <span id="login-link"><a href="login.html">Editor Login</a></span>
+        <div class="dropdown">
+            <span class="dropbtn">Games ▼</span>
+            <div class="dropdown-content">
+                <a href="daily.html">Daily</a>
+                <a href="zonequiz.html">Zone Quiz</a>
+                <a href="mobguess.html">Mob Guess</a>
+            </div>
+        </div>
+        <div class="dropdown">
+            <span class="dropbtn">Community Tools ▼</span>
+            <div class="dropdown-content">
+                <a href="market.html">Market</a>
+                <a href="lfg.html">LFG</a>
+            </div>
+        </div>
+        <div class="dropdown">
+            <span class="dropbtn">More ▼</span>
+            <div class="dropdown-content">
+                <a href="info.html">About</a>
+                <a href="ideas.html">Ideas</a>
+            </div>
+        </div>
+        <div class="dropdown" id="editor-dropdown" style="display:none;">
+            <span class="dropbtn">Editor ▼</span>
+            <div class="dropdown-content">
+                <a href="import.html">Add Equipment</a>
+                <a href="batch.html">Batch Import</a>
+                <a href="import-db.html">Import Database</a>
+            </div>
+        </div>
+        <span id="login-link"><a href="login.html">Login</a></span>
+        <span id="signup-link"><a href="signup.html" style="color:#44aa44;">Sign Up</a></span>
+        <span id="admin-link" style="display:none;"><a href="admin.html" style="color:#FFD700;font-weight:bold;">Admin Panel</a></span>
         <span id="logout-link" style="display:none;"><a href="#" onclick="logout()">Logout</a></span>
     </nav>
+    <script>document.querySelectorAll('nav a').forEach(function(a){if(a.href.split('/').pop()===location.pathname.split('/').pop())a.style.color='#00FFFF';});</script>
+    </div>
+
+    <h2>Login</h2>
+    <hr>
+
+    <div class="tab-bar">
+        <button class="active" id="tab-user" onclick="switchTab('user')">User Login</button>
+        <button id="tab-editor" onclick="switchTab('editor')">Editor Login</button>
+    </div>
+
+    <div class="tab-content active" id="content-user">
+        <p style="color:#888;font-size:13px;">Log in to your account to earn points and track progress.</p>
+        <div>
+            <input type="text" id="user-username" placeholder="Username" autocomplete="off">
+            <br>
+            <input type="password" id="user-password" placeholder="Password">
+            <br>
+            <button id="user-login-btn">Login</button>
+        </div>
+        <p id="user-message" style="margin-top:10px;"></p>
+        <p style="font-size:13px;">No account? <a href="signup.html">Sign up</a></p>
+    </div>
+
+    <div class="tab-content" id="content-editor">
+        <p style="color:#888;font-size:13px;">Editor login for administrators and content contributors.</p>
+        <div>
+            <input type="text" id="editor-name" placeholder="Your name (optional)" style="width:250px;">
+            <br>
+            <input type="password" id="password" placeholder="Editor password" style="width:250px;">
+            <br>
+            <button id="login-btn">Login</button>
+        </div>
+        <p id="editor-message" style="margin-top:10px;"></p>
+    </div>
 
     <script type="module">
         var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
         var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
         var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        
+
+        // ── User login ──
+        async function hashPassword(password, username) {
+            var encoder = new TextEncoder();
+            var data = encoder.encode(password + ':' + username.toLowerCase() + ':hukodb');
+            var hash = await crypto.subtle.digest('SHA-256', data);
+            return Array.from(new Uint8Array(hash)).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+        }
+
+        document.getElementById('user-login-btn').addEventListener('click', async function() {
+            var msg = document.getElementById('user-message');
+            var username = document.getElementById('user-username').value.trim();
+            var password = document.getElementById('user-password').value;
+
+            if (!username || !password) { msg.innerHTML = '<span class="error">Enter username and password.</span>'; return; }
+
+            msg.innerHTML = '<span style="color:#888;">Logging in...</span>';
+
+            var hash = await hashPassword(password, username);
+            var result = await supabase.from('accounts').select('username, points').eq('username', username).eq('password_hash', hash).limit(1);
+
+            if (result.error) {
+                msg.innerHTML = '<span class="error">Error: ' + result.error.message + '</span>';
+            } else if (!result.data || result.data.length === 0) {
+                msg.innerHTML = '<span class="error">Wrong username or password.</span>';
+            } else {
+                localStorage.setItem('user_logged_in', 'true');
+                localStorage.setItem('username', username);
+                msg.innerHTML = '<span class="success">Logged in as ' + username + '!</span>';
+                document.getElementById('user-login-btn').disabled = true;
+                setTimeout(function() { window.location.href = 'index.html'; }, 1000);
+            }
+        });
+
+        // ── Editor login ──
         document.getElementById('login-btn').addEventListener('click', async function() {
+            var msg = document.getElementById('editor-message');
             var pw = document.getElementById('password').value;
             var name = document.getElementById('editor-name').value.trim() || 'editor';
-            
-            if (!pw) { document.getElementById('message').innerHTML = '<span class="error">Enter password.</span>'; return; }
-            
+
+            if (!pw) { msg.innerHTML = '<span class="error">Enter password.</span>'; return; }
+
+            msg.innerHTML = '<span style="color:#888;">Logging in...</span>';
+
             var result = await supabase.from('admins').select('*').eq('password', pw).limit(1);
+
             if (result.error || !result.data || result.data.length === 0) {
-                document.getElementById('message').innerHTML = '<span class="error">Wrong password.</span>';
+                msg.innerHTML = '<span class="error">Wrong password.</span>';
                 return;
             }
-            
+
             sessionStorage.setItem('editor_logged_in', 'true');
             sessionStorage.setItem('editor_name', name);
-            document.getElementById('message').innerHTML = '<span class="success">Logged in as ' + name + '! <a href="index.html">Go to search</a></span>';
+            msg.innerHTML = '<span class="success">Logged in as ' + name + '! <a href="index.html">Go to search</a></span>';
         });
     </script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"131579fcdf914a0f9aa2fb16db7f327e","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+
     <script>
+        window.switchTab = function(tab) {
+            document.querySelectorAll('.tab-bar button').forEach(function(b) { b.classList.remove('active'); });
+            document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
+            document.getElementById('tab-' + tab).classList.add('active');
+            document.getElementById('content-' + tab).classList.add('active');
+        };
+
         if (sessionStorage.getItem('editor_logged_in') === 'true') {
-            document.getElementById('editor-links').style.display = 'inline';
+            document.getElementById('editor-dropdown').style.display = 'inline-block';
+            document.getElementById('admin-link').style.display = 'inline';
             document.getElementById('logout-link').style.display = 'inline';
             document.getElementById('login-link').style.display = 'none';
+            document.getElementById('signup-link').style.display = 'none';
         }
-        function logout() { sessionStorage.removeItem('editor_logged_in'); location.reload(); }
+        if (localStorage.getItem('user_logged_in') === 'true') {
+            document.getElementById('login-link').style.display = 'none';
+            document.getElementById('signup-link').style.display = 'none';
+        }
+        function logout() {
+            sessionStorage.removeItem('editor_logged_in');
+            sessionStorage.removeItem('editor_name');
+            localStorage.removeItem('user_logged_in');
+            localStorage.removeItem('username');
+            location.reload();
+        }
     </script>
-<style>
-#bug-btn-container{text-align:center;padding:10px 0;margin-top:20px;}
-#bug-btn{background:#ff4444;color:white;border:none;border-radius:3px;padding:8px 16px;cursor:pointer;font-size:13px;}
-#bug-btn:hover{background:#cc0000;}
-#bug-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:none;align-items:center;justify-content:center;}
-#bug-modal-content{background:#1a1a1a;border:2px solid #555;border-radius:10px;padding:20px;width:90%;max-width:500px;color:#ccc;}
-#bug-modal-content h3{margin:0 0 10px;color:#ff4444;}
-#bug-modal-content textarea{width:100%;height:120px;padding:8px;background:#333;color:#ccc;border:1px solid #555;border-radius:3px;box-sizing:border-box;margin:10px 0;font-family:Arial,sans-serif;}
-#bug-modal-content .bug-url{color:#888;font-size:12px;word-break:break-all;}
-#bug-modal-content .btn-row{display:flex;gap:10px;justify-content:flex-end;}
-#bug-modal-content .btn-submit{background:#ff4444;color:white;border:none;border-radius:3px;padding:8px 16px;cursor:pointer;}
-#bug-modal-content .btn-cancel{background:#666;color:white;border:none;border-radius:3px;padding:8px 16px;cursor:pointer;}
-#bug-modal-content .btn-submit:disabled{opacity:0.5;cursor:not-allowed;}
-#bug-modal-content .bug-msg{margin:10px 0 0;font-size:13px;}
-</style>
-<div id="bug-btn-container"><button id="bug-btn" onclick="openBugReport()">Report Bug</button></div>
-<div id="bug-modal" onclick="if(event.target===this)closeBugReport()">
-  <div id="bug-modal-content">
-    <h3>Report Bug</h3>
-    <p class="bug-url">Page: <span id="bug-page-url"></span></p>
-    <textarea id="bug-description" placeholder="Describe what went wrong..."></textarea>
-    <div class="btn-row">
-      <button class="btn-cancel" onclick="closeBugReport()">Cancel</button>
-      <button class="btn-submit" id="bug-submit-btn" onclick="submitBugReport()">Submit</button>
-    </div>
-    <p class="bug-msg" id="bug-msg"></p>
-  </div>
-</div>
-<script>
-    var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
-    var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
-    window.openBugReport = function() {
-        document.getElementById('bug-page-url').textContent = window.location.href;
-        document.getElementById('bug-description').value = '';
-        document.getElementById('bug-msg').textContent = '';
-        document.getElementById('bug-modal').style.display = 'flex';
-        document.getElementById('bug-submit-btn').disabled = false;
-    };
-    window.closeBugReport = function() {
-        document.getElementById('bug-modal').style.display = 'none';
-    };
-    window.submitBugReport = async function() {
-        var d = document.getElementById('bug-description').value.trim();
-        if (!d) { document.getElementById('bug-msg').innerHTML = '<span style="color:#ff4444;">Please describe the bug.</span>'; return; }
-        var b = document.getElementById('bug-submit-btn');
-        b.disabled = true;
-        document.getElementById('bug-msg').innerHTML = '<span style="color:#888;">Submitting...</span>';
-        try {
-            var r = await fetch(SUPABASE_URL + '/rest/v1/bug_reports', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY, 'Prefer': 'return=representation' },
-                body: JSON.stringify({ page_url: window.location.href, description: d })
-            });
-            if (r.ok || r.status === 201) {
-                document.getElementById('bug-msg').innerHTML = '<span style="color:#44aa44;">Bug reported! Thank you.</span>';
-                document.getElementById('bug-description').value = '';
-                setTimeout(window.closeBugReport, 2000);
-            } else {
-                var txt = await r.text();
-                document.getElementById('bug-msg').innerHTML = '<span style="color:#ff4444;">Error: ' + (txt || r.statusText) + '</span>';
-                b.disabled = false;
-            }
-        } catch(e) {
-            document.getElementById('bug-msg').innerHTML = '<span style="color:#ff4444;">Error: ' + e.message + '</span>';
-            b.disabled = false;
-        }
-    };
-</script>
 </body>
 </html>

@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign Up - MUD Equipment DB</title>
+    <title>My Account - MUD Equipment DB</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: "Inter", sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; text-align: center; }
+        body { font-family: "Inter", sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
         a { color: #8787FF; }
         h1, h2 { color: #C0C0C0; }
         nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; }
@@ -21,11 +21,11 @@
         nav .dropdown-content a:hover { background: #444; color: #C0C0C0; }
         nav .dropdown:hover .dropdown-content { display: block; }
         #sticky-header { position: sticky; top: 0; z-index: 100; background: #1a1a1a; }
-        input { padding: 8px; width: 250px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; margin: 5px; box-sizing: border-box; }
-        button { padding: 8px 16px; background: #8787FF; color: #000; border: none; border-radius: 3px; cursor: pointer; margin: 5px; }
-        .error { color: #ff4444; }
-        .success { color: #44aa44; }
-        .info { color: #888; font-size: 12px; margin: 10px 0; }
+        .stat-row { display: flex; gap: 12px; flex-wrap: wrap; margin: 15px 0; }
+        .stat-box { background: #222; padding: 12px 20px; border-radius: 5px; text-align: center; border: 1px solid #333; min-width: 80px; }
+        .stat-box .num { font-size: 24px; font-weight: bold; color: #8787FF; }
+        .stat-box .lbl { font-size: 11px; color: #888; margin-top: 3px; }
+        .section { margin: 20px 0; padding: 15px; background: #222; border-radius: 5px; }
     </style>
 </head>
 <body>
@@ -73,24 +73,39 @@
     <script>document.querySelectorAll('nav a').forEach(function(a){if(a.href.split('/').pop()===location.pathname.split('/').pop())a.style.color='#00FFFF';});</script>
     </div>
 
-    <h2>Create Account</h2>
-    <hr>
-
-    <p class="info">No email required. Pick a username and password. Your password is scrambled before being stored — we never see the original.</p>
-
-    <p id="message"></p>
-
-    <div>
-        <input type="text" id="username" placeholder="Username" maxlength="30" autocomplete="off">
-        <br>
-        <input type="password" id="password" placeholder="Password (min 4 characters)" minlength="4">
-        <br>
-        <input type="password" id="confirm" placeholder="Confirm password">
-        <br>
-        <button id="signup-btn">Create Account</button>
+    <div id="not-logged-in" style="display:none;">
+        <h2>My Account</h2>
+        <hr>
+        <p style="color:#888;">You are not logged in. <a href="login.html">Login</a> or <a href="signup.html">create an account</a>.</p>
     </div>
 
-    <p style="margin-top:15px;font-size:13px;">Already have an account? <a href="login.html">Login</a></p>
+    <div id="account-content" style="display:none;">
+        <h2>My Account</h2>
+        <hr>
+
+        <div class="section">
+            <h2 id="account-username" style="margin-top:0;"></h2>
+            <div class="stat-row">
+                <div class="stat-box"><div class="num" id="account-points">0</div><div class="lbl">Points</div></div>
+                <div class="stat-box"><div class="num" id="account-joined">-</div><div class="lbl">Member since</div></div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 style="margin-top:0;">Your Data</h2>
+            <p style="color:#888;font-size:13px;">Only your username, a scrambled password hash, and point total are stored. No email, no IP logging, no personal information. <a href="info.html">Learn more</a></p>
+        </div>
+
+        <div class="section">
+            <h2 style="margin-top:0;">Coming Soon</h2>
+            <ul style="color:#888;font-size:13px;">
+                <li>Earn points by playing Daily, Zone Quiz, and Mob Guess</li>
+                <li>Track your game stats and leaderboard rank</li>
+                <li>Submit item corrections for points</li>
+                <li>Redeem points for ... something cool</li>
+            </ul>
+        </div>
+    </div>
 
     <script type="module">
         var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
@@ -98,49 +113,22 @@
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
         var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        async function hashPassword(password, username) {
-            var encoder = new TextEncoder();
-            var data = encoder.encode(password + ':' + username.toLowerCase() + ':hukodb');
-            var hash = await crypto.subtle.digest('SHA-256', data);
-            return Array.from(new Uint8Array(hash)).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
-        }
+        var username = localStorage.getItem('username');
+        if (username && localStorage.getItem('user_logged_in') === 'true') {
+            document.getElementById('not-logged-in').style.display = 'none';
+            document.getElementById('account-content').style.display = 'block';
+            document.getElementById('account-username').textContent = username;
 
-        document.getElementById('signup-btn').addEventListener('click', async function() {
-            var msg = document.getElementById('message');
-            var username = document.getElementById('username').value.trim();
-            var password = document.getElementById('password').value;
-            var confirm = document.getElementById('confirm').value;
-
-            if (!username || username.length < 2) { msg.innerHTML = '<span class="error">Username must be at least 2 characters.</span>'; return; }
-            if (!/^[a-zA-Z0-9_]+$/.test(username)) { msg.innerHTML = '<span class="error">Username can only contain letters, numbers, and underscores.</span>'; return; }
-            if (password.length < 4) { msg.innerHTML = '<span class="error">Password must be at least 4 characters.</span>'; return; }
-            if (password !== confirm) { msg.innerHTML = '<span class="error">Passwords do not match.</span>'; return; }
-
-            msg.innerHTML = '<span style="color:#888;">Creating account...</span>';
-
-            var existing = await supabase.from('accounts').select('id').eq('username', username).limit(1);
-            if (existing.data && existing.data.length > 0) {
-                msg.innerHTML = '<span class="error">Username already taken.</span>';
-                return;
-            }
-
-            var hash = await hashPassword(password, username);
-            var result = await supabase.from('accounts').insert({ username: username, password_hash: hash });
-
-            if (result.error) {
-                if (result.error.code === '23505') {
-                    msg.innerHTML = '<span class="error">Username already taken.</span>';
-                } else {
-                    msg.innerHTML = '<span class="error">Error: ' + result.error.message + '</span>';
+            var result = await supabase.from('accounts').select('points, created_at').eq('username', username).single();
+            if (result.data) {
+                document.getElementById('account-points').textContent = result.data.points || 0;
+                if (result.data.created_at) {
+                    document.getElementById('account-joined').textContent = new Date(result.data.created_at).toLocaleDateString();
                 }
-            } else {
-                localStorage.setItem('user_logged_in', 'true');
-                localStorage.setItem('username', username);
-                msg.innerHTML = '<span class="success">Account created! Welcome, ' + username + '.</span>';
-                document.getElementById('signup-btn').disabled = true;
-                setTimeout(function() { window.location.href = 'index.html'; }, 1500);
             }
-        });
+        } else {
+            document.getElementById('not-logged-in').style.display = 'block';
+        }
     </script>
 
     <script>
@@ -149,6 +137,7 @@
             document.getElementById('admin-link').style.display = 'inline';
             document.getElementById('logout-link').style.display = 'inline';
             document.getElementById('login-link').style.display = 'none';
+            document.getElementById('signup-link').style.display = 'none';
         }
         if (localStorage.getItem('user_logged_in') === 'true') {
             document.getElementById('login-link').style.display = 'none';
@@ -156,6 +145,7 @@
         }
         function logout() {
             sessionStorage.removeItem('editor_logged_in');
+            sessionStorage.removeItem('editor_name');
             localStorage.removeItem('user_logged_in');
             localStorage.removeItem('username');
             location.reload();

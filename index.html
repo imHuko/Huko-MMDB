@@ -4,23 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MUD Equipment Database</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+        body { font-family: "Inter", sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
         a { color: #8787FF; }
         h1 { color: #C0C0C0; }
-        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; }
-        nav a { margin-right: 15px; }
-        .item-card { border: 1px solid #444; margin: 10px 0; padding: 15px; border-radius: 5px; background: #1a1a1a; position: relative; }
-        .item-card:hover { border-color: #666; }
-        #item-tooltip { position: fixed; z-index: 9999; background: #111; border: 1px solid #555; border-radius: 6px; padding: 12px 14px; max-width: 380px; min-width: 200px; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.5; pointer-events: none; display: none; box-shadow: 0 4px 20px rgba(0,0,0,0.8); }
-        #item-tooltip .mm-cyan   { color: #00FFFF; }
-        #item-tooltip .mm-yellow { color: #FFFF00; }
-        #item-tooltip .mm-red    { color: #FF0000; }
-        #item-tooltip .mm-green  { color: #00FF00; }
-        #item-tooltip .mm-blue   { color: #8787FF; }
-        #item-tooltip .mm-pink   { color: #D78787; }
-        #item-tooltip .mm-white  { color: #C0C0C0; }
-        #item-tooltip .tt-loading { color: #555; font-style: italic; }
+        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; }
+        nav a { margin-right: 15px; color: #8787FF; text-decoration: none; }
+        nav a:hover { color: #C0C0C0; }
+        nav .dropdown { position: relative; display: inline-block; margin-right: 15px; }
+        nav .dropbtn { cursor: pointer; color: #8787FF; }
+        nav .dropdown-content { display: none; position: absolute; top: 100%; left: 0; background: #333; min-width: 160px; border: 1px solid #444; border-radius: 3px; z-index: 1000; }
+        nav .dropdown-content a { display: block; padding: 8px 12px; margin: 0; white-space: nowrap; }
+        nav .dropdown-content a:hover { background: #444; color: #C0C0C0; }
+        nav .dropdown:hover .dropdown-content { display: block; }
+        .item-card { border: 1px solid #444; margin: 10px 0; padding: 15px; border-radius: 5px; background: #1a1a1a; }
         .item-card h3 { margin: 0 0 5px 0; }
         .item-card h3 a { color: #C0C0C0; text-decoration: none; }
         .item-card h3 a:hover { text-decoration: underline; }
@@ -30,28 +30,85 @@
         .search-bar button { cursor: pointer; background: #8787FF; color: #000; border: none; }
         #advanced-filters { margin: 10px 0; padding: 10px; background: #222; border-radius: 5px; }
         #advanced-filters select, #advanced-filters input { padding: 6px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; margin: 3px; }
+        #sticky-header { position: sticky; top: 0; z-index: 100; background: #1a1a1a; }
+        #sticky-filters { background: #1a1a1a; padding-bottom: 8px; }
+        .main-content { display: flex; gap: 20px; align-items: flex-start; }
+        #results { flex: 1; min-width: 0; }
+        .sidebar { width: 220px; flex-shrink: 0; }
+        .sidebar-section { background: #222; border: 1px solid #333; border-radius: 5px; margin-bottom: 12px; overflow: hidden; }
+        .sidebar-section h4 { margin: 0; padding: 8px 10px; background: #2a2a2a; color: #888; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
+        .sidebar-section h4 a { color: #8787FF; font-size: 11px; text-transform: none; letter-spacing: 0; font-weight: normal; }
+        .sidebar-entry { padding: 7px 10px; border-bottom: 1px solid #2a2a2a; font-size: 12px; }
+        .sidebar-entry:last-child { border-bottom: none; }
+        .sidebar-entry a { color: #C0C0C0; text-decoration: none; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sidebar-entry a:hover { color: #8787FF; }
+        .sidebar-entry .meta { color: #555; font-size: 11px; margin-top: 2px; }
+        .badge-need     { color: #ff8800; font-size: 10px; font-weight: bold; }
+        .badge-offer    { color: #44aa44; font-size: 10px; font-weight: bold; }
+        .badge-run      { color: #8787FF; font-size: 10px; font-weight: bold; }
+        .badge-interest { color: #aa44aa; font-size: 10px; font-weight: bold; }
+        .badge-sell     { color: #44aa44; font-size: 10px; font-weight: bold; }
+        .badge-buy      { color: #8787FF; font-size: 10px; font-weight: bold; }
+        .badge-trade    { color: #ffaa00; font-size: 10px; font-weight: bold; }
+        .sidebar-empty  { padding: 10px; font-size: 12px; color: #444; text-align: center; font-style: italic; }
+        #item-tooltip { position: fixed; z-index: 9999; background: #111; border: 1px solid #555; border-radius: 6px; padding: 12px 14px; max-width: 380px; min-width: 200px; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.5; pointer-events: none; display: none; box-shadow: 0 4px 20px rgba(0,0,0,0.8); }
+        #item-tooltip .mm-cyan   { color: #00FFFF; }
+        #item-tooltip .mm-yellow { color: #FFFF00; }
+        #item-tooltip .mm-red    { color: #FF0000; }
+        #item-tooltip .mm-green  { color: #00FF00; }
+        #item-tooltip .mm-blue   { color: #8787FF; }
+        #item-tooltip .mm-pink   { color: #D78787; }
+        #item-tooltip .mm-white  { color: #C0C0C0; }
+        #item-tooltip .tt-loading { color: #555; font-style: italic; }
+        @media (max-width: 900px) { .main-content { flex-direction: column; } .sidebar { width: auto; position: static; } }
     </style>
 </head>
 <body>
-    <h1>MUD Equipment Database</h1>
+    <div style="margin-bottom:6px;text-align:center;"><img src="images/logo.png" alt="HukoDB" style="height:130px;"></div>
+    <div id="sticky-header">
     <nav>
         <a href="index.html">Search</a>
-        <a href="info.html">About</a>
-        <a href="ideas.html">Ideas</a>
-        <span id="editor-links" style="display:none;">
-            <a href="import.html">Add Equipment</a>
-            <a href="batch.html">Batch Import</a>
-            <a href="import-db.html">Import Database</a>
-            <a href="admin.html">Admin</a>
-        </span>
-        <span id="login-link">
-            <a href="login.html">Editor Login</a>
-        </span>
-        <span id="logout-link" style="display:none;">
-            <a href="#" onclick="logout()">Logout</a>
-        </span>
-    </nav>
+        <a href="zones.html">Zones</a>
+        <a href="leaderboard.html">Leaderboard</a>
+        
+        <div class="dropdown">
+            <span class="dropbtn">Games ▼</span>
+            <div class="dropdown-content">
+                <a href="daily.html">Daily</a>
+                <a href="zonequiz.html">Zone Quiz</a>
+                <a href="mobguess.html">Mob Guess</a>
+            </div>
+        </div>
 
+        <div class="dropdown">
+            <span class="dropbtn">Community Tools ▼</span>
+            <div class="dropdown-content">
+                <a href="market.html">Market</a>
+                <a href="lfg.html">LFG</a>
+            </div>
+        </div>
+        <div class="dropdown">
+            <span class="dropbtn">More ▼</span>
+            <div class="dropdown-content">
+                <a href="info.html">About</a>
+                <a href="ideas.html">Ideas</a>
+            </div>
+        </div>
+        <div class="dropdown" id="editor-dropdown" style="display:none;">
+            <span class="dropbtn">Editor ▼</span>
+            <div class="dropdown-content">
+                <a href="import.html">Add Equipment</a>
+                <a href="batch.html">Batch Import</a>
+                <a href="import-db.html">Import Database</a>
+            </div>
+        </div>
+        <span id="login-link"><a href="login.html">Login</a></span>
+        <span id="signup-link"><a href="signup.html" style="color:#44aa44;">Sign Up</a></span>
+        <span id="admin-link" style="display:none;"><a href="admin.html" style="color:#FFD700;font-weight:bold;">Admin Panel</a></span>
+        <span id="logout-link" style="display:none;"><a href="#" onclick="logout()">Logout</a></span>
+    </nav>
+    <script>document.querySelectorAll('nav a').forEach(function(a){if(a.href&&a.href.split('/').pop()===location.pathname.split('/').pop())a.style.color='#00FFFF';});</script>
+    <div id="sticky-filters">
     <div class="search-bar">
         <input type="text" id="search-input" placeholder="Search equipment..." style="width:250px;">
         <button id="search-btn">Search</button>
@@ -60,7 +117,8 @@
         <button id="reset-btn">Reset</button>
         <button id="toggle-filters-btn" style="background:#555;">+ Filters</button>
     </div>
-    
+    <p style="color:#888;font-size:12px;font-style:italic;margin:2px 0 0 0;">Disclaimer: Item, mob, and zone data may be inaccurate due to how Materia Magica's database records them.</p>
+    <p style="color:#888;font-size:12px;font-style:italic;margin:0 0 6px 0;">Check out the <a href="info.html" style="color:#8787FF;">About</a> page to learn how the addon and site works</p>
     <div id="advanced-filters" style="display:none;">
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
             <select id="filter-type">
@@ -148,12 +206,40 @@
             <datalist id="affect-list"></datalist>
         </div>
     </div>
+    </div>
+    </div>
 
-    <p style="color:#888;text-align:center;">Thanks for visiting the UNOFFICIAL Materia Magica Equipment Database!</p>
-    <hr>
-
+    <div class="main-content">
     <div id="results">
-        <p style="color:#888;">Use the search bar above or click Search to browse all items.</p>
+        <div id="changelog">
+            <h2 style="color:#C0C0C0;font-size:18px;border-bottom:1px solid #333;padding-bottom:6px;">Changelog</h2>
+            <div style="color:#888;font-size:13px;line-height:1.7;">
+                <p><strong style="color:#aaa;">2026-06-07</strong> — Account system launched (signup, login, dashboard). Item hover tooltips added. Font changed to Inter. Unified navigation across all pages.</p>
+                <p><strong style="color:#aaa;">2026-06-06</strong> — Navigation overhaul with dropdown menus. Zone page merged with RPC-based data loading. About page updated with data accuracy explanation.</p>
+                <p><strong style="color:#aaa;">2026-06-05</strong> — Logo replaced, max-width standardized to 900px. Stat tooltips on item cards.</p>
+                <p style="margin-top:12px;color:#666;font-size:12px;">Use the search bar above or click Search to browse ~30k items.</p>
+            </div>
+            <div id="mini-leaderboard" style="margin-top:20px;">
+                <h2 style="color:#C0C0C0;font-size:18px;border-bottom:1px solid #333;padding-bottom:6px;">Top Contributors</h2>
+                <div id="mini-lb-body" style="color:#888;font-size:13px;line-height:1.8;">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="sidebar">
+        <div class="sidebar-section" id="sidebar-lfg">
+            <h4>LFG <a href="lfg.html">See all →</a></h4>
+            <div id="sidebar-lfg-body"><div class="sidebar-empty">Loading...</div></div>
+        </div>
+        <div class="sidebar-section" id="sidebar-market">
+            <h4>Market <a href="market.html">See all →</a></h4>
+            <div id="sidebar-market-body"><div class="sidebar-empty">Loading...</div></div>
+        </div>
+        <div class="sidebar-section">
+            <h4>Recently Added <a href="leaderboard.html">Contributors →</a></h4>
+            <div id="sidebar-recent-body"><div class="sidebar-empty">Loading...</div></div>
+        </div>
+    </div>
     </div>
 	    <script type="module">
         var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
@@ -342,7 +428,7 @@ if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
                         var fallbackHtml = '';
                         for (var f = 0; f < dbFallback.data.length; f++) {
                             var fb = dbFallback.data[f];
-                            fallbackHtml += '<div class="item-card">';
+                            fallbackHtml += '<div class="item-card" data-name="' + escapeHtml(fb.name) + '">';
                             fallbackHtml += '<h3><a href="item.html?name=' + encodeURIComponent(fb.name) + '">' + escapeHtml(fb.name) + '</a></h3>';
                             fallbackHtml += '<div class="item-meta"><span style="color:#ffaa00;">Locations available — stats pending</span></div>';
                             fallbackHtml += '</div>';
@@ -355,29 +441,23 @@ if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
                 return;
             }
             
-            resultsDiv.innerHTML = '';
+            var html = '';
             for (var i = 0; i < data.length; i++) {
                 var item = data[i];
-                var card = document.createElement('div');
-                card.className = 'item-card';
-                var meta = '';
-                meta += '[' + escapeHtml(item.type) + '] ';
-                if (item.slot) meta += 'Slot: ' + escapeHtml(item.slot) + ' ';
-                if (item.level_req > 0) meta += 'Level: ' + item.level_req + ' ';
-                if (item.value > 0) meta += 'Value: ' + item.value + ' gold ';
-                meta += item.verified ? '<span style="color:#44aa44;">EQDB</span>' : '<span style="color:#ffaa00;">Personal</span>';
-                card.innerHTML = '<h3><a href="item.html?name=' + encodeURIComponent(item.name) + '">' + escapeHtml(item.name) + '</a></h3>'
-                    + '<div class="item-meta">' + meta + '</div>';
-                card.setAttribute('data-name', item.name);
-                card.addEventListener('mouseenter', handleItemHover);
-                card.addEventListener('mouseleave', hideTooltip);
-                card.addEventListener('mousemove', moveTooltip);
-                resultsDiv.appendChild(card);
+                html += '<div class="item-card" data-name="' + escapeHtml(item.name) + '">';
+                html += '<h3><a href="item.html?name=' + encodeURIComponent(item.name) + '">' + escapeHtml(item.name) + '</a></h3>';
+                html += '<div class="item-meta">';
+                html += '[' + escapeHtml(item.type) + '] ';
+                if (item.slot) html += 'Slot: ' + escapeHtml(item.slot) + ' ';
+                if (item.level_req > 0) html += 'Level: ' + item.level_req + ' ';
+                if (item.value > 0) html += 'Value: ' + item.value + ' gold ';
+                html += item.verified ? '<span style="color:#44aa44;">EQDB</span>' : '<span style="color:#ffaa00;">Personal</span>';
+                html += '</div>';
+                html += '</div>';
             }
-            var countEl = document.createElement('p');
-            countEl.style.cssText = 'color:#888;margin-top:20px;';
-            countEl.textContent = 'Found ' + count + ' items';
-            resultsDiv.appendChild(countEl);
+            
+            html += '<p style="color:#888;margin-top:20px;">Found ' + count + ' items</p>';
+            resultsDiv.innerHTML = html;
             saveSearchState();
         }
                 async function searchMobs() {
@@ -404,16 +484,21 @@ if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
             resultsDiv.innerHTML = html;
             saveSearchState();
         }
+        function escapeHtml(text) {
+            if (!text) return '';
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
         // ============================================
         // ITEM TOOLTIP
         // ============================================
         var tooltipCache = {};
         var tooltipTimer = null;
-        var tooltip = null;
 
         function getTooltip() {
-            if (!tooltip) tooltip = document.getElementById('item-tooltip');
-            return tooltip;
+            return document.getElementById('item-tooltip');
         }
 
         function moveTooltip(e) {
@@ -421,7 +506,6 @@ if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
             if (tt.style.display === 'none') return;
             var x = e.clientX + 15;
             var y = e.clientY + 15;
-            // Keep within viewport
             if (x + 400 > window.innerWidth)  x = e.clientX - 400;
             if (y + 300 > window.innerHeight) y = e.clientY - 310;
             tt.style.left = x + 'px';
@@ -430,25 +514,25 @@ if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
 
         function hideTooltip() {
             clearTimeout(tooltipTimer);
-            var tt = getTooltip();
-            tt.style.display = 'none';
+            getTooltip().style.display = 'none';
         }
 
         async function handleItemHover(e) {
-            var name = this.getAttribute('data-name');
+            var card = e.target.closest('.item-card');
+            if (!card) return;
+            var name = card.getAttribute('data-name');
             if (!name) return;
 
             clearTimeout(tooltipTimer);
-            var card = this;
+            var currentEvent = e;
 
             tooltipTimer = setTimeout(async function() {
                 var tt = getTooltip();
                 tt.innerHTML = '<span class="tt-loading">Loading...</span>';
                 tt.style.display = 'block';
-                tt.style.left = (e.clientX + 15) + 'px';
-                tt.style.top  = (e.clientY + 15) + 'px';
+                tt.style.left = (currentEvent.clientX + 15) + 'px';
+                tt.style.top  = (currentEvent.clientY + 15) + 'px';
 
-                // Use cache to avoid re-fetching
                 if (!tooltipCache[name]) {
                     var r = await supabase.from('equipment').select('description, type, slot, level_req, value, verified').eq('name', name).limit(1);
                     tooltipCache[name] = (r.data && r.data.length > 0) ? r.data[0] : null;
@@ -460,38 +544,336 @@ if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
                     return;
                 }
 
-                // Colorize the description
                 tt.innerHTML = colorize(item.description);
-            }, 300); // 300ms delay before showing
+            }, 300);
         }
 
         function colorize(html) {
             if (!html) return '';
-            // If already has span tags it's pre-colorized HTML from MUSHclient
-            if (html.indexOf('<span') >= 0 || html.indexOf('<font') >= 0) {
-                // Strip font tags, convert to our color classes
-                html = html.replace(/<font color="#00FFFF">/gi, '<span class="mm-cyan">');
-                html = html.replace(/<font color="#FFFF00">/gi, '<span class="mm-yellow">');
-                html = html.replace(/<font color="#FF0000">/gi, '<span class="mm-red">');
-                html = html.replace(/<font color="#00FF00">/gi, '<span class="mm-green">');
-                html = html.replace(/<font color="#8787FF">/gi, '<span class="mm-blue">');
-                html = html.replace(/<font color="#D78787">/gi, '<span class="mm-pink">');
-                html = html.replace(/<font color="#C0C0C0">/gi, '<span class="mm-white">');
-                html = html.replace(/<font[^>]*>/gi, '');
-                html = html.replace(/<\/font>/gi, '</span>');
-                html = html.replace(/<\/?u>/gi, '');
+            if (html.indexOf('<font') >= 0 || html.indexOf('<span') >= 0) {
                 return '<div style="white-space:pre-wrap;">' + html + '</div>';
             }
-            return '<div style="white-space:pre-wrap;color:#C0C0C0;">' + html + '</div>';
+            return '<div style="white-space:pre-wrap;">' + colorizeMM(html) + '</div>';
         }
 
-        function escapeHtml(text) {
-            if (!text) return '';
-            var div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+        const C = {
+            blue: '#8787FF', white: '#C0C0C0', cyan: '#00FFFF', yellow: '#FFFF00',
+            green: '#00FF00', pink: '#D78787', magenta: '#FF00FF', gray: '#808080',
+            olive: '#808000', red: '#FF0000', darkgreen: '#008000'
+        };
+        function tag(color, text) { return '<font color="' + color + '">' + text + '</font>'; }
+        function numbersWhite(str, baseColor) {
+            return str.replace(/(\d[\d,]*\.?\d*%?)/g,
+                '</font><font color="' + C.white + '">$1</font><font color="' + baseColor + '">');
         }
-        
+        function colorizeItemLine(line) {
+            let h = tag(C.blue, "Item '");
+            const nm = line.match(/^Item\s+'(.+?)'\s+is type/);        if (nm) h += tag(C.white, escapeHtml(nm[1])) + tag(C.blue, "' is type ");
+            const tm = line.match(/is type\s+(\S+)/);                  if (tm) h += tag(C.white, escapeHtml(tm[1].replace(',', ''))) + tag(C.blue, ',');
+            const am = line.match(/alignment\s+(-?\d+)/);              if (am) h += tag(C.blue, ' alignment ') + tag(C.white, am[1]) + tag(C.blue, ',');
+            const mm = line.match(/made of\s+(\S+)/);                  if (mm) h += tag(C.blue, ' made of ') + tag(C.white, escapeHtml(mm[1]));
+            const cm = line.match(/\(in\s+\((.+?)\)\s+condition\)/);   if (cm) h += tag(C.blue, ' (in ') + tag(C.white, '(' + escapeHtml(cm[1]) + ')') + tag(C.blue, ' condition)');
+            if (/\[EQDB\]/.test(line))  h += tag(C.white, '[EQDB]');
+            if (/\[Study\]/.test(line)) h += tag(C.white, '[Study]');
+            if (/\[LTB\]/.test(line))   h += tag(C.white, '[LTB]');
+            return h;
+        }
+        function colorizeKeywordLine(line) {
+            let h = tag(C.blue, "has keywords '");
+            const km = line.match(/has keywords\s+'([^']+)'/); if (km) h += tag(C.white, escapeHtml(km[1])) + tag(C.blue, "'");
+            const em = line.match(/, equipped\s+(.+?)\.?$/);   if (em) h += tag(C.blue, ', equipped ') + tag(C.white, escapeHtml(em[1])) + tag(C.blue, '.');
+            return h;
+        }
+        function colorizeAffectLine(line) {
+            const isSetBonus  = /\(Requires\s+\d+\s+items?\)/.test(line);
+            const labelColor  = isSetBonus ? C.magenta : C.cyan;
+            const match = line.match(/^Affects\s+(.+?)\s+by\s+(-?[\d.]+)\s*(\.?)\s*(\(Requires\s+\d+\s+items?\))?\.?\s*(\{[^}]+\})?/);
+            if (match) {
+                const [, stat, num, dot, req, freq] = match;
+                let h = tag(labelColor, 'Affects') + ' ' + tag(C.white, stat) + ' ' + tag(labelColor, 'by') + ' ' + tag(C.white, num);
+                if (dot) h += tag(labelColor, dot);
+                if (req) {
+                    const rm = req.match(/\(Requires\s+(\d+)\s+items?\)/);
+                    h += rm
+                        ? ' ' + tag(C.magenta, '(Requires ') + tag(C.white, rm[1]) + tag(C.magenta, ' items)')
+                        : ' ' + tag(C.magenta, req);
+                }
+                if (freq) h += ' ' + tag(C.pink, freq);
+                return h;
+            }
+            return tag(labelColor, escapeHtml(line));
+        }
+        function colorizeReqLine(content) {
+            let h = escapeHtml(content);
+            h = h.replace(/Your /,             'Your </font><font color="' + C.white + '">');
+            h = h.replace(/ must be /,         '</font><font color="' + C.cyan + '"> must be </font><font color="' + C.white + '">');
+            h = h.replace(/ must not be /,     '</font><font color="' + C.cyan + '"> must not be </font><font color="' + C.white + '">');
+            h = h.replace(/ to use this item/, '</font><font color="' + C.cyan + '"> to use this item');
+            return h;
+        }
+        function colorizeMM(text) {
+            if (!text) return '';
+            text = text.replace(/\n?.*\d+hp\s+\d+sp\s+\d+st[^\n]*\n?/g, '\n');
+            const lines  = text.split('\n');
+            const result = [];
+            let inRelic  = false;
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const t    = line.trim();
+                if (t === '') { result.push(''); continue; }
+                if (/^\+\+\+/.test(t)) {
+                    result.push(tag(C.green, escapeHtml(line)));
+                    i++;
+                    while (i < lines.length) {
+                        const nl = lines[i], nt = nl.trim();
+                        if (nt === '' || /^\+\+\+/.test(nt) || /^Item\s+'/.test(nt) || /^\*/.test(nt)) { i--; break; }
+                        result.push(tag(C.green, escapeHtml(nl)));
+                        i++;
+                    }
+                    continue;
+                }
+                if (/^Relics:/.test(t))                           { inRelic = true;  result.push(tag(C.green, escapeHtml(line))); continue; }
+                if (inRelic && /^(Small|Medium|Large)\s*\(/.test(t))               { result.push(tag(C.green, escapeHtml(line))); continue; }
+                if (inRelic && /^\s*\(\d+\/\d+/.test(t))          { inRelic = false; result.push(tag(C.green, escapeHtml(line))); continue; }
+                if (/^\*/.test(t)) {
+                    if (/^\*\s*Item\s+'/.test(t)) {
+                        const si = t.match(/\*\s*(Item\s+')(.+)(')$/);
+                        result.push(si
+                            ? tag(C.yellow, '* ') + tag(C.magenta, si[1]) + escapeHtml(si[2]) + tag(C.magenta, si[3])
+                            : tag(C.yellow, escapeHtml(line)));
+                        continue;
+                    }
+                    if (/^\*This/.test(t)) {
+                        result.push(tag(C.yellow, '*') + tag(C.blue, ' ' + numbersWhite(escapeHtml(t.substring(1).trim()), C.blue) + '</font>'));
+                        continue;
+                    }
+                    result.push(tag(C.yellow, '*') + tag(C.cyan, colorizeReqLine(t.substring(1).trim())));
+                    continue;
+                }
+                if (/^-\s*Item\s+'/.test(t)) {
+                    const di = t.match(/^(-\s*)(Item\s+')(.+)(')$/);
+                    if (di) result.push(tag(C.gray, di[1]) + tag(C.magenta, di[2]) + escapeHtml(di[3]) + tag(C.magenta, di[4]));
+                    continue;
+                }
+                if (/^Affects/.test(t)) { result.push(colorizeAffectLine(t)); continue; }
+                if (/^Special weapon attributes:/.test(t)) {
+                    const sw = line.match(/^(Special weapon attributes:)\s+(.+)$/);
+                    result.push(sw
+                        ? tag(C.blue, escapeHtml(sw[1])) + ' ' + tag(C.white, escapeHtml(sw[2]))
+                        : tag(C.blue, escapeHtml(line)));
+                    continue;
+                }
+                if (/^Your .+ will deal .+ damage with .+ accuracy, at .+ range, with a .+ chance to crit for .+ damage\.$/i.test(t)) {
+                    const ws = line.match(/^(Your )(.+?)( will deal )(.+?)( damage with )(.+?)( accuracy, at )(.+?)( range, with a )(.+?)( chance to crit for )(.+?)( damage\.)$/i);
+                    if (ws) {
+                        result.push(
+                            tag(C.cyan,  escapeHtml(ws[1]))  + tag(C.white, escapeHtml(ws[2]))  +
+                            tag(C.cyan,  escapeHtml(ws[3]))  + tag(C.white, escapeHtml(ws[4]))  +
+                            tag(C.cyan,  escapeHtml(ws[5]))  + tag(C.white, escapeHtml(ws[6]))  +
+                            tag(C.cyan,  escapeHtml(ws[7]))  + tag(C.white, escapeHtml(ws[8]))  +
+                            tag(C.cyan,  escapeHtml(ws[9]))  + tag(C.white, escapeHtml(ws[10])) +
+                            tag(C.cyan,  escapeHtml(ws[11])) + tag(C.white, escapeHtml(ws[12])) +
+                            tag(C.cyan,  escapeHtml(ws[13]))
+                        );
+                    } else {
+                        result.push(tag(C.cyan, escapeHtml(line)));
+                    }
+                    continue;
+                }
+                if (/^When/.test(t)) {
+                    const wm = line.match(/^(When\s+(casting|wielding|evoking|affected\s+by)\s+)(.+?)(,.+)$/i);
+                    if (wm) {
+                        const restColored = numbersWhite(escapeHtml(wm[4]), C.green);
+                        let h = tag(C.green, escapeHtml(wm[1])) + tag(C.white, escapeHtml(wm[3])) + '<font color="' + C.green + '">' + restColored + '</font>';
+                        h = h.replace(/<font color="#00FF00"><\/font>/g, '');
+                        result.push(h);
+                    } else {
+                        result.push('<font color="' + C.green + '">' + numbersWhite(escapeHtml(line), C.green) + '</font>');
+                    }
+                    continue;
+                }
+                if (/^(Adds resistance|Decreases|Grants|Casts|Improves|Your weapon special|Alters)/.test(t)) {
+                    const cls = (/^Adds resistance/.test(t) && /\(Requires/.test(t)) ? C.magenta : C.cyan;
+                    result.push(tag(cls, numbersWhite(escapeHtml(line), cls) + '</font>'));
+                    continue;
+                }
+                if (/^Increases/.test(t)) {
+                    const inc = line.match(/^(Increases )(.+?)( to )(.+?)(-based attacks\.)/i);
+                    if (inc) {
+                        result.push(
+                            tag(C.cyan, escapeHtml(inc[1])) + tag(C.white, escapeHtml(inc[2])) +
+                            tag(C.cyan, escapeHtml(inc[3])) + tag(C.white, escapeHtml(inc[4])) +
+                            tag(C.cyan, escapeHtml(inc[5]))
+                        );
+                    } else {
+                        result.push(tag(C.cyan, escapeHtml(line)));
+                    }
+                    continue;
+                }
+                if (/^Item\s+'/.test(t)) { result.push(colorizeItemLine(t)); continue; }
+                if (/^Level\s+\d+\s+item\s+'/.test(t)) {
+                    const lm = t.match(/^(Level\s+\d+\s+item\s+')(.+?)('\s+is type)/);
+                    result.push(lm
+                        ? tag(C.blue, lm[1]) + tag(C.white, escapeHtml(lm[2])) + tag(C.blue, lm[3])
+                        : tag(C.blue, escapeHtml(line)));
+                    continue;
+                }
+                if (/^has keywords/.test(t)) { result.push(colorizeKeywordLine(t)); continue; }
+                if (/^This item has a default lifespan/.test(t) || /^This item will lose its status/.test(t) || /^This item will vanish/.test(t)) {
+                    result.push(tag(C.blue, numbersWhite(escapeHtml(line), C.blue) + '</font>'));
+                    continue;
+                }
+                if (/^This level .+ item has the attributes:/.test(t)) {
+                    const am = line.match(/^(This level \d+ item has the attributes:)(.+)$/);
+                    result.push(am
+                        ? tag(C.blue, numbersWhite(escapeHtml(am[1]), C.blue) + '</font>') + tag(C.white, escapeHtml(am[2]))
+                        : tag(C.blue, escapeHtml(line)));
+                    continue;
+                }
+                if (/^(This item weighs|This level|This item has|This armor has|This item protects|This ward has|This relic|This item, when|This amulet|Your magical wand|This light source|Armor resistance|This item will have|This item is enchanted)/.test(t)) {
+                    const catMatch = line.match(/\{Cat\.\s*\d+\}/);
+                    const catText  = catMatch ? catMatch[0] : '';
+                    let working    = escapeHtml(line.replace(/\{Cat\.\s*\d+\}/g, '##CAT##'));
+                    let colored    = tag(C.blue, numbersWhite(working, C.blue) + '</font>');
+                    if (catText) colored = colored.replace(/##CAT##/g, '</font><font color="' + C.red + '">' + escapeHtml(catText) + '</font><font color="' + C.blue + '">');
+                    colored = colored.replace(/<font color="#8787FF"><\/font>/g, '');
+                    result.push(colored);
+                    continue;
+                }
+                if (/^(This is part of|You are currently)/.test(t)) {
+                    result.push(tag(C.magenta, numbersWhite(escapeHtml(line), C.magenta) + '</font>'));
+                    continue;
+                }
+                if (/This item is beyond your power/.test(t)) { result.push(tag(C.magenta, escapeHtml(line))); continue; }
+                if (/^(Capacity:|Upon|Small )/.test(t)) {
+                    result.push(tag(C.cyan, numbersWhite(escapeHtml(line), C.cyan) + '</font>'));
+                    continue;
+                }
+                result.push(tag(C.white, escapeHtml(line)));
+            }
+            return result.join('\n');
+        }
+
+        // ============================================
+        // SIDEBAR
+        // ============================================
+        async function loadSidebar() {
+            var now = new Date().toISOString();
+            var [lfgResult, marketResult, recentResult] = await Promise.all([
+                supabase.from('lfg_posts')
+                    .select('target, character_name, post_type, created_at')
+                    .eq('is_deleted', false)
+                    .or('expires_at.is.null,expires_at.gt.' + now)
+                    .order('created_at', { ascending: false })
+                    .limit(3),
+                supabase.from('market_listings')
+                    .select('item_name, character_name, listing_type, price, created_at')
+                    .eq('is_sold', false)
+                    .eq('is_deleted', false)
+                    .or('expires_at.is.null,expires_at.gt.' + now)
+                    .order('created_at', { ascending: false })
+                    .limit(3),
+                supabase.from('equipment')
+                    .select('name, verified, created_at')
+                    .order('created_at', { ascending: false })
+                    .limit(8)
+            ]);
+
+            // LFG
+            var lfgEl = document.getElementById('sidebar-lfg-body');
+            var lfg = lfgResult.data || [];
+            if (lfg.length === 0) {
+                lfgEl.innerHTML = '<div class="sidebar-empty">No active posts</div>';
+            } else {
+                lfgEl.innerHTML = '';
+                var badges = { need: 'NEED', offer: 'OFFER', run: 'RUN', interest: 'WANT' };
+                lfg.forEach(function(p) {
+                    var d = document.createElement('div');
+                    d.className = 'sidebar-entry';
+                    d.innerHTML = '<span class="badge-' + p.post_type + '">' + (badges[p.post_type] || p.post_type.toUpperCase()) + '</span> '
+                        + '<a href="lfg.html" title="' + escapeHtml(p.target) + '">' + escapeHtml(p.target) + '</a>'
+                        + '<div class="meta">' + escapeHtml(p.character_name) + '</div>';
+                    lfgEl.appendChild(d);
+                });
+            }
+
+            // Market
+            var mktEl = document.getElementById('sidebar-market-body');
+            var mkt = marketResult.data || [];
+            if (mkt.length === 0) {
+                mktEl.innerHTML = '<div class="sidebar-empty">No active listings</div>';
+            } else {
+                mktEl.innerHTML = '';
+                var mktBadges = { sell: 'SELL', buy: 'BUY', trade: 'TRADE' };
+                mkt.forEach(function(m) {
+                    var d = document.createElement('div');
+                    d.className = 'sidebar-entry';
+                    d.innerHTML = '<span class="badge-' + m.listing_type + '">' + (mktBadges[m.listing_type] || m.listing_type.toUpperCase()) + '</span> '
+                        + '<a href="item.html?name=' + encodeURIComponent(m.item_name) + '" title="' + escapeHtml(m.item_name) + '">' + escapeHtml(m.item_name) + '</a>'
+                        + '<div class="meta">' + escapeHtml(m.character_name) + (m.price ? ' · ' + escapeHtml(m.price) : '') + '</div>';
+                    mktEl.appendChild(d);
+                });
+            }
+
+            // Recently added (sidebar)
+            var recentEl = document.getElementById('sidebar-recent-body');
+            var recent = recentResult.data || [];
+            if (recent.length === 0) {
+                recentEl.innerHTML = '<div class="sidebar-empty">Nothing yet</div>';
+            } else {
+                recentEl.innerHTML = '';
+                recent.forEach(function(e) {
+                    var d = document.createElement('div');
+                    d.className = 'sidebar-entry';
+                    var src = e.verified
+                        ? '<span style="color:#44aa44;font-size:10px;">EQDB</span> '
+                        : '<span style="color:#ffaa00;font-size:10px;">NEW</span> ';
+                    d.innerHTML = src + '<a href="item.html?name=' + encodeURIComponent(e.name) + '" title="' + escapeHtml(e.name) + '">' + escapeHtml(e.name) + '</a>';
+                    recentEl.appendChild(d);
+                });
+            }
+
+        }
+
+        async function loadMiniLeaderboard() {
+            var el = document.getElementById('mini-lb-body');
+            if (!el) return;
+            try {
+                var { data, error } = await supabase.from('submission_history').select('submitter').limit(5000);
+                if (error) { console.error('MiniLB err:', error); el.textContent = 'Query error.'; return; }
+                if (!data || data.length === 0) { el.textContent = 'No submissions yet.'; return; }
+                var counts = {};
+                var allData = data;
+                var page = 1, pageSize = 1000, maxPages = 10;
+                while (data.length === pageSize && page < maxPages) {
+                    var r2 = await supabase.from('submission_history').select('submitter').range(page * pageSize, (page + 1) * pageSize - 1);
+                    if (r2.error || !r2.data || r2.data.length === 0) break;
+                    allData = allData.concat(r2.data);
+                    data = r2.data;
+                    page++;
+                }
+                for (var i = 0; i < allData.length; i++) {
+                    var n = allData[i].submitter || 'anonymous';
+                    if (n.toLowerCase() === 'huko') continue;
+                    counts[n] = (counts[n] || 0) + 1;
+                }
+                var sorted = Object.keys(counts).sort(function(a, b) { return counts[b] - counts[a]; });
+                var top = sorted.slice(0, 5);
+                if (top.length === 0) { el.textContent = 'Only Huko has submissions.'; return; }
+                var html = '';
+                var medals = ['#1', '#2', '#3', '#4', '#5'];
+                for (var j = 0; j < top.length; j++) {
+                    html += '<div>' + medals[j] + ' <strong style="color:#aaa;">' + escapeHtml(top[j]) + '</strong> — ' + counts[top[j]] + ' items</div>';
+                }
+                el.innerHTML = html;
+            } catch(e) {
+                console.error('MiniLB error:', e);
+                el.innerHTML = 'Error: ' + e.message;
+            }
+        }
+
+        loadSidebar();
+        loadMiniLeaderboard();
 
         // ============================================
         // AFFECT TAG MANAGEMENT
@@ -548,6 +930,16 @@ if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
             }
         });
 
+        // ============================================
+        // TOOLTIP EVENT DELEGATION
+        // ============================================
+        var resultsEl = document.getElementById('results');
+        resultsEl.addEventListener('mouseenter', handleItemHover, true);
+        resultsEl.addEventListener('mouseleave', function(e) {
+            if (e.target.closest('.item-card')) hideTooltip();
+        }, true);
+        resultsEl.addEventListener('mousemove', moveTooltip, true);
+
         if (restoreSearchState()) {
             var lastSearch = JSON.parse(sessionStorage.getItem('eqdb_search')).lastSearch;
             if (lastSearch === 'mobs') {
@@ -560,12 +952,20 @@ if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
     
     <script>
         if (sessionStorage.getItem('editor_logged_in') === 'true') {
-            document.getElementById('editor-links').style.display = 'inline';
+            document.getElementById('editor-dropdown').style.display = 'inline-block';
+            document.getElementById('admin-link').style.display = 'inline';
             document.getElementById('logout-link').style.display = 'inline';
             document.getElementById('login-link').style.display = 'none';
         }
+                if (localStorage.getItem('user_logged_in') === 'true') {
+            document.getElementById('login-link').style.display = 'none';
+            document.getElementById('signup-link').style.display = 'none';
+        }
         function logout() {
             sessionStorage.removeItem('editor_logged_in');
+            sessionStorage.removeItem('editor_name');
+            localStorage.removeItem('user_logged_in');
+            localStorage.removeItem('username');
             location.reload();
         }
     </script>

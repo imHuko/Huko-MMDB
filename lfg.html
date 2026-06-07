@@ -4,13 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LFG Board - MUD Equipment DB</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+        body { font-family: "Inter", sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
         a { color: #8787FF; }
         h1, h2 { color: #C0C0C0; }
-        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; }
-        nav a { margin-right: 15px; }
-        input, select, textarea, button { padding: 8px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; font-family: Arial, sans-serif; }
+        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; }
+        nav a { margin-right: 15px; color: #8787FF; text-decoration: none; }
+        nav a:hover { color: #C0C0C0; }
+        nav .dropdown { position: relative; display: inline-block; margin-right: 15px; }
+        nav .dropbtn { cursor: pointer; color: #8787FF; }
+        nav .dropdown-content { display: none; position: absolute; top: 100%; left: 0; background: #333; min-width: 160px; border: 1px solid #444; border-radius: 3px; z-index: 1000; }
+        nav .dropdown-content a { display: block; padding: 8px 12px; margin: 0; white-space: nowrap; }
+        nav .dropdown-content a:hover { background: #444; color: #C0C0C0; }
+        nav .dropdown:hover .dropdown-content { display: block; }
+        input, select, textarea, button { padding: 8px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; font-family: "Inter", sans-serif; }
         button { cursor: pointer; }
         .btn-primary { background: #8787FF; color: #000; border: none; }
         .btn-danger  { background: #ff4444; color: white; border: none; font-size: 12px; padding: 3px 8px; }
@@ -56,21 +66,57 @@
         .ac-item { padding: 7px 10px; font-size: 13px; cursor: pointer; }
         .ac-item:hover, .ac-item.selected { background: #3a3a5a; color: #fff; }
         .type-desc { font-size: 12px; color: #666; margin-top: 6px; }
+        #sticky-header { position: sticky; top: 0; z-index: 100; background: #1a1a1a; }
     </style>
 </head>
 <body>
+    <div style="margin-bottom:6px;text-align:center;"><img src="images/logo.png" alt="HukoDB" style="height:130px;"></div>
+    <div id="sticky-header">
     <nav>
         <a href="index.html">Search</a>
-        <a href="info.html">About</a>
-        <a href="ideas.html">Ideas</a>
-        <a href="market.html">Market</a>
-        <a href="lfg.html">LFG</a>
+        <a href="zones.html">Zones</a>
         <a href="leaderboard.html">Leaderboard</a>
-        <span id="editor-links" style="display:none;"><a href="admin.html">Admin</a></span>
-    </nav>
-    <hr>
+        
+        <div class="dropdown">
+            <span class="dropbtn">Games ▼</span>
+            <div class="dropdown-content">
+                <a href="daily.html">Daily</a>
+                <a href="zonequiz.html">Zone Quiz</a>
+                <a href="mobguess.html">Mob Guess</a>
+            </div>
+        </div>
 
-    <h1>LFG Board</h1>
+        <div class="dropdown">
+            <span class="dropbtn">Community Tools ▼</span>
+            <div class="dropdown-content">
+                <a href="market.html">Market</a>
+                <a href="lfg.html">LFG</a>
+            </div>
+        </div>
+        <div class="dropdown">
+            <span class="dropbtn">More ▼</span>
+            <div class="dropdown-content">
+                <a href="info.html">About</a>
+                <a href="ideas.html">Ideas</a>
+            </div>
+        </div>
+        <div class="dropdown" id="editor-dropdown" style="display:none;">
+            <span class="dropbtn">Editor ▼</span>
+            <div class="dropdown-content">
+                <a href="import.html">Add Equipment</a>
+                <a href="batch.html">Batch Import</a>
+                <a href="import-db.html">Import Database</a>
+            </div>
+        </div>
+        <span id="login-link"><a href="login.html">Login</a></span>
+        <span id="signup-link"><a href="signup.html" style="color:#44aa44;">Sign Up</a></span>
+        <span id="admin-link" style="display:none;"><a href="admin.html" style="color:#FFD700;font-weight:bold;">Admin Panel</a></span>
+        <span id="logout-link" style="display:none;"><a href="#" onclick="logout()">Logout</a></span>
+    </nav>
+    <script>document.querySelectorAll('nav a').forEach(function(a){if(a.href.split('/').pop()===location.pathname.split('/').pop())a.style.color='#00FFFF';});</script>
+    </div>
+    <h2>LFG Board</h2>
+    <hr>
     <p style="color:#888;font-size:13px;">Looking for group, help with marks, or zone runs. Contact people in-game. <strong style="color:#ffaa00;">Save your PIN</strong> to manage your post.</p>
 
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:5px;">
@@ -143,6 +189,10 @@
                 <label>Note <span style="color:#555;font-size:11px;">(optional — time, requirements, any details)</span></label>
                 <textarea id="post-note" placeholder="Available evenings EST, need group of 3..."></textarea>
             </div>
+            <div class="field">
+                <label>PIN <span style="color:#555;font-size:11px;">(4 digits — used to delete your post, leave blank for random)</span></label>
+                <input type="number" id="post-pin" placeholder="1234" min="1000" max="9999" style="width:100px;">
+            </div>
             <div id="pin-reveal" style="display:none;">
                 <div class="pin-box">
                     <div class="pin-num" id="pin-number"></div>
@@ -198,7 +248,7 @@
             need:     'Looking for someone to help you with a mark or zone.',
             offer:    'You can help others — they can reach out to you in-game.',
             run:      'Organising a zone run and want company.',
-            interest: 'You want to do this but can't commit yet — lets others know.'
+            interest: 'You want to do this but can\'t commit yet — lets others know.'
         };
 
         var BADGES = {
@@ -227,6 +277,7 @@
         window.loadMore = function() { fetchPosts(true); };
 
         async function fetchPosts(append) {
+            try {
             var hideExpired = document.getElementById('hide-expired').checked;
             var q = supabase.from('lfg_posts')
                 .select('*')
@@ -239,6 +290,11 @@
             if (hideExpired) q = q.or('expires_at.is.null,expires_at.gt.' + new Date().toISOString());
 
             var result = await q;
+            if (result.error) {
+                document.getElementById('posts-container').innerHTML = '<p class="empty" style="color:#ff4444;">Error: ' + escHtml(result.error.message) + '</p>';
+                document.getElementById('load-more-row').style.display = 'none';
+                return;
+            }
             var rows = result.data || [];
 
             var container = document.getElementById('posts-container');
@@ -253,6 +309,10 @@
             rows.forEach(function(r) { container.appendChild(buildCard(r)); });
             currentOffset += rows.length;
             document.getElementById('load-more-row').style.display = rows.length === PAGE_SIZE ? 'block' : 'none';
+            } catch (e) {
+                document.getElementById('posts-container').innerHTML = '<p class="empty" style="color:#ff4444;">Error: ' + escHtml(e.message || e) + '</p>';
+                document.getElementById('load-more-row').style.display = 'none';
+            }
         }
 
         function buildCard(r) {
@@ -310,7 +370,14 @@
             document.getElementById('post-target').value = '';
             document.getElementById('post-char').value = '';
             document.getElementById('post-note').value = '';
+            document.getElementById('post-pin').value = '';
             updateTypeDesc();
+            // Limit expiry options for non-editors
+            var isEditor = sessionStorage.getItem('editor_logged_in') === 'true';
+            var expires = document.getElementById('post-expires');
+            expires.querySelector('option[value="720"]').style.display = isEditor ? 'block' : 'none';
+            expires.querySelector('option[value="0"]').style.display = isEditor ? 'block' : 'none';
+            if (!isEditor && (expires.value === '720' || expires.value === '0')) expires.value = '168';
         };
 
         window.closePost = function() {
@@ -334,7 +401,8 @@
             if (!target)   { msgEl.className='msg-err'; msgEl.textContent='Enter a mark or zone name.'; return; }
             if (!charName) { msgEl.className='msg-err'; msgEl.textContent='Enter your character name.'; return; }
 
-            var pin = Math.floor(1000 + Math.random() * 9000);
+            var customPin = document.getElementById('post-pin').value.trim();
+            var pin = customPin ? customPin : Math.floor(1000 + Math.random() * 9000);
             var expiresAt = expireH > 0 ? new Date(Date.now() + expireH * 3600000).toISOString() : null;
 
             var result = await supabase.from('lfg_posts').insert({
@@ -345,9 +413,16 @@
                 expires_at:     expiresAt,
                 pin:            String(pin),
                 is_deleted:     false
-            });
+            }).select('id');
 
             if (result.error) { msgEl.className='msg-err'; msgEl.textContent='Error: ' + result.error.message; return; }
+
+            // Save PIN to localStorage so the same browser remembers it
+            if (result.data && result.data[0]) {
+                var savedPins = JSON.parse(localStorage.getItem('lfg_pins') || '{}');
+                savedPins[result.data[0].id] = String(pin);
+                localStorage.setItem('lfg_pins', JSON.stringify(savedPins));
+            }
 
             document.getElementById('post-form-btns').style.display = 'none';
             document.getElementById('pin-number').textContent = pin;
@@ -359,7 +434,9 @@
         window.openDel = function(id, name) {
             deletingId = id;
             document.getElementById('del-post-name').textContent = name;
-            document.getElementById('del-pin').value = '';
+            // Auto-fill PIN from localStorage if available
+            var savedPins = JSON.parse(localStorage.getItem('lfg_pins') || '{}');
+            document.getElementById('del-pin').value = savedPins[id] || '';
             document.getElementById('del-msg').textContent = '';
             document.getElementById('del-modal').classList.add('open');
         };
@@ -485,12 +562,26 @@
             return d.innerHTML;
         }
 
-        loadPosts();
+        window.loadPosts();
     </script>
 
     <script>
         if (sessionStorage.getItem('editor_logged_in') === 'true') {
-            document.getElementById('editor-links').style.display = 'inline';
+            document.getElementById('editor-dropdown').style.display = 'inline-block';
+            document.getElementById('admin-link').style.display = 'inline';
+            document.getElementById('logout-link').style.display = 'inline';
+            document.getElementById('login-link').style.display = 'none';
+        }
+                if (localStorage.getItem('user_logged_in') === 'true') {
+            document.getElementById('login-link').style.display = 'none';
+            document.getElementById('signup-link').style.display = 'none';
+        }
+        function logout() {
+            sessionStorage.removeItem('editor_logged_in');
+            sessionStorage.removeItem('editor_name');
+            localStorage.removeItem('user_logged_in');
+            localStorage.removeItem('username');
+            location.reload();
         }
     </script>
 </body>
