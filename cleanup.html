@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Cleanup - HukoDB</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+        a { color: #8787FF; }
+        h1 { color: #C0C0C0; text-align: center; }
+        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        nav a { margin-right: 15px; }
+        hr { border-color: #333; }
+        .subtitle { text-align: center; color: #888; font-size: 13px; margin: -8px 0 15px; }
+        .stats-row { display: flex; gap: 10px; justify-content: center; margin: 10px 0; flex-wrap: wrap; }
+        .stat-box { background: #222; padding: 8px 16px; border-radius: 5px; text-align: center; border: 1px solid #333; min-width: 70px; }
+        .stat-box .num { font-size: 20px; font-weight: bold; color: #8787FF; }
+        .stat-box .lbl { font-size: 11px; color: #555; }
+        .mode-row { display: flex; gap: 8px; justify-content: center; align-items: center; margin: 10px 0; flex-wrap: wrap; }
+        .mode-btn { padding: 5px 14px; background: #333; border: 1px solid #444; border-radius: 3px; color: #888; cursor: pointer; font-size: 12px; }
+        .mode-btn.active { background: #8787FF; color: #000; border-color: #8787FF; }
+        .name-input { padding: 6px 10px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; font-size: 13px; width: 140px; }
+        .card { background: #222; border: 1px solid #444; border-radius: 8px; padding: 20px; margin: 15px 0; min-height: 200px; }
+        .card-label { font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+        .card-name { font-size: 20px; color: #C0C0C0; font-weight: bold; margin: 8px 0; word-break: break-word; }
+        .card-meta { font-size: 13px; color: #888; margin: 4px 0; }
+        .card-meta span { color: #aaa; }
+        .card-link { font-size: 12px; margin-top: 10px; display: inline-block; }
+        .flag-badge { display: inline-block; background: #3a1a1a; color: #ff6666; border: 1px solid #ff4444; border-radius: 3px; padding: 2px 8px; font-size: 11px; margin-top: 8px; }
+        .btn-row { display: flex; gap: 10px; justify-content: center; margin: 20px 0; flex-wrap: wrap; }
+        .btn-legit { padding: 14px 28px; background: #1a3a1a; border: 2px solid #44aa44; color: #44aa44; border-radius: 6px; cursor: pointer; font-size: 15px; font-weight: bold; transition: all 0.1s; }
+        .btn-legit:hover { background: #44aa44; color: #000; }
+        .btn-junk { padding: 14px 28px; background: #3a1a1a; border: 2px solid #ff4444; color: #ff4444; border-radius: 6px; cursor: pointer; font-size: 15px; font-weight: bold; transition: all 0.1s; }
+        .btn-junk:hover { background: #ff4444; color: #fff; }
+        .btn-skip { padding: 14px 20px; background: #2a2a2a; border: 2px solid #555; color: #888; border-radius: 6px; cursor: pointer; font-size: 15px; transition: all 0.1s; }
+        .btn-skip:hover { background: #333; color: #ccc; }
+        .btn-delete { padding: 14px 28px; background: #ff4444; border: 2px solid #ff4444; color: #fff; border-radius: 6px; cursor: pointer; font-size: 15px; font-weight: bold; }
+        .btn-delete:hover { background: #cc0000; border-color: #cc0000; }
+        .progress-wrap { background: #333; border-radius: 3px; height: 4px; margin: 8px 0; }
+        .progress-bar { background: #8787FF; height: 4px; border-radius: 3px; transition: width 0.3s; }
+        .queue-label { text-align: center; font-size: 12px; color: #555; margin: -8px 0 10px; }
+        .empty-state { text-align: center; padding: 40px 20px; color: #555; }
+        .empty-state h3 { color: #888; }
+        .feedback { text-align: center; font-size: 14px; min-height: 24px; margin: 4px 0; font-weight: bold; opacity: 0; transition: opacity 0.2s; }
+        .feedback.show { opacity: 1; }
+        .feedback.legit  { color: #44aa44; }
+        .feedback.junk   { color: #ff4444; }
+        .feedback.skip   { color: #888; }
+        .feedback.delete { color: #ff8800; }
+        .flagged-section { margin: 20px 0; }
+        .flagged-section h3 { color: #C0C0C0; font-size: 14px; border-bottom: 1px solid #333; padding-bottom: 6px; }
+        .flagged-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #2a2a2a; font-size: 13px; gap: 10px; }
+        .flagged-row .fname { flex: 1; color: #C0C0C0; }
+        .flagged-row .farea { color: #666; font-size: 12px; }
+        .flagged-row .fcount { color: #ff6666; font-size: 12px; white-space: nowrap; }
+        .btn-sm { padding: 3px 10px; font-size: 11px; border: none; border-radius: 3px; cursor: pointer; }
+        .btn-sm-delete { background: #ff4444; color: #fff; }
+        .btn-sm-restore { background: #444; color: #ccc; }
+        .keyboard-hint { text-align: center; font-size: 11px; color: #444; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="index.html">Search</a>
+        <a href="zones.html">Zones</a>
+        <a href="admin.html">Admin</a>
+    </nav>
+    <hr>
+
+    <h1>🧹 Data Cleanup</h1>
+    <p class="subtitle">Help clean bad entries from the database. Legit, Junk, or Skip.</p>
+
+    <div class="stats-row">
+        <div class="stat-box"><div class="num" id="stat-reviewed">0</div><div class="lbl">Reviewed</div></div>
+        <div class="stat-box"><div class="num" id="stat-legit">0</div><div class="lbl">Legit</div></div>
+        <div class="stat-box"><div class="num" id="stat-junk">0</div><div class="lbl">Flagged</div></div>
+        <div class="stat-box"><div class="num" id="stat-skip">0</div><div class="lbl">Skipped</div></div>
+        <div class="stat-box"><div class="num" id="stat-streak">0</div><div class="lbl">Streak</div></div>
+    </div>
+
+    <div class="mode-row">
+        <button class="mode-btn active" id="mode-random"  onclick="setMode('random')">Random</button>
+        <button class="mode-btn"        id="mode-suspect" onclick="setMode('suspect')">Suspect Items</button>
+        <button class="mode-btn"        id="mode-flagged" onclick="setMode('flagged')">Flagged Queue</button>
+        <span style="color:#555;font-size:12px;">|</span>
+        <button class="mode-btn"        id="mode-admin"   onclick="toggleAdmin()">Admin Mode: OFF</button>
+        <input type="text" class="name-input" id="reviewer-name" placeholder="Your name..." maxlength="30">
+    </div>
+
+    <div class="progress-wrap"><div class="progress-bar" id="progress-bar" style="width:0%"></div></div>
+    <div class="queue-label" id="queue-label"></div>
+
+    <div id="game-area"><p style="text-align:center;color:#555;">Loading...</p></div>
+
+    <div class="feedback" id="feedback"></div>
+    <p class="keyboard-hint">Keyboard: L = Legit &nbsp;·&nbsp; J = Junk &nbsp;·&nbsp; S / Space = Skip</p>
+
+    <!-- Flagged list (admin only) -->
+    <div class="flagged-section" id="flagged-section" style="display:none;">
+        <h3>All Flagged Items</h3>
+        <div id="flagged-list"></div>
+    </div>
+
+    <script type="module">
+        var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
+        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+        var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        var mode      = 'random';
+        var adminMode = false;
+        var queue     = [];
+        var qIndex    = 0;
+        var current   = null;
+        var stats     = { reviewed: 0, legit: 0, junk: 0, skip: 0, streak: 0 };
+        var seen      = new Set(); // avoid showing same item twice in a session
+
+        // ── Mode ──────────────────────────────────────────────────
+        window.setMode = function(m) {
+            mode = m;
+            document.querySelectorAll('.mode-btn').forEach(function(b) { b.classList.remove('active'); });
+            document.getElementById('mode-' + m).classList.add('active');
+            queue = []; qIndex = 0; seen = new Set();
+            loadQueue();
+        };
+
+        window.toggleAdmin = function() {
+            adminMode = !adminMode;
+            var btn = document.getElementById('mode-admin');
+            btn.textContent = 'Admin Mode: ' + (adminMode ? 'ON' : 'OFF');
+            btn.className = 'mode-btn' + (adminMode ? ' active' : '');
+            document.getElementById('flagged-section').style.display = adminMode ? 'block' : 'none';
+            if (adminMode) loadFlaggedList();
+            renderCard();
+        };
+
+        // ── Load queue ────────────────────────────────────────────
+        async function loadQueue() {
+            document.getElementById('game-area').innerHTML = '<p style="text-align:center;color:#555;">Loading...</p>';
+
+            if (mode === 'flagged') {
+                // Show flagged items first
+                var r = await supabase.from('item_flags')
+                    .select('item_name, area, mobid, flag_type')
+                    .eq('flag_type', 'junk')
+                    .order('created_at', { ascending: false })
+                    .limit(100);
+                queue = (r.data || []).map(function(row) {
+                    return { name: row.item_name, area: row.area, mobid: row.mobid, flagged: true };
+                });
+            } else if (mode === 'suspect') {
+                // Items that look like junk
+                var r = await supabase.from('itemsloc_db')
+                    .select('itemid, area, mobid')
+                    .limit(500);
+                var ids = [...new Set((r.data || []).map(function(x) { return String(x.itemid); }))];
+                var nameRes = await supabase.from('items_db').select('itemid, name').in('itemid', ids.slice(0, 200));
+                var nameMap = {};
+                (nameRes.data || []).forEach(function(n) { nameMap[String(n.itemid)] = n.name; });
+                queue = (r.data || [])
+                    .filter(function(row) {
+                        var n = nameMap[String(row.itemid)] || '';
+                        return n.match(/corpse|gold coin|ticket|voucher|credit|\(no short/i) || n.length < 3;
+                    })
+                    .map(function(row) {
+                        return { name: nameMap[String(row.itemid)] || 'Unknown', area: row.area, itemid: row.itemid, mobid: row.mobid };
+                    });
+            } else {
+                // Random items from itemsloc_db
+                var r = await supabase.from('itemsloc_db')
+                    .select('itemid, area, mobid')
+                    .limit(500);
+                queue = [];
+                var ids = [...new Set((r.data || []).map(function(x) { return String(x.itemid); }))];
+                var nameRes = await supabase.from('items_db').select('itemid, name').in('itemid', ids.slice(0, 200));
+                var nameMap = {};
+                (nameRes.data || []).forEach(function(n) { nameMap[String(n.itemid)] = n.name; });
+                queue = (r.data || []).map(function(row) {
+                    return { name: nameMap[String(row.itemid)] || null, area: row.area, itemid: row.itemid, mobid: row.mobid };
+                }).filter(function(x) { return x.name; });
+                // Shuffle
+                queue.sort(function() { return Math.random() - 0.5; });
+            }
+
+            qIndex = 0;
+            document.getElementById('queue-label').textContent = queue.length + ' items in queue';
+            nextCard();
+        }
+
+        function nextCard() {
+            // Skip already seen items
+            while (qIndex < queue.length && seen.has(queue[qIndex].name)) qIndex++;
+            if (qIndex >= queue.length) {
+                // Reload queue
+                loadQueue();
+                return;
+            }
+            current = queue[qIndex];
+            renderCard();
+            updateProgress();
+        }
+
+        // ── Render card ───────────────────────────────────────────
+        function renderCard() {
+            if (!current) return;
+            var area = document.getElementById('game-area');
+            area.innerHTML = '';
+
+            var card = document.createElement('div');
+            card.className = 'card';
+
+            var label = document.createElement('div');
+            label.className = 'card-label';
+            label.textContent = current.flagged ? '⚠ Previously Flagged' : 'Item Entry';
+            card.appendChild(label);
+
+            var name = document.createElement('div');
+            name.className = 'card-name';
+            name.textContent = current.name;
+            card.appendChild(name);
+
+            if (current.area) {
+                var meta1 = document.createElement('div');
+                meta1.className = 'card-meta';
+                meta1.innerHTML = 'Zone: <span><a href="zone.html?area=' + encodeURIComponent(current.area) + '">' + escHtml(current.area) + '</a></span>';
+                card.appendChild(meta1);
+            }
+
+            if (current.flagged) {
+                var badge = document.createElement('div');
+                badge.className = 'flag-badge';
+                badge.textContent = '⚑ Flagged as junk';
+                card.appendChild(badge);
+            }
+
+            var link = document.createElement('a');
+            link.className = 'card-link';
+            link.href = 'item.html?name=' + encodeURIComponent(current.name);
+            link.target = '_blank';
+            link.textContent = 'View full item page →';
+            card.appendChild(link);
+
+            area.appendChild(card);
+
+            // Buttons
+            var btnRow = document.createElement('div');
+            btnRow.className = 'btn-row';
+
+            var legitBtn = document.createElement('button');
+            legitBtn.className = 'btn-legit';
+            legitBtn.innerHTML = '✓ Legit';
+            legitBtn.addEventListener('click', function() { vote('legit'); });
+
+            var skipBtn = document.createElement('button');
+            skipBtn.className = 'btn-skip';
+            skipBtn.innerHTML = '? Skip';
+            skipBtn.addEventListener('click', function() { vote('skip'); });
+
+            if (adminMode && current.flagged) {
+                var delBtn = document.createElement('button');
+                delBtn.className = 'btn-delete';
+                delBtn.innerHTML = '🗑 Delete';
+                delBtn.addEventListener('click', function() { adminDelete(); });
+                btnRow.appendChild(legitBtn);
+                btnRow.appendChild(skipBtn);
+                btnRow.appendChild(delBtn);
+            } else {
+                var junkBtn = document.createElement('button');
+                junkBtn.className = 'btn-junk';
+                junkBtn.innerHTML = '✗ Junk';
+                junkBtn.addEventListener('click', function() { vote('junk'); });
+                btnRow.appendChild(legitBtn);
+                btnRow.appendChild(skipBtn);
+                btnRow.appendChild(junkBtn);
+            }
+
+            area.appendChild(btnRow);
+        }
+
+        // ── Vote ──────────────────────────────────────────────────
+        async function vote(type) {
+            if (!current) return;
+            var reviewer = document.getElementById('reviewer-name').value.trim() || 'anonymous';
+
+            seen.add(current.name);
+            stats.reviewed++;
+            if (type === 'legit')  { stats.legit++;  stats.streak++; }
+            if (type === 'junk')   { stats.junk++;   stats.streak++; }
+            if (type === 'skip')   { stats.skip++;   stats.streak = 0; }
+            updateStatDisplay();
+            showFeedback(type);
+
+            // Log to database
+            await supabase.from('item_flags').insert({
+                item_name:  current.name,
+                itemid:     current.itemid || null,
+                area:       current.area   || null,
+                mobid:      current.mobid  || null,
+                flag_type:  type,
+                flagged_by: reviewer
+            });
+
+            qIndex++;
+            setTimeout(nextCard, 150);
+        }
+
+        async function adminDelete() {
+            if (!current) return;
+            var reviewer = document.getElementById('reviewer-name').value.trim() || 'admin';
+            if (!confirm('Delete all entries for "' + current.name + '"?\nThis removes from itemsloc_db and items_db.')) return;
+
+            showFeedback('delete');
+
+            // Log removal
+            await supabase.from('item_removals').insert({
+                item_name:  current.name,
+                itemid:     current.itemid || null,
+                area:       current.area   || null,
+                reason:     'admin_cleanup',
+                removed_by: reviewer
+            });
+
+            // Delete from itemsloc_db
+            if (current.itemid) {
+                await supabase.from('itemsloc_db').delete().eq('itemid', String(current.itemid));
+                await supabase.from('items_db').delete().eq('itemid', String(current.itemid));
+            } else {
+                // Delete by name if no itemid
+                var r = await supabase.from('items_db').select('itemid').eq('name', current.name).limit(1);
+                if (r.data && r.data.length > 0) {
+                    var id = String(r.data[0].itemid);
+                    await supabase.from('itemsloc_db').delete().eq('itemid', id);
+                    await supabase.from('items_db').delete().eq('itemid', id);
+                }
+            }
+
+            // Clear flags for this item
+            await supabase.from('item_flags').delete().eq('item_name', current.name);
+
+            stats.junk++;
+            stats.reviewed++;
+            updateStatDisplay();
+            seen.add(current.name);
+            qIndex++;
+            setTimeout(function() { nextCard(); loadFlaggedList(); }, 300);
+        }
+
+        async function loadFlaggedList() {
+            var r = await supabase.from('item_flags')
+                .select('item_name, area, flag_type, flagged_by')
+                .eq('flag_type', 'junk')
+                .order('created_at', { ascending: false })
+                .limit(50);
+
+            var list = document.getElementById('flagged-list');
+            if (!r.data || r.data.length === 0) {
+                list.innerHTML = '<p style="color:#555;font-size:13px;">No flagged items.</p>';
+                return;
+            }
+
+            // Group by item name
+            var byName = {};
+            (r.data || []).forEach(function(row) {
+                if (!byName[row.item_name]) byName[row.item_name] = { area: row.area, count: 0 };
+                byName[row.item_name].count++;
+            });
+
+            list.innerHTML = '';
+            Object.entries(byName).forEach(function(entry) {
+                var name = entry[0], info = entry[1];
+                var row = document.createElement('div');
+                row.className = 'flagged-row';
+                row.innerHTML = '<span class="fname"><a href="item.html?name=' + encodeURIComponent(name) + '" target="_blank">' + escHtml(name) + '</a></span>'
+                    + '<span class="farea">' + escHtml(info.area || '') + '</span>'
+                    + '<span class="fcount">⚑ ' + info.count + 'x</span>';
+                var delBtn = document.createElement('button');
+                delBtn.className = 'btn-sm btn-sm-delete';
+                delBtn.textContent = 'Delete';
+                delBtn.addEventListener('click', async function() {
+                    if (!confirm('Delete "' + name + '"?')) return;
+                    var r2 = await supabase.from('items_db').select('itemid').eq('name', name).limit(1);
+                    if (r2.data && r2.data.length > 0) {
+                        var id = String(r2.data[0].itemid);
+                        await Promise.all([
+                            supabase.from('itemsloc_db').delete().eq('itemid', id),
+                            supabase.from('items_db').delete().eq('itemid', id),
+                            supabase.from('item_flags').delete().eq('item_name', name),
+                            supabase.from('item_removals').insert({ item_name: name, itemid: id, reason: 'admin_cleanup', removed_by: document.getElementById('reviewer-name').value.trim() || 'admin' })
+                        ]);
+                    }
+                    row.remove();
+                });
+                var clearBtn = document.createElement('button');
+                clearBtn.className = 'btn-sm btn-sm-restore';
+                clearBtn.textContent = 'Clear';
+                clearBtn.addEventListener('click', async function() {
+                    await supabase.from('item_flags').delete().eq('item_name', name).eq('flag_type', 'junk');
+                    row.remove();
+                });
+                row.appendChild(delBtn);
+                row.appendChild(clearBtn);
+                list.appendChild(row);
+            });
+        }
+
+        // ── UI helpers ────────────────────────────────────────────
+        function showFeedback(type) {
+            var msgs = { legit: '✓ Marked as legit', junk: '✗ Flagged as junk', skip: '→ Skipped', delete: '🗑 Deleted' };
+            var fb = document.getElementById('feedback');
+            fb.textContent = msgs[type] || '';
+            fb.className = 'feedback show ' + type;
+            setTimeout(function() { fb.classList.remove('show'); }, 800);
+        }
+
+        function updateStatDisplay() {
+            document.getElementById('stat-reviewed').textContent = stats.reviewed;
+            document.getElementById('stat-legit').textContent    = stats.legit;
+            document.getElementById('stat-junk').textContent     = stats.junk;
+            document.getElementById('stat-skip').textContent     = stats.skip;
+            document.getElementById('stat-streak').textContent   = stats.streak;
+        }
+
+        function updateProgress() {
+            var pct = queue.length > 0 ? Math.round(qIndex / queue.length * 100) : 0;
+            document.getElementById('progress-bar').style.width = pct + '%';
+        }
+
+        function escHtml(s) {
+            if (!s) return '';
+            var d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
+        // ── Keyboard shortcuts ────────────────────────────────────
+        document.addEventListener('keydown', function(e) {
+            if (e.target.tagName === 'INPUT') return;
+            if (e.key === 'l' || e.key === 'L') vote('legit');
+            else if (e.key === 'j' || e.key === 'J') vote('junk');
+            else if (e.key === 's' || e.key === 'S' || e.key === ' ') { e.preventDefault(); vote('skip'); }
+        });
+
+        loadQueue();
+    </script>
+</body>
+</html>
