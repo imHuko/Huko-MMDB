@@ -4,26 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Import Database - MUD Equipment DB</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: "Inter", sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
-        #sticky-header { position: sticky; top: 0; z-index: 100; background: #1a1a1a; }
+        body { font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
         a { color: #8787FF; }
         h1, h2, h3 { color: #C0C0C0; }
         input, button { padding: 8px; margin: 5px; }
         button { background: #8787FF; color: #000; border: none; border-radius: 3px; cursor: pointer; }
         button:disabled { opacity: 0.5; cursor: not-allowed; }
-        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; }
-        nav a { margin-right: 15px; color: #8787FF; text-decoration: none; }
-        nav a:hover { color: #C0C0C0; }
-        nav .dropdown { position: relative; display: inline-block; margin-right: 15px; }
-        nav .dropbtn { cursor: pointer; color: #8787FF; }
-        nav .dropdown-content { display: none; position: absolute; top: 100%; left: 0; background: #333; min-width: 160px; border: 1px solid #444; border-radius: 3px; z-index: 1000; }
-        nav .dropdown-content a { display: block; padding: 8px 12px; margin: 0; white-space: nowrap; }
-        nav .dropdown-content a:hover { background: #444; color: #C0C0C0; }
-        nav .dropdown:hover .dropdown-content { display: block; }
+        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        nav a { margin-right: 15px; }
         .hidden { display: none; }
         .table-card { margin: 8px 0; padding: 12px; background: #222; border: 1px solid #444; border-radius: 5px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
         .table-card.ready  { border-color: #44aa44; }
@@ -45,51 +34,13 @@
     </style>
 </head>
 <body>
-    <div style="margin-bottom:6px;text-align:center;"><img src="images/logo.png" alt="HukoDB" style="height:130px;"></div>
-    <div id="sticky-header">
+    <h1>Import Database</h1>
     <nav>
         <a href="index.html">Search</a>
-        <a href="zones.html">Zones</a>
-        <a href="leaderboard.html">Leaderboard</a>
-        
-        <div class="dropdown">
-            <span class="dropbtn">Games ▼</span>
-            <div class="dropdown-content">
-                <a href="daily.html">Daily</a>
-                <a href="zonequiz.html">Zone Quiz</a>
-                <a href="mobguess.html">Mob Guess</a>
-            </div>
-        </div>
-
-        <div class="dropdown">
-            <span class="dropbtn">Community Tools ▼</span>
-            <div class="dropdown-content">
-                <a href="market.html">Market</a>
-                <a href="lfg.html">LFG</a>
-            </div>
-        </div>
-        <div class="dropdown">
-            <span class="dropbtn">More ▼</span>
-            <div class="dropdown-content">
-                <a href="info.html">About</a>
-                <a href="ideas.html">Ideas</a>
-            </div>
-        </div>
-        <div class="dropdown" id="editor-dropdown" style="display:none;">
-            <span class="dropbtn">Editor ▼</span>
-            <div class="dropdown-content">
-                <a href="import.html">Add Equipment</a>
-                <a href="batch.html">Batch Import</a>
-                <a href="import-db.html">Import Database</a>
-            </div>
-        </div>
-        <span id="login-link"><a href="login.html">Login</a></span>
-        <span id="signup-link"><a href="signup.html" style="color:#44aa44;">Sign Up</a></span>
-        <span id="admin-link" style="display:none;"><a href="admin.html" style="color:#FFD700;font-weight:bold;">Admin Panel</a></span>
-        <span id="logout-link" style="display:none;"><a href="#" onclick="logout()">Logout</a></span>
+        <a href="import.html">Add Equipment</a>
+        <a href="batch.html">Batch Import</a>
+        <a href="admin.html">Admin</a>
     </nav>
-    </div>
-    <h2>Import Database</h2>
     <hr>
 
     <p>Upload your <strong>.db</strong> file. New rows are merged in — existing rows with the same ID are skipped, so you won't get duplicates. Use <strong>Reimport</strong> to fully replace a table.</p>
@@ -348,23 +299,11 @@
     </script>
     <script>
         if (sessionStorage.getItem('editor_logged_in') === 'true') {
-            document.getElementById('editor-dropdown') && (document.getElementById('editor-dropdown').style.display = 'inline-block');
-            document.getElementById('admin-link') && (document.getElementById('admin-link').style.display = 'inline');
+            document.getElementById('editor-links') && (document.getElementById('editor-links').style.display = 'inline');
             document.getElementById('logout-link') && (document.getElementById('logout-link').style.display = 'inline');
             document.getElementById('login-link') && (document.getElementById('login-link').style.display = 'none');
         }
-                if (localStorage.getItem('user_logged_in') === 'true') {
-            document.getElementById('login-link').style.display = 'none';
-            document.getElementById('signup-link').style.display = 'none';
-        }
-        function logout() {
-            sessionStorage.removeItem('editor_logged_in');
-            sessionStorage.removeItem('editor_name');
-            localStorage.removeItem('user_logged_in');
-            localStorage.removeItem('username');
-            location.reload();
-        }
+        function logout() { sessionStorage.removeItem('editor_logged_in'); location.reload(); }
     </script>
 </body>
 </html>
-
