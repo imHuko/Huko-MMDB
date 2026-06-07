@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zone Quiz - HukoDB</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+        a { color: #8787FF; }
+        h1 { color: #C0C0C0; text-align: center; }
+        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        nav a { margin-right: 15px; }
+        .subtitle { text-align: center; color: #888; font-size: 13px; margin: -10px 0 20px; }
+        hr { border-color: #333; }
+        .stats-row { display: flex; gap: 12px; justify-content: center; margin: 15px 0; flex-wrap: wrap; }
+        .stat-box { background: #222; padding: 10px 18px; border-radius: 5px; text-align: center; border: 1px solid #333; }
+        .stat-box .num { font-size: 22px; font-weight: bold; color: #8787FF; }
+        .stat-box .lbl { font-size: 11px; color: #555; }
+        .question-card { background: #222; border: 1px solid #333; border-radius: 8px; padding: 20px; margin: 15px 0; text-align: center; }
+        .question-label { font-size: 12px; color: #555; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+        .question-item { font-size: 20px; color: #C0C0C0; font-weight: bold; margin: 10px 0; }
+        .question-hint { font-size: 12px; color: #555; margin-top: 8px; }
+        .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0; }
+        .choice-btn { padding: 12px 10px; background: #2a2a2a; border: 1px solid #444; border-radius: 5px; color: #ccc; cursor: pointer; font-size: 13px; text-align: center; transition: background 0.1s; }
+        .choice-btn:hover:not(:disabled) { background: #333; border-color: #8787FF; color: #fff; }
+        .choice-btn:disabled { cursor: not-allowed; }
+        .choice-btn.correct { background: #1a3a1a; border-color: #44aa44; color: #88ff88; }
+        .choice-btn.wrong   { background: #2a1a1a; border-color: #ff4444; color: #ff8888; }
+        .choice-btn.reveal  { background: #1a3a1a; border-color: #44aa44; color: #88ff88; opacity: 0.7; }
+        .feedback { text-align: center; font-size: 16px; min-height: 28px; margin: 8px 0; font-weight: bold; }
+        .feedback.correct { color: #44aa44; }
+        .feedback.wrong   { color: #ff4444; }
+        .next-row { text-align: center; margin: 10px 0; }
+        .next-row button { padding: 10px 30px; background: #8787FF; color: #000; border: none; border-radius: 3px; cursor: pointer; font-size: 14px; font-weight: bold; }
+        .score-bar-wrap { background: #333; border-radius: 3px; height: 6px; margin: 8px 0; }
+        .score-bar { background: #8787FF; height: 6px; border-radius: 3px; transition: width 0.3s; }
+        .diff-row { display: flex; gap: 8px; justify-content: center; margin: 10px 0; }
+        .diff-btn { padding: 5px 14px; background: #333; border: 1px solid #444; border-radius: 3px; color: #888; cursor: pointer; font-size: 12px; }
+        .diff-btn.active { background: #8787FF; color: #000; border-color: #8787FF; }
+        .game-over { text-align: center; background: #222; border-radius: 8px; padding: 25px; margin: 15px 0; border: 2px solid #8787FF; }
+        .game-over h2 { color: #C0C0C0; margin: 0 0 10px; }
+        .game-over .final-score { font-size: 36px; font-weight: bold; color: #8787FF; }
+        .game-over .grade { font-size: 18px; margin: 5px 0; }
+        .empty { text-align: center; color: #555; padding: 40px 0; }
+        .streak-badge { display: inline-block; background: #ffaa00; color: #000; border-radius: 3px; padding: 2px 8px; font-size: 11px; font-weight: bold; margin-left: 8px; }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="index.html">Search</a>
+        <a href="zones.html">Zones</a>
+        <a href="daily.html">Daily Item</a>
+        <a href="zonequiz.html">Zone Quiz</a>
+        <a href="market.html">Market</a>
+        <a href="lfg.html">LFG</a>
+    </nav>
+    <hr>
+
+    <h1>🗺️ Zone Quiz</h1>
+    <p class="subtitle">Which zone does this item drop in?</p>
+
+    <div class="stats-row">
+        <div class="stat-box"><div class="num" id="score-num">0</div><div class="lbl">Score</div></div>
+        <div class="stat-box"><div class="num" id="streak-num">0</div><div class="lbl">Streak</div></div>
+        <div class="stat-box"><div class="num" id="best-num">0</div><div class="lbl">Best</div></div>
+        <div class="stat-box"><div class="num" id="q-num">0/10</div><div class="lbl">Question</div></div>
+    </div>
+
+    <div class="diff-row">
+        <button class="diff-btn active" id="diff-easy"   onclick="setDiff('easy')">Easy (4 choices)</button>
+        <button class="diff-btn"        id="diff-medium" onclick="setDiff('medium')">Medium (6 choices)</button>
+        <button class="diff-btn"        id="diff-hard"   onclick="setDiff('hard')">Hard (8 choices)</button>
+    </div>
+
+    <div id="game-area"><p class="empty">Loading quiz data...</p></div>
+
+    <script type="module">
+        var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
+        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+        var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        var TOTAL_QUESTIONS = 10;
+        var DIFF_CHOICES = { easy: 4, medium: 6, hard: 8 };
+        var diff = 'easy';
+
+        var pool = [];       // { name, zone } pairs
+        var zones = [];      // all unique zone names
+        var questions = [];  // current round questions
+        var qIndex = 0;
+        var score = 0;
+        var streak = 0;
+        var best = parseInt(localStorage.getItem('zonequiz_best') || '0');
+        var answered = false;
+
+        window.setDiff = function(d) {
+            diff = d;
+            document.querySelectorAll('.diff-btn').forEach(function(b) { b.classList.remove('active'); });
+            document.getElementById('diff-' + d).classList.add('active');
+            if (pool.length > 0) startRound();
+        };
+
+        // ── Load data ─────────────────────────────────────────────
+        async function loadData() {
+            document.getElementById('game-area').innerHTML = '<p class="empty">Loading...</p>';
+
+            // Get items that are in exactly one zone, with stats in equipment table
+            var result = await supabase.rpc('get_quiz_items');
+
+            if (!result.data || result.data.length < 20) {
+                // Fallback: load directly
+                var r = await supabase.from('itemsloc_db')
+                    .select('itemid, area')
+                    .not('area', 'is', null)
+                    .neq('area', '')
+                    .neq('area', '-')
+                    .limit(5000);
+
+                // Build pool from raw data
+                var byItem = {};
+                (r.data || []).forEach(function(row) {
+                    if (!byItem[row.itemid]) byItem[row.itemid] = new Set();
+                    byItem[row.itemid].add(row.area);
+                });
+
+                // Get names for single-zone items
+                var singleZoneIds = Object.keys(byItem).filter(function(id) { return byItem[id].size === 1; });
+                var nameMap = {};
+                for (var i = 0; i < singleZoneIds.length; i += 200) {
+                    var batch = singleZoneIds.slice(i, i + 200);
+                    var nr = await supabase.from('items_db').select('itemid, name').in('itemid', batch);
+                    (nr.data || []).forEach(function(row) { nameMap[String(row.itemid)] = row.name; });
+                }
+
+                pool = [];
+                singleZoneIds.forEach(function(id) {
+                    var name = nameMap[id];
+                    if (name && !name.includes('corpse') && !name.includes('gold coins') && name.length < 50) {
+                        pool.push({ name: name, zone: Array.from(byItem[id])[0] });
+                    }
+                });
+
+                zones = [...new Set(pool.map(function(p) { return p.zone; }))].sort();
+            } else {
+                pool = result.data.filter(function(r) {
+                    return r.name && !r.name.includes('corpse') && !r.name.includes('gold coins') && r.name.length < 50;
+                });
+                zones = [...new Set(pool.map(function(p) { return p.zone; }))].sort();
+            }
+
+            document.getElementById('best-num').textContent = best;
+            startRound();
+        }
+
+        // ── Round ─────────────────────────────────────────────────
+        function startRound() {
+            score = 0;
+            streak = 0;
+            qIndex = 0;
+            questions = buildQuestions();
+            updateStats();
+            nextQuestion();
+        }
+
+        function buildQuestions() {
+            // Shuffle pool and take TOTAL_QUESTIONS
+            var shuffled = pool.slice().sort(function() { return Math.random() - 0.5; });
+            return shuffled.slice(0, TOTAL_QUESTIONS);
+        }
+
+        function nextQuestion() {
+            if (qIndex >= TOTAL_QUESTIONS) {
+                showGameOver();
+                return;
+            }
+
+            answered = false;
+            var q = questions[qIndex];
+            var numChoices = DIFF_CHOICES[diff];
+
+            // Build wrong choices from other zones
+            var wrongZones = zones.filter(function(z) { return z !== q.zone; });
+            wrongZones.sort(function() { return Math.random() - 0.5; });
+            var choices = [q.zone].concat(wrongZones.slice(0, numChoices - 1));
+            choices.sort(function() { return Math.random() - 0.5; });
+
+            renderQuestion(q, choices);
+        }
+
+        function renderQuestion(q, choices) {
+            var area = document.getElementById('game-area');
+            area.innerHTML = '';
+
+            // Progress bar
+            var progWrap = document.createElement('div');
+            progWrap.className = 'score-bar-wrap';
+            var progBar = document.createElement('div');
+            progBar.className = 'score-bar';
+            progBar.style.width = (qIndex / TOTAL_QUESTIONS * 100) + '%';
+            progWrap.appendChild(progBar);
+            area.appendChild(progWrap);
+
+            // Question card
+            var card = document.createElement('div');
+            card.className = 'question-card';
+            card.innerHTML = '<div class="question-label">Which zone does this item drop in?</div>'
+                + '<div class="question-item">' + escHtml(q.name) + '</div>'
+                + '<div class="question-hint"><a href="item.html?name=' + encodeURIComponent(q.name) + '" target="_blank" style="color:#555;font-size:11px;">View item →</a></div>';
+            area.appendChild(card);
+
+            // Feedback
+            var feedback = document.createElement('div');
+            feedback.className = 'feedback';
+            feedback.id = 'feedback';
+            area.appendChild(feedback);
+
+            // Choices grid
+            var grid = document.createElement('div');
+            grid.className = 'choices';
+            choices.forEach(function(zone) {
+                var btn = document.createElement('button');
+                btn.className = 'choice-btn';
+                btn.textContent = zone;
+                btn.addEventListener('click', function() { handleChoice(zone, q.zone, choices); });
+                grid.appendChild(btn);
+            });
+            area.appendChild(grid);
+
+            // Next button (hidden until answered)
+            var nextRow = document.createElement('div');
+            nextRow.className = 'next-row';
+            nextRow.id = 'next-row';
+            nextRow.style.display = 'none';
+            var nextBtn = document.createElement('button');
+            nextBtn.textContent = qIndex === TOTAL_QUESTIONS - 1 ? 'See Results' : 'Next →';
+            nextBtn.addEventListener('click', function() {
+                qIndex++;
+                nextQuestion();
+            });
+            nextRow.appendChild(nextBtn);
+            area.appendChild(nextRow);
+        }
+
+        function handleChoice(chosen, correct, choices) {
+            if (answered) return;
+            answered = true;
+
+            var isCorrect = chosen === correct;
+            var feedback = document.getElementById('feedback');
+
+            // Color all buttons
+            document.querySelectorAll('.choice-btn').forEach(function(btn) {
+                btn.disabled = true;
+                if (btn.textContent === correct) {
+                    btn.className = 'choice-btn ' + (isCorrect ? 'correct' : 'reveal');
+                } else if (btn.textContent === chosen && !isCorrect) {
+                    btn.className = 'choice-btn wrong';
+                }
+            });
+
+            if (isCorrect) {
+                score++;
+                streak++;
+                feedback.className = 'feedback correct';
+                feedback.innerHTML = '✓ Correct!' + (streak >= 3 ? ' <span class="streak-badge">🔥 ' + streak + ' streak</span>' : '');
+            } else {
+                streak = 0;
+                feedback.className = 'feedback wrong';
+                feedback.textContent = '✗ It was ' + correct;
+            }
+
+            updateStats();
+            document.getElementById('next-row').style.display = 'block';
+        }
+
+        function showGameOver() {
+            var pct = Math.round(score / TOTAL_QUESTIONS * 100);
+            var grade = pct >= 90 ? '🍄 Sporefolk Master!' : pct >= 70 ? '⚔️ Seasoned Adventurer' : pct >= 50 ? '🗺️ Getting there...' : '💀 Keep exploring!';
+
+            if (score > best) {
+                best = score;
+                localStorage.setItem('zonequiz_best', best);
+                document.getElementById('best-num').textContent = best;
+            }
+
+            var area = document.getElementById('game-area');
+            area.innerHTML = '';
+
+            var box = document.createElement('div');
+            box.className = 'game-over';
+            box.innerHTML = '<h2>Round Complete!</h2>'
+                + '<div class="final-score">' + score + ' / ' + TOTAL_QUESTIONS + '</div>'
+                + '<div class="grade">' + grade + '</div>';
+
+            var playAgain = document.createElement('button');
+            playAgain.style.cssText = 'margin-top:15px;padding:10px 30px;background:#8787FF;color:#000;border:none;border-radius:3px;cursor:pointer;font-size:14px;font-weight:bold;';
+            playAgain.textContent = 'Play Again';
+            playAgain.addEventListener('click', startRound);
+            box.appendChild(playAgain);
+            area.appendChild(box);
+        }
+
+        function updateStats() {
+            document.getElementById('score-num').textContent  = score;
+            document.getElementById('streak-num').textContent = streak;
+            document.getElementById('best-num').textContent   = best;
+            document.getElementById('q-num').textContent      = (qIndex + 1) + '/' + TOTAL_QUESTIONS;
+        }
+
+        function escHtml(s) {
+            if (!s) return '';
+            var d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
+        loadData();
+    </script>
+</body>
+</html>

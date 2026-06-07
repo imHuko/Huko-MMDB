@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mob Guesser - HukoDB</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+        a { color: #8787FF; }
+        h1 { color: #C0C0C0; text-align: center; }
+        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        nav a { margin-right: 15px; }
+        .subtitle { text-align: center; color: #888; font-size: 13px; margin: -10px 0 20px; }
+        hr { border-color: #333; }
+        .stats-row { display: flex; gap: 12px; justify-content: center; margin: 10px 0; flex-wrap: wrap; }
+        .stat-box { background: #222; padding: 10px 18px; border-radius: 5px; text-align: center; border: 1px solid #333; min-width: 70px; }
+        .stat-box .num { font-size: 22px; font-weight: bold; color: #8787FF; }
+        .stat-box .lbl { font-size: 11px; color: #555; }
+        .hint-card { background: #222; border: 1px solid #333; border-radius: 5px; padding: 12px 15px; margin: 8px 0; display: flex; gap: 12px; align-items: flex-start; }
+        .hint-card.locked { opacity: 0.35; }
+        .hint-num { background: #333; color: #888; border-radius: 3px; padding: 2px 7px; font-size: 11px; font-weight: bold; white-space: nowrap; flex-shrink: 0; margin-top: 2px; }
+        .hint-num.active { background: #8787FF; color: #000; }
+        .hint-content { flex: 1; }
+        .hint-label { font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px; }
+        .hint-value { font-size: 14px; color: #C0C0C0; }
+        .hint-locked-text { font-size: 12px; color: #444; font-style: italic; }
+        .guesses { margin: 15px 0; }
+        .guess-entry { padding: 8px 12px; margin: 4px 0; border-radius: 3px; font-size: 13px; display: flex; align-items: center; gap: 10px; }
+        .guess-entry.wrong   { background: #2a1a1a; border: 1px solid #ff4444; color: #ff8888; }
+        .guess-entry.close   { background: #2a2200; border: 1px solid #ffaa00; color: #ffcc44; }
+        .guess-entry.correct { background: #1a3a1a; border: 1px solid #44aa44; color: #88ff88; }
+        .guess-icon { font-size: 16px; width: 20px; text-align: center; }
+        .attempts { text-align: center; color: #555; font-size: 13px; margin: 5px 0; }
+        .input-row { display: flex; gap: 8px; margin: 12px 0; }
+        .input-row input { flex: 1; padding: 10px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; font-size: 14px; }
+        .input-row button { padding: 10px 20px; background: #8787FF; color: #000; border: none; border-radius: 3px; cursor: pointer; font-size: 14px; font-weight: bold; }
+        .input-row button:disabled { opacity: 0.4; cursor: not-allowed; }
+        .ac-wrap { position: relative; flex: 1; }
+        .ac-list { position: absolute; top: 100%; left: 0; right: 0; background: #2a2a2a; border: 1px solid #555; border-top: none; border-radius: 0 0 4px 4px; max-height: 200px; overflow-y: auto; z-index: 100; display: none; }
+        .ac-list.open { display: block; }
+        .ac-item { padding: 7px 10px; font-size: 13px; cursor: pointer; }
+        .ac-item:hover, .ac-item.sel { background: #3a3a5a; color: #fff; }
+        .result-box { text-align: center; padding: 20px; background: #222; border-radius: 8px; margin: 15px 0; }
+        .result-box.win  { border: 2px solid #44aa44; }
+        .result-box.lose { border: 2px solid #ff4444; }
+        .result-box h2 { margin: 0 0 8px; }
+        .result-answer { font-size: 20px; color: #C0C0C0; margin: 10px 0; font-weight: bold; }
+        .result-box a.item-link { display: inline-block; margin: 8px 5px 0; padding: 7px 14px; background: #8787FF; color: #000; border-radius: 3px; text-decoration: none; font-size: 13px; }
+        .result-box a.item-link.secondary { background: #444; color: #ccc; }
+        .next-timer { color: #555; font-size: 12px; margin-top: 10px; }
+        .skip-btn { background: none; border: none; color: #555; font-size: 12px; cursor: pointer; text-decoration: underline; margin-top: 5px; display: block; text-align: center; width: 100%; }
+        .skip-btn:hover { color: #888; }
+        .mode-row { display: flex; gap: 8px; justify-content: center; margin: 10px 0; }
+        .mode-btn { padding: 5px 14px; background: #333; border: 1px solid #444; border-radius: 3px; color: #888; cursor: pointer; font-size: 12px; }
+        .mode-btn.active { background: #8787FF; color: #000; border-color: #8787FF; }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="index.html">Search</a>
+        <a href="zones.html">Zones</a>
+        <a href="daily.html">Daily Item</a>
+        <a href="zonequiz.html">Zone Quiz</a>
+        <a href="mobguess.html">Mob Guesser</a>
+        <a href="market.html">Market</a>
+        <a href="lfg.html">LFG</a>
+    </nav>
+    <hr>
+
+    <h1>👾 Mob Guesser</h1>
+    <p class="subtitle">Guess the mob from the clues. A new clue unlocks each wrong guess.</p>
+
+    <div class="stats-row">
+        <div class="stat-box"><div class="num" id="streak-num">0</div><div class="lbl">Streak</div></div>
+        <div class="stat-box"><div class="num" id="best-num">0</div><div class="lbl">Best Streak</div></div>
+        <div class="stat-box"><div class="num" id="played-num">0</div><div class="lbl">Played</div></div>
+        <div class="stat-box"><div class="num" id="won-num">0</div><div class="lbl">Won</div></div>
+    </div>
+
+    <div class="mode-row">
+        <button class="mode-btn active" id="mode-endless" onclick="setMode('endless')">Endless</button>
+        <button class="mode-btn" id="mode-daily" onclick="setMode('daily')">Daily</button>
+    </div>
+
+    <div id="game-area"><p style="text-align:center;color:#555;">Loading mobs...</p></div>
+
+    <script type="module">
+        var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
+        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+        var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        var MAX_GUESSES = 5;
+        var mode = 'endless';
+        var pool = [];
+        var allNames = [];
+        var currentMob = null;
+        var guesses = [];
+        var finished = false;
+        var acSelected = -1;
+
+        var stats = loadStats();
+        updateStatDisplay();
+
+        function loadStats() {
+            try { return JSON.parse(localStorage.getItem('mobguess_stats') || '{}'); } catch(e) { return {}; }
+        }
+        function saveStats() {
+            try { localStorage.setItem('mobguess_stats', JSON.stringify(stats)); } catch(e) {}
+        }
+
+        function getTodayKey() {
+            var d = new Date();
+            return d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate();
+        }
+
+        function dateSeed() {
+            var s = getTodayKey().replace(/-/g, '');
+            var h = 0;
+            for (var i = 0; i < s.length; i++) h = Math.imul(31, h) + s.charCodeAt(i) | 0;
+            return Math.abs(h);
+        }
+
+        window.setMode = function(m) {
+            mode = m;
+            document.querySelectorAll('.mode-btn').forEach(function(b) { b.classList.remove('active'); });
+            document.getElementById('mode-' + m).classList.add('active');
+            if (pool.length > 0) newMob();
+        };
+
+        // ── Load data ─────────────────────────────────────────────
+        async function loadData() {
+            var result = await supabase.rpc('get_mob_guess_pool');
+            var rows = result.data || [];
+
+            if (rows.length === 0) {
+                // Fallback direct query
+                var r = await supabase.from('mobs_db')
+                    .select('mobid, name')
+                    .not('name', 'ilike', 'a %')
+                    .not('name', 'ilike', 'an %')
+                    .not('name', 'ilike', 'the %')
+                    .not('name', 'ilike', '%corpse%')
+                    .not('name', 'ilike', '%(no%')
+                    .gte('name', 'A')
+                    .limit(2000);
+                rows = (r.data || []).filter(function(m) {
+                    return m.name.length >= 4 && m.name.length <= 30;
+                });
+            }
+
+            pool = rows;
+            allNames = [...new Set(rows.map(function(r) { return r.name; }))].sort();
+            newMob();
+        }
+
+        // ── Pick mob ──────────────────────────────────────────────
+        async function newMob() {
+            guesses = [];
+            finished = false;
+
+            var candidate;
+            if (mode === 'daily') {
+                var idx = dateSeed() % pool.length;
+                candidate = pool[idx];
+            } else {
+                candidate = pool[Math.floor(Math.random() * pool.length)];
+            }
+
+            // Fetch hints for this mob in parallel
+            var [locResult, itemResult] = await Promise.all([
+                supabase.from('mobsloc_db').select('area, room, hits').eq('mobid', String(candidate.mobid || candidate.name)).order('hits', { ascending: false }).limit(10),
+                supabase.from('itemsloc_db').select('itemid').eq('mobid', String(candidate.mobid || candidate.name)).limit(5)
+            ]);
+
+            // Get top zone
+            var zones = [...new Set((locResult.data || []).map(function(r) { return r.area; }).filter(Boolean))];
+            var topZone = zones[0] || 'Unknown';
+
+            // Get top room
+            var topRoom = null;
+            if (locResult.data && locResult.data.length > 0) {
+                var withRoom = locResult.data.filter(function(r) { return r.room && r.room !== '-'; });
+                if (withRoom.length > 0) topRoom = withRoom[0].room;
+            }
+
+            // Count zones
+            var zoneCount = zones.length;
+
+            // Get item drops
+            var itemIds = (itemResult.data || []).map(function(r) { return String(r.itemid); });
+            var dropName = null;
+            if (itemIds.length > 0) {
+                var nameRes = await supabase.from('items_db').select('name').in('itemid', itemIds.slice(0, 3)).limit(1);
+                if (nameRes.data && nameRes.data.length > 0) dropName = nameRes.data[0].name;
+            }
+
+            // Name length hint
+            var wordCount = candidate.name.trim().split(/\s+/).length;
+
+            currentMob = {
+                name:      candidate.name,
+                mobid:     candidate.mobid,
+                hints: [
+                    { label: 'Zone',          value: topZone,
+                      desc: 'This mob is found in ' + topZone },
+                    { label: 'Room',          value: topRoom || 'Unknown',
+                      desc: topRoom ? 'Spotted in: ' + topRoom : 'Room data unavailable' },
+                    { label: 'Drops',         value: dropName || 'Nothing notable',
+                      desc: dropName ? 'Drops: ' + dropName : 'No notable drops' },
+                    { label: 'Zones',         value: zoneCount + ' zone' + (zoneCount !== 1 ? 's' : ''),
+                      desc: 'Found across ' + zoneCount + ' zone' + (zoneCount !== 1 ? 's' : '') },
+                    { label: 'Name Length',   value: candidate.name.length + ' chars, ' + wordCount + ' word' + (wordCount !== 1 ? 's' : ''),
+                      desc: candidate.name.length + ' characters, ' + wordCount + ' word' + (wordCount !== 1 ? 's' : '') }
+                ]
+            };
+
+            renderGame();
+        }
+
+        // ── Render ────────────────────────────────────────────────
+        function renderGame() {
+            var area = document.getElementById('game-area');
+            area.innerHTML = '';
+
+            var guessCount = guesses.length;
+
+            // Hints
+            currentMob.hints.forEach(function(h, i) {
+                var locked = i > guessCount && !finished;
+                var div = document.createElement('div');
+                div.className = 'hint-card' + (locked ? ' locked' : '');
+
+                var num = document.createElement('div');
+                num.className = 'hint-num' + (i === guessCount && !finished ? ' active' : '');
+                num.textContent = 'Hint ' + (i + 1);
+
+                var content = document.createElement('div');
+                content.className = 'hint-content';
+                content.innerHTML = '<div class="hint-label">' + escHtml(h.label) + '</div>'
+                    + (locked
+                        ? '<div class="hint-locked-text">Unlocks after guess ' + i + '</div>'
+                        : '<div class="hint-value">' + escHtml(h.desc) + '</div>');
+
+                div.appendChild(num);
+                div.appendChild(content);
+                area.appendChild(div);
+            });
+
+            // Past guesses
+            if (guesses.length > 0) {
+                var guessDiv = document.createElement('div');
+                guessDiv.className = 'guesses';
+                guesses.forEach(function(g) {
+                    var correct = g.toLowerCase() === currentMob.name.toLowerCase();
+                    var close   = !correct && currentMob.name.toLowerCase().indexOf(g.toLowerCase()) >= 0;
+                    var entry   = document.createElement('div');
+                    entry.className = 'guess-entry ' + (correct ? 'correct' : close ? 'close' : 'wrong');
+                    entry.innerHTML = '<span class="guess-icon">' + (correct ? '✓' : close ? '~' : '✗') + '</span>' + escHtml(g);
+                    guessDiv.appendChild(entry);
+                });
+                area.appendChild(guessDiv);
+            }
+
+            if (finished) {
+                renderResult(area);
+                return;
+            }
+
+            // Attempts remaining
+            var attEl = document.createElement('p');
+            attEl.className = 'attempts';
+            attEl.textContent = (MAX_GUESSES - guessCount) + ' guess' + (MAX_GUESSES - guessCount !== 1 ? 'es' : '') + ' remaining';
+            area.appendChild(attEl);
+
+            // Input row
+            var inputRow = document.createElement('div');
+            inputRow.className = 'input-row';
+            inputRow.innerHTML = '<div class="ac-wrap">'
+                + '<input type="text" id="guess-input" placeholder="Type mob name..." autocomplete="off" oninput="acSearch(this.value)" onkeydown="handleKey(event)">'
+                + '<div class="ac-list" id="guess-ac"></div>'
+                + '</div>';
+            var btn = document.createElement('button');
+            btn.id = 'guess-btn';
+            btn.textContent = 'Guess';
+            btn.addEventListener('click', submitGuess);
+            inputRow.appendChild(btn);
+            area.appendChild(inputRow);
+
+            // Skip button
+            if (mode === 'endless') {
+                var skip = document.createElement('button');
+                skip.className = 'skip-btn';
+                skip.textContent = 'Skip this mob';
+                skip.addEventListener('click', function() {
+                    stats.streak = 0;
+                    saveStats();
+                    updateStatDisplay();
+                    newMob();
+                });
+                area.appendChild(skip);
+            }
+
+            document.getElementById('guess-input').focus();
+        }
+
+        function renderResult(area) {
+            var won = guesses.some(function(g) { return g.toLowerCase() === currentMob.name.toLowerCase(); });
+            var box = document.createElement('div');
+            box.className = 'result-box ' + (won ? 'win' : 'lose');
+            box.innerHTML = '<h2>' + (won ? '✓ Correct!' : '✗ Not quite') + '</h2>'
+                + '<div class="result-answer">' + escHtml(currentMob.name) + '</div>';
+
+            var mobLink = document.createElement('a');
+            mobLink.className = 'item-link';
+            mobLink.href = 'mob.html?mobid=' + encodeURIComponent(currentMob.mobid);
+            mobLink.textContent = 'View Mob Page →';
+            box.appendChild(mobLink);
+
+            if (mode === 'endless') {
+                var nextBtn = document.createElement('a');
+                nextBtn.className = 'item-link secondary';
+                nextBtn.href = '#';
+                nextBtn.textContent = 'Next Mob →';
+                nextBtn.addEventListener('click', function(e) { e.preventDefault(); newMob(); });
+                box.appendChild(nextBtn);
+            } else {
+                var next = msUntilMidnight();
+                var timer = document.createElement('div');
+                timer.className = 'next-timer';
+                timer.innerHTML = 'Next daily mob in: <span id="countdown">' + formatMs(next) + '</span>';
+                box.appendChild(timer);
+                setInterval(function() {
+                    var el = document.getElementById('countdown');
+                    if (el) el.textContent = formatMs(msUntilMidnight());
+                }, 1000);
+            }
+
+            area.appendChild(box);
+        }
+
+        // ── Submit ────────────────────────────────────────────────
+        function submitGuess() {
+            var input = document.getElementById('guess-input');
+            if (!input) return;
+            var guess = input.value.trim();
+            if (!guess || finished) return;
+
+            document.querySelectorAll('.ac-list').forEach(function(l) { l.classList.remove('open'); });
+            guesses.push(guess);
+
+            var correct = guess.toLowerCase() === currentMob.name.toLowerCase();
+            if (correct || guesses.length >= MAX_GUESSES) {
+                finished = true;
+                stats.played = (stats.played || 0) + 1;
+                if (correct) {
+                    stats.won = (stats.won || 0) + 1;
+                    stats.streak = (stats.streak || 0) + 1;
+                    stats.best = Math.max(stats.best || 0, stats.streak);
+                } else {
+                    stats.streak = 0;
+                }
+                saveStats();
+                updateStatDisplay();
+            }
+
+            renderGame();
+        }
+
+        // ── Autocomplete ──────────────────────────────────────────
+        window.acSearch = function(val) {
+            var ac = document.getElementById('guess-ac');
+            if (!ac) return;
+            if (!val || val.length < 2) { ac.classList.remove('open'); return; }
+            var lower = val.toLowerCase();
+            var matches = allNames.filter(function(n) { return n.toLowerCase().indexOf(lower) >= 0; }).slice(0, 10);
+            if (!matches.length) { ac.classList.remove('open'); return; }
+            ac.innerHTML = '';
+            acSelected = -1;
+            matches.forEach(function(m) {
+                var item = document.createElement('div');
+                item.className = 'ac-item';
+                item.textContent = m;
+                item.addEventListener('mousedown', function(e) {
+                    e.preventDefault();
+                    document.getElementById('guess-input').value = m;
+                    ac.classList.remove('open');
+                });
+                ac.appendChild(item);
+            });
+            ac.classList.add('open');
+        };
+
+        window.handleKey = function(e) {
+            var ac = document.getElementById('guess-ac');
+            var items = ac ? ac.querySelectorAll('.ac-item') : [];
+            if (e.key === 'ArrowDown') { e.preventDefault(); acSelected = Math.min(acSelected + 1, items.length - 1); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); acSelected = Math.max(acSelected - 1, -1); }
+            else if (e.key === 'Enter') {
+                if (acSelected >= 0 && items[acSelected]) {
+                    e.preventDefault();
+                    document.getElementById('guess-input').value = items[acSelected].textContent;
+                    ac.classList.remove('open');
+                    acSelected = -1;
+                } else { submitGuess(); }
+                return;
+            } else if (e.key === 'Escape') { if (ac) ac.classList.remove('open'); return; }
+            items.forEach(function(item, idx) { item.classList.toggle('sel', idx === acSelected); });
+        };
+
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.ac-wrap')) {
+                document.querySelectorAll('.ac-list').forEach(function(l) { l.classList.remove('open'); });
+            }
+        });
+
+        // ── Helpers ───────────────────────────────────────────────
+        function updateStatDisplay() {
+            document.getElementById('streak-num').textContent = stats.streak  || 0;
+            document.getElementById('best-num').textContent   = stats.best    || 0;
+            document.getElementById('played-num').textContent = stats.played  || 0;
+            document.getElementById('won-num').textContent    = stats.won     || 0;
+        }
+
+        function msUntilMidnight() {
+            var now = new Date(), midnight = new Date(now);
+            midnight.setHours(24, 0, 0, 0);
+            return midnight - now;
+        }
+
+        function formatMs(ms) {
+            var s = Math.floor(ms / 1000);
+            return Math.floor(s/3600) + 'h ' + String(Math.floor((s%3600)/60)).padStart(2,'0') + 'm ' + String(s%60).padStart(2,'0') + 's';
+        }
+
+        function escHtml(s) {
+            if (!s) return '';
+            var d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
+        loadData();
+    </script>
+</body>
+</html>

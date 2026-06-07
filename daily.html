@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Item - HukoDB</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+        a { color: #8787FF; }
+        h1 { color: #C0C0C0; text-align: center; }
+        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        nav a { margin-right: 15px; }
+        .subtitle { text-align: center; color: #888; font-size: 13px; margin: -10px 0 20px; }
+        .hint-box { background: #222; border: 1px solid #333; border-radius: 5px; padding: 15px; margin: 10px 0; }
+        .hint-box .hint-label { font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+        .hint-box .hint-value { font-size: 15px; color: #C0C0C0; }
+        .hint-box.locked .hint-value { color: #333; }
+        .hint-box.locked .hint-label { color: #333; }
+        .hint-unlock { font-size: 12px; color: #555; font-style: italic; }
+        .guess-row { display: flex; gap: 8px; margin: 15px 0; }
+        .guess-row input { flex: 1; padding: 10px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; font-size: 14px; }
+        .guess-row button { padding: 10px 20px; background: #8787FF; color: #000; border: none; border-radius: 3px; cursor: pointer; font-size: 14px; font-weight: bold; }
+        .guess-row button:disabled { opacity: 0.4; cursor: not-allowed; }
+        .guesses { margin: 15px 0; }
+        .guess-entry { padding: 8px 12px; margin: 4px 0; border-radius: 3px; font-size: 13px; display: flex; align-items: center; gap: 10px; }
+        .guess-entry.wrong   { background: #2a1a1a; border: 1px solid #ff4444; color: #ff8888; }
+        .guess-entry.close   { background: #2a2a00; border: 1px solid #ffaa00; color: #ffcc44; }
+        .guess-entry.correct { background: #1a3a1a; border: 1px solid #44aa44; color: #88ff88; }
+        .guess-icon { font-size: 16px; }
+        .attempts { text-align: center; color: #555; font-size: 13px; margin: 5px 0; }
+        .result-box { text-align: center; padding: 20px; background: #222; border-radius: 8px; margin: 15px 0; }
+        .result-box.win  { border: 2px solid #44aa44; }
+        .result-box.lose { border: 2px solid #ff4444; }
+        .result-box h2 { margin: 0 0 10px; }
+        .result-box .answer { font-size: 18px; color: #C0C0C0; margin: 10px 0; }
+        .result-box a { display: inline-block; margin-top: 10px; padding: 8px 16px; background: #8787FF; color: #000; border-radius: 3px; text-decoration: none; }
+        .next-timer { color: #888; font-size: 12px; margin-top: 8px; }
+        .ac-wrap { position: relative; }
+        .ac-list { position: absolute; top: 100%; left: 0; right: 0; background: #2a2a2a; border: 1px solid #555; border-top: none; border-radius: 0 0 4px 4px; max-height: 180px; overflow-y: auto; z-index: 100; display: none; }
+        .ac-list.open { display: block; }
+        .ac-item { padding: 7px 10px; font-size: 13px; cursor: pointer; }
+        .ac-item:hover, .ac-item.sel { background: #3a3a5a; color: #fff; }
+        .streak { text-align: center; display: flex; gap: 20px; justify-content: center; margin: 10px 0; }
+        .streak-box { background: #222; padding: 8px 16px; border-radius: 5px; text-align: center; }
+        .streak-box .num { font-size: 22px; font-weight: bold; color: #8787FF; }
+        .streak-box .lbl { font-size: 11px; color: #555; }
+        hr { border-color: #333; }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="index.html">Search</a>
+        <a href="zones.html">Zones</a>
+        <a href="daily.html">Daily</a>
+        <a href="market.html">Market</a>
+        <a href="lfg.html">LFG</a>
+        <a href="leaderboard.html">Leaderboard</a>
+    </nav>
+    <hr>
+
+    <h1>🍄 Daily Item</h1>
+    <p class="subtitle">Guess today's item from the hints. New item every day.</p>
+
+    <div class="streak">
+        <div class="streak-box"><div class="num" id="streak-num">-</div><div class="lbl">Streak</div></div>
+        <div class="streak-box"><div class="num" id="played-num">-</div><div class="lbl">Played</div></div>
+        <div class="streak-box"><div class="num" id="won-num">-</div><div class="lbl">Won</div></div>
+    </div>
+
+    <div id="game-area"><p style="text-align:center;color:#555;">Loading today's item...</p></div>
+
+    <script type="module">
+        var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
+        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+        var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        var MAX_GUESSES = 5;
+        var todayKey = getTodayKey();
+        var state = loadState();
+        var itemData = null;
+        var allNames = [];
+        var acSelected = -1;
+
+        // ── Date seed ─────────────────────────────────────────────
+        function getTodayKey() {
+            var d = new Date();
+            return d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate();
+        }
+
+        function dateSeed() {
+            // Simple hash of today's date string for consistent daily item
+            var s = todayKey.replace(/-/g, '');
+            var h = 0;
+            for (var i = 0; i < s.length; i++) {
+                h = Math.imul(31, h) + s.charCodeAt(i) | 0;
+            }
+            return Math.abs(h);
+        }
+
+        // ── State persistence ─────────────────────────────────────
+        function loadState() {
+            try {
+                var raw = localStorage.getItem('hukodb_daily');
+                var s = raw ? JSON.parse(raw) : {};
+                // Reset game state if it's a new day
+                if (s.day !== todayKey) {
+                    s.day = todayKey;
+                    s.guesses = [];
+                    s.finished = false;
+                    s.won = false;
+                }
+                if (!s.streak)  s.streak  = 0;
+                if (!s.played)  s.played  = 0;
+                if (!s.won_total) s.won_total = 0;
+                return s;
+            } catch(e) { return { day: todayKey, guesses: [], finished: false, won: false, streak: 0, played: 0, won_total: 0 }; }
+        }
+
+        function saveState() {
+            try { localStorage.setItem('hukodb_daily', JSON.stringify(state)); } catch(e) {}
+        }
+
+        // ── Load item ─────────────────────────────────────────────
+        async function loadGame() {
+            // Get all valid item names for autocomplete and seed selection
+            var result = await supabase.from('equipment')
+                .select('name, type, description')
+                .not('description', 'is', null)
+                .neq('description', '')
+                .order('name', { ascending: true });
+
+            var items = result.data || [];
+            if (items.length === 0) {
+                document.getElementById('game-area').innerHTML = '<p style="color:#ff4444;">Could not load items.</p>';
+                return;
+            }
+
+            // Pick today's item using date seed
+            var idx = dateSeed() % items.length;
+            itemData = items[idx];
+            allNames = items.map(function(i) { return i.name; });
+
+            // Get location hints
+            var [locResult, mobResult] = await Promise.all([
+                supabase.from('itemsloc_db').select('area, mobid').eq('itemid', itemData.itemid || '').limit(5),
+                supabase.from('equipment').select('name').eq('name', itemData.name).limit(1)
+            ]);
+
+            // Get zone from itemsloc via items_db
+            var itemsDbResult = await supabase.from('items_db').select('itemid').eq('name', itemData.name).limit(1);
+            var itemId = itemsDbResult.data && itemsDbResult.data.length > 0 ? itemsDbResult.data[0].itemid : null;
+
+            var zone = 'Unknown';
+            var mobName = 'Unknown';
+            if (itemId) {
+                var locRes = await supabase.from('itemsloc_db').select('area, mobid').eq('itemid', String(itemId)).limit(1);
+                if (locRes.data && locRes.data.length > 0) {
+                    zone = locRes.data[0].area || 'Unknown';
+                    var mobId = locRes.data[0].mobid;
+                    if (mobId) {
+                        var mobRes = await supabase.from('mobs_db').select('name').eq('mobid', String(mobId)).limit(1);
+                        if (mobRes.data && mobRes.data.length > 0) mobName = mobRes.data[0].name;
+                    }
+                }
+            }
+
+            // Parse type from description
+            var typeMatch = (itemData.description || '').match(/is type ([^\s,]+)/i);
+            var itemType = typeMatch ? typeMatch[1] : (itemData.type || 'unknown');
+
+            // Parse a stat hint from description
+            var statMatch = (itemData.description || '').match(/Affects\s+(\S+)\s+by\s+([+-]?\d+)/i);
+            var statHint = statMatch ? ('Affects ' + statMatch[1] + ' by ' + statMatch[2]) : null;
+
+            itemData._zone    = zone;
+            itemData._mob     = mobName;
+            itemData._type    = itemType;
+            itemData._stat    = statHint;
+
+            updateStats();
+            renderGame();
+        }
+
+        // ── Render ────────────────────────────────────────────────
+        function renderGame() {
+            var area = document.getElementById('game-area');
+            area.innerHTML = '';
+
+            var guessCount = state.guesses.length;
+
+            // Hints — revealed progressively
+            var hints = [
+                { label: 'Item Type',    value: itemData._type,  unlockAt: 0 },
+                { label: 'Found In Zone',value: itemData._zone,  unlockAt: 1 },
+                { label: 'Dropped By',   value: itemData._mob,   unlockAt: 2 },
+                { label: 'Stat Hint',    value: itemData._stat || 'No stat data', unlockAt: 3 },
+                { label: 'First Letter', value: itemData.name[0].toUpperCase(), unlockAt: 4 }
+            ];
+
+            hints.forEach(function(h) {
+                var box = document.createElement('div');
+                var locked = guessCount < h.unlockAt && !state.finished;
+                box.className = 'hint-box' + (locked ? ' locked' : '');
+                box.innerHTML = '<div class="hint-label">' + h.label + '</div>'
+                    + '<div class="hint-value">' + (locked ? '???' : escHtml(h.value || 'Unknown')) + '</div>'
+                    + (locked ? '<div class="hint-unlock">Unlocks after guess ' + h.unlockAt + '</div>' : '');
+                area.appendChild(box);
+            });
+
+            // Past guesses
+            var guessesDiv = document.createElement('div');
+            guessesDiv.className = 'guesses';
+            state.guesses.forEach(function(g) {
+                var entry = document.createElement('div');
+                var correct = g.toLowerCase() === itemData.name.toLowerCase();
+                var close   = !correct && itemData.name.toLowerCase().indexOf(g.toLowerCase()) >= 0;
+                entry.className = 'guess-entry ' + (correct ? 'correct' : close ? 'close' : 'wrong');
+                entry.innerHTML = '<span class="guess-icon">' + (correct ? '✓' : close ? '~' : '✗') + '</span>' + escHtml(g);
+                guessesDiv.appendChild(entry);
+            });
+            area.appendChild(guessesDiv);
+
+            if (state.finished) {
+                renderResult(area);
+                return;
+            }
+
+            // Attempts remaining
+            var attEl = document.createElement('p');
+            attEl.className = 'attempts';
+            attEl.textContent = (MAX_GUESSES - guessCount) + ' guess' + (MAX_GUESSES - guessCount !== 1 ? 'es' : '') + ' remaining';
+            area.appendChild(attEl);
+
+            // Input
+            var guessRow = document.createElement('div');
+            guessRow.className = 'guess-row';
+            guessRow.innerHTML = '<div class="ac-wrap" style="flex:1;">'
+                + '<input type="text" id="guess-input" placeholder="Type item name..." autocomplete="off" oninput="acSearch(this.value)" onkeydown="handleKey(event)">'
+                + '<div class="ac-list" id="guess-ac"></div>'
+                + '</div>'
+                + '<button id="guess-btn" onclick="submitGuess()">Guess</button>';
+            area.appendChild(guessRow);
+
+            document.getElementById('guess-input').focus();
+        }
+
+        function renderResult(area) {
+            var box = document.createElement('div');
+            box.className = 'result-box ' + (state.won ? 'win' : 'lose');
+            var next = msUntilMidnight();
+            box.innerHTML = '<h2>' + (state.won ? '🍄 Got it!' : '💀 Better luck tomorrow') + '</h2>'
+                + '<div class="answer">The item was:<br><strong>' + escHtml(itemData.name) + '</strong></div>'
+                + '<a href="item.html?name=' + encodeURIComponent(itemData.name) + '">View Item Page →</a>'
+                + '<div class="next-timer">Next item in: <span id="countdown">' + formatMs(next) + '</span></div>';
+            area.appendChild(box);
+
+            // Countdown
+            setInterval(function() {
+                var el = document.getElementById('countdown');
+                if (el) el.textContent = formatMs(msUntilMidnight());
+            }, 1000);
+        }
+
+        function updateStats() {
+            document.getElementById('streak-num').textContent  = state.streak;
+            document.getElementById('played-num').textContent  = state.played;
+            document.getElementById('won-num').textContent     = state.won_total;
+        }
+
+        // ── Guessing ──────────────────────────────────────────────
+        window.submitGuess = function() {
+            var input = document.getElementById('guess-input');
+            var guess = input.value.trim();
+            if (!guess) return;
+
+            state.guesses.push(guess);
+            document.querySelectorAll('.ac-list').forEach(function(l) { l.classList.remove('open'); });
+
+            var correct = guess.toLowerCase() === itemData.name.toLowerCase();
+
+            if (correct || state.guesses.length >= MAX_GUESSES) {
+                state.finished = true;
+                state.won = correct;
+                state.played++;
+                if (correct) {
+                    state.won_total++;
+                    state.streak++;
+                } else {
+                    state.streak = 0;
+                }
+                updateStats();
+            }
+
+            saveState();
+            renderGame();
+        };
+
+        window.handleKey = function(e) {
+            var ac = document.getElementById('guess-ac');
+            var items = ac ? ac.querySelectorAll('.ac-item') : [];
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                acSelected = Math.min(acSelected + 1, items.length - 1);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                acSelected = Math.max(acSelected - 1, -1);
+            } else if (e.key === 'Enter') {
+                if (acSelected >= 0 && items[acSelected]) {
+                    e.preventDefault();
+                    document.getElementById('guess-input').value = items[acSelected].textContent;
+                    ac.classList.remove('open');
+                    acSelected = -1;
+                } else {
+                    submitGuess();
+                }
+                return;
+            } else if (e.key === 'Escape') {
+                if (ac) ac.classList.remove('open');
+                return;
+            }
+            items.forEach(function(item, idx) { item.classList.toggle('sel', idx === acSelected); });
+        };
+
+        window.acSearch = function(val) {
+            var ac = document.getElementById('guess-ac');
+            if (!ac) return;
+            if (!val || val.length < 2) { ac.classList.remove('open'); return; }
+            var lower = val.toLowerCase();
+            var matches = allNames.filter(function(n) { return n.toLowerCase().indexOf(lower) >= 0; }).slice(0, 10);
+            if (!matches.length) { ac.classList.remove('open'); return; }
+            ac.innerHTML = '';
+            acSelected = -1;
+            matches.forEach(function(m) {
+                var item = document.createElement('div');
+                item.className = 'ac-item';
+                item.textContent = m;
+                item.addEventListener('mousedown', function(e) {
+                    e.preventDefault();
+                    document.getElementById('guess-input').value = m;
+                    ac.classList.remove('open');
+                });
+                ac.appendChild(item);
+            });
+            ac.classList.add('open');
+        };
+
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.ac-wrap')) {
+                document.querySelectorAll('.ac-list').forEach(function(l) { l.classList.remove('open'); });
+            }
+        });
+
+        // ── Helpers ───────────────────────────────────────────────
+        function msUntilMidnight() {
+            var now = new Date();
+            var midnight = new Date(now);
+            midnight.setHours(24, 0, 0, 0);
+            return midnight - now;
+        }
+
+        function formatMs(ms) {
+            var s = Math.floor(ms / 1000);
+            var h = Math.floor(s / 3600);
+            var m = Math.floor((s % 3600) / 60);
+            var sec = s % 60;
+            return h + 'h ' + String(m).padStart(2,'0') + 'm ' + String(sec).padStart(2,'0') + 's';
+        }
+
+        function escHtml(s) {
+            if (!s) return '';
+            var d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
+        loadGame();
+    </script>
+</body>
+</html>
