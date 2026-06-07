@@ -65,22 +65,20 @@
         var mobOffset  = 0, itemOffset  = 0;
         var mobSearch  = '',  itemSearch  = '';
         var MOB_PAGE   = 50,  ITEM_PAGE   = 50;
-        var allMobIds  = [], allItemIds  = [];
+        var allMobData = [], allItemData = [];
 
         async function loadZone(area) {
-            // Get distinct counts and item IDs in parallel
-            var [mobCountResult, itemLocResult] = await Promise.all([
-                supabase.rpc('get_zone_mob_name_count', { zone_area: area }),
-                supabase.from('itemsloc_db').select('itemid').eq('area', area).limit(5000)
+            // Single RPC call for both mobs and items
+            var [mobResult, itemResult] = await Promise.all([
+                supabase.rpc('get_zone_mobs',  { zone_area: area }),
+                supabase.rpc('get_zone_items', { zone_area: area })
             ]);
 
-            var itemLocs     = itemLocResult.data || [];
-            var uniqueItemIds = [...new Set(itemLocs.map(function(r) { return String(r.itemid); }))];
-            allItemIds = uniqueItemIds;
-            allMobIds  = ['placeholder']; // loadMobs fetches its own data, just needs non-empty
+            allMobData  = mobResult.data  || [];
+            allItemData = itemResult.data || [];
 
-            var totalMobs  = (mobCountResult.data && mobCountResult.data[0]) ? mobCountResult.data[0].count : 0;
-            var totalItems = uniqueItemIds.length;
+            var totalMobs  = allMobData.length;
+            var totalItems = allItemData.length;
 
             // Build page shell
             var content = document.getElementById('page-content');
@@ -128,11 +126,9 @@
                 + '<div class="load-more" id="item-load-more" style="display:none;"><button onclick="loadMoreItems()">Load More</button></div>';
             content.appendChild(itemSection);
 
-            // Initial data load for both tabs in parallel
-            await Promise.all([
-                loadMobs(false),
-                loadItems(false)
-            ]);
+            // Render both tabs (data already loaded above)
+            renderMobs(false);
+            renderItems(false);
         }
 
         // ── Tab switching ────────────────────────────────────────
@@ -144,10 +140,9 @@
         };
 
         // ── Mobs ─────────────────────────────────────────────────
-        var allMobLocs = []; // all location rows for this zone
-
         window.filterMobs = function() {
             mobSearch = document.getElementById('mob-search').value.trim().toLowerCase();
+            mobOffset = 0;
             renderMobs(false);
         };
 
@@ -156,58 +151,13 @@
             renderMobs(true);
         };
 
-        async function loadMobs(append) {
-            if (allMobIds.length === 0) {
-                document.getElementById('mob-tbody').innerHTML = '<tr><td colspan="3" class="empty">No mobs found.</td></tr>';
-                return;
-            }
-
-            // Fetch all location rows for this zone at once
-            var locResult = await supabase.from('mobsloc_db')
-                .select('mobid, room, hits')
-                .eq('area', area)
-                .limit(5000);
-
-            // Get unique mobids from location data, then fetch their names
-            var locMobIds = [...new Set((locResult.data || []).map(function(r) { return String(r.mobid); }))];
-
-            var nameMap = {};
-            if (locMobIds.length > 0) {
-                // Fetch in batches of 200 to avoid URL length limits
-                for (var ni = 0; ni < locMobIds.length; ni += 200) {
-                    var batch = locMobIds.slice(ni, ni + 200);
-                    var nr = await supabase.from('mobs_db').select('mobid, name').in('mobid', batch);
-                    (nr.data || []).forEach(function(m) { nameMap[String(m.mobid)] = m.name; });
-                }
-            }
-
-            // Group locations by mob name, merging hash + integer IDs
-            var byName = {};
-            (locResult.data || []).forEach(function(loc) {
-                var name = nameMap[String(loc.mobid)] || ('Mob #' + loc.mobid);
-                var id   = String(loc.mobid);
-                if (!byName[name]) byName[name] = { name: name, id: id, rooms: {}, totalHits: 0 };
-                var room = loc.room && loc.room !== '-' ? loc.room : null;
-                if (room) {
-                    if (!byName[name].rooms[room]) byName[name].rooms[room] = 0;
-                    byName[name].rooms[room] += parseInt(loc.hits || 0);
-                }
-                byName[name].totalHits += parseInt(loc.hits || 0);
-            });
-
-            // Sort by total hits desc
-            allMobLocs = Object.values(byName).sort(function(a, b) { return b.totalHits - a.totalHits; });
-            mobOffset = 0;
-            renderMobs(false);
-        }
-
         function renderMobs(append) {
             var tbody = document.getElementById('mob-tbody');
             if (!append) { tbody.innerHTML = ''; mobOffset = 0; }
 
             var filtered = mobSearch
-                ? allMobLocs.filter(function(m) { return m.name.toLowerCase().indexOf(mobSearch) >= 0; })
-                : allMobLocs;
+                ? allMobData.filter(function(m) { return m.name.toLowerCase().indexOf(mobSearch) >= 0; })
+                : allMobData;
 
             var page = filtered.slice(mobOffset, mobOffset + MOB_PAGE);
 
@@ -218,61 +168,55 @@
             }
 
             page.forEach(function(mob) {
-                // Top room by hits
-                var rooms = Object.entries(mob.rooms).sort(function(a,b) { return b[1]-a[1]; });
-                var topRoom = rooms.length > 0 ? rooms[0][0] : '-';
-                var extraRooms = rooms.length > 1 ? ' <span style="color:#555;font-size:11px;">+' + (rooms.length-1) + ' rooms</span>' : '';
-
                 var tr = document.createElement('tr');
-                tr.innerHTML = '<td><a href="mob.html?mobid=' + encodeURIComponent(mob.id) + '">' + escHtml(mob.name) + '</a></td>'
-                    + '<td style="color:#888;">' + escHtml(topRoom) + extraRooms + '</td>'
-                    + '<td class="hits">' + (mob.totalHits || '-') + '</td>';
+                tr.innerHTML = '<td><a href="mob.html?mobid=' + encodeURIComponent(mob.mobid) + '">' + escHtml(mob.name) + '</a></td>'
+                    + '<td style="color:#888;">' + escHtml(mob.top_room || '-') + '</td>'
+                    + '<td class="hits">' + (mob.total_hits || '-') + '</td>';
                 tbody.appendChild(tr);
             });
 
-            mobOffset = mobOffset + page.length;
-            document.getElementById('mob-load-more').style.display = (mobOffset < (mobSearch ? allMobLocs.filter(function(m){return m.name.toLowerCase().indexOf(mobSearch)>=0;}).length : allMobLocs.length)) ? 'block' : 'none';
+            mobOffset += page.length;
+            document.getElementById('mob-load-more').style.display = (mobOffset < filtered.length) ? 'block' : 'none';
         }
 
         // ── Items ─────────────────────────────────────────────────
+        var allItemList = []; // all unique item names for this zone
+
         window.filterItems = function() {
-            itemSearch = document.getElementById('item-search').value.trim();
+            itemSearch = document.getElementById('item-search').value.trim().toLowerCase();
             itemOffset = 0;
-            loadItems(false);
+            renderItems(false);
         };
 
-        window.loadMoreItems = function() { loadItems(true); };
+        window.loadMoreItems = function() {
+            itemOffset += ITEM_PAGE;
+            renderItems(true);
+        };
 
-        async function loadItems(append) {
-            if (allItemIds.length === 0) return;
-
-            var q = supabase.from('items_db').select('itemid, name')
-                .in('itemid', allItemIds)
-                .order('name', { ascending: true })
-                .range(itemOffset, itemOffset + ITEM_PAGE - 1);
-
-            if (itemSearch) q = q.ilike('name', '%' + itemSearch + '%');
-
-            var result = await q;
-            var rows = result.data || [];
-
+        function renderItems(append) {
             var tbody = document.getElementById('item-tbody');
-            if (!append) tbody.innerHTML = '';
+            if (!append) { tbody.innerHTML = ''; itemOffset = 0; }
 
-            if (rows.length === 0 && !append) {
+            var filtered = itemSearch
+                ? allItemData.filter(function(i) { return i.name.toLowerCase().indexOf(itemSearch) >= 0; })
+                : allItemData;
+
+            var page = filtered.slice(itemOffset, itemOffset + ITEM_PAGE);
+
+            if (page.length === 0 && !append) {
                 tbody.innerHTML = '<tr><td class="empty">No items found.</td></tr>';
                 document.getElementById('item-load-more').style.display = 'none';
                 return;
             }
 
-            rows.forEach(function(item) {
+            page.forEach(function(item) {
                 var tr = document.createElement('tr');
                 tr.innerHTML = '<td><a href="item.html?name=' + encodeURIComponent(item.name) + '">' + escHtml(item.name) + '</a></td>';
                 tbody.appendChild(tr);
             });
 
-            itemOffset += rows.length;
-            document.getElementById('item-load-more').style.display = rows.length === ITEM_PAGE ? 'block' : 'none';
+            itemOffset += page.length;
+            document.getElementById('item-load-more').style.display = (itemOffset < filtered.length) ? 'block' : 'none';
         }
 
         function escHtml(s) {
