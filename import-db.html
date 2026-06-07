@@ -268,6 +268,10 @@
                         // Skip the local auto-increment id — Supabase generates its own
                         if (colName.toLowerCase() === 'id') continue;
                         var val = row[c];
+                        // Cast itemid/mobid to string — SQLite stores as int but Supabase expects text
+                        if ((colName === 'itemid' || colName === 'mobid') && val !== null && val !== undefined) {
+                            val = String(val);
+                        }
                         if (val !== null && val !== undefined) obj[colName] = val;
                     }
                     batch.push(obj);
