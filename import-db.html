@@ -172,7 +172,6 @@
                         + '<br><span class="dim">' + rows.length.toLocaleString() + ' rows in file | ' + existingCount.toLocaleString() + ' already in Supabase</span></div>'
                         + '<div class="table-actions">'
                         + '<button class="btn-sm btn-go btn-merge" data-table="' + tn + '">Merge New</button>'
-                        + '<button class="btn-sm btn-warn btn-reimport" data-table="' + tn + '">Reimport</button>'
                         + '</div></div>';
                 } else {
                     html += '<div class="table-card ready" id="card-' + tn + '">'
@@ -194,14 +193,7 @@
             document.querySelectorAll('.btn-merge').forEach(function(b) {
                 b.addEventListener('click', function() { importTable(this.getAttribute('data-table'), false); });
             });
-            document.querySelectorAll('.btn-reimport').forEach(function(b) {
-                b.addEventListener('click', async function() {
-                    var tn = this.getAttribute('data-table');
-                    if (!confirm('Delete all rows from ' + tableData[tn].supabaseTable + ' and reimport from file? This cannot be undone.')) return;
-                    await clearTable(tableData[tn].supabaseTable);
-                    importTable(tn, false);
-                });
-            });
+
         });
 
         // Import All button
@@ -220,16 +212,7 @@
             document.getElementById('import-all-status').textContent = 'Done!';
         });
 
-        // ── Clear a Supabase table fast using gt/lt trick ──────────────
-        async function clearTable(supabaseTable) {
-            setStatus('Clearing ' + supabaseTable + '...');
-            // Delete all rows — Supabase requires a filter; id > 0 matches everything
-            var r = await supabase.from(supabaseTable).delete().gt('id', 0);
-            if (r.error) {
-                // Fallback: delete where id >= 0 (catches id=0 edge case)
-                await supabase.from(supabaseTable).delete().gte('id', 0);
-            }
-        }
+
 
         // ── Import a single table ──────────────────────────────────────
         function getUploaderName() {
