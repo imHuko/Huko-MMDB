@@ -195,7 +195,17 @@
                 { label: 'Found In Zone',value: itemData._zone,  unlockAt: 1 },
                 { label: 'Dropped By',   value: itemData._mob,   unlockAt: 2 },
                 { label: 'Stat Hint',    value: itemData._stat || 'No stat data', unlockAt: 3 },
-                { label: 'First Letter', value: itemData.name[0].toUpperCase(), unlockAt: 4 }
+                { label: 'First Letter', value: (function() {
+                    var n = itemData.name;
+                    var article = '';
+                    var rest = n;
+                    var lower = n.toLowerCase();
+                    if (lower.startsWith('a '))   { article = 'a';   rest = n.slice(2); }
+                    else if (lower.startsWith('an '))  { article = 'an';  rest = n.slice(3); }
+                    else if (lower.startsWith('the ')) { article = 'the'; rest = n.slice(4); }
+                    var firstLetter = rest[0] ? rest[0].toUpperCase() : n[0].toUpperCase();
+                    return article ? article + ' ' + firstLetter + '...' : firstLetter + '...';
+                })(), unlockAt: 4 }
             ];
 
             hints.forEach(function(h) {
@@ -214,7 +224,8 @@
             state.guesses.forEach(function(g) {
                 var entry = document.createElement('div');
                 var correct = g.toLowerCase() === itemData.name.toLowerCase();
-                var close   = !correct && itemData.name.toLowerCase().indexOf(g.toLowerCase()) >= 0;
+                function stripArt(s) { var l=s.toLowerCase(); if(l.startsWith('the '))return l.slice(4); if(l.startsWith('an '))return l.slice(3); if(l.startsWith('a '))return l.slice(2); return l; }
+                var close = !correct && (itemData.name.toLowerCase().indexOf(g.toLowerCase()) >= 0 || stripArt(itemData.name).indexOf(stripArt(g)) >= 0);
                 entry.className = 'guess-entry ' + (correct ? 'correct' : close ? 'close' : 'wrong');
                 entry.innerHTML = '<span class="guess-icon">' + (correct ? '✓' : close ? '~' : '✗') + '</span>' + escHtml(g);
                 guessesDiv.appendChild(entry);
