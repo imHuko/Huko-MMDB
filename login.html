@@ -25,11 +25,6 @@
         button { padding: 8px 16px; background: #8787FF; color: #000; border: none; border-radius: 3px; cursor: pointer; margin: 5px; }
         .error { color: #ff4444; }
         .success { color: #44aa44; }
-        .tab-bar { display: flex; gap: 0; margin: 15px 0; border-bottom: 1px solid #444; }
-        .tab-bar button { flex: 1; background: #222; color: #888; border: 1px solid #444; border-bottom: none; border-radius: 5px 5px 0 0; padding: 10px; cursor: pointer; font-size: 14px; margin: 0; }
-        .tab-bar button.active { background: #333; color: #ccc; border-color: #8787FF; }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
         hr { border: none; border-top: 1px solid #333; margin: 20px 0; }
     </style>
 </head>
@@ -80,35 +75,16 @@
     <h2>Login</h2>
     <hr>
 
-    <div class="tab-bar">
-        <button class="active" id="tab-user" onclick="switchTab('user')">User Login</button>
-        <button id="tab-editor" onclick="switchTab('editor')">Editor Login</button>
+    <p style="color:#888;font-size:13px;">Enter your username (regular users) or full email (admin).</p>
+    <div>
+        <input type="text" id="username" placeholder="Username or email" autocomplete="off">
+        <br>
+        <input type="password" id="password" placeholder="Password">
+        <br>
+        <button id="login-btn">Login</button>
     </div>
-
-    <div class="tab-content active" id="content-user">
-        <p style="color:#888;font-size:13px;">Log in to your account to earn points and track progress.</p>
-        <div>
-            <input type="text" id="user-username" placeholder="Username" autocomplete="off">
-            <br>
-            <input type="password" id="user-password" placeholder="Password">
-            <br>
-            <button id="user-login-btn">Login</button>
-        </div>
-        <p id="user-message" style="margin-top:10px;"></p>
-        <p style="font-size:13px;">No account? <a href="signup.html">Sign up</a></p>
-    </div>
-
-    <div class="tab-content" id="content-editor">
-        <p style="color:#888;font-size:13px;">Admin login — uses Supabase Auth credentials.</p>
-        <div>
-            <input type="email" id="email" placeholder="Admin email" style="width:250px;">
-            <br>
-            <input type="password" id="password" placeholder="Password" style="width:250px;">
-            <br>
-            <button id="login-btn">Login</button>
-        </div>
-        <p id="editor-message" style="margin-top:10px;"></p>
-    </div>
+    <p id="message" style="margin-top:10px;"></p>
+    <p style="font-size:13px;">No account? <a href="signup.html">Sign up</a></p>
 
     <script type="module">
         var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
@@ -116,62 +92,43 @@
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
         var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // ── User login ──
-        document.getElementById('user-login-btn').addEventListener('click', async function() {
-            var msg = document.getElementById('user-message');
-            var username = document.getElementById('user-username').value.trim();
-            var password = document.getElementById('user-password').value;
+        document.getElementById('login-btn').addEventListener('click', async function() {
+            var msg = document.getElementById('message');
+            var input = document.getElementById('username').value.trim();
+            var password = document.getElementById('password').value;
 
-            if (!username || !password) { msg.innerHTML = '<span class="error">Enter username and password.</span>'; return; }
+            if (!input || !password) { msg.innerHTML = '<span class="error">Enter your username/email and password.</span>'; return; }
+
+            var email = input.indexOf('@') !== -1 ? input : input + '@hukodb.com';
+            var username = email.split('@')[0];
 
             msg.innerHTML = '<span style="color:#888;">Logging in...</span>';
 
-            var email = username + '@hukodb.com';
             var result = await supabase.auth.signInWithPassword({ email: email, password: password });
 
             if (result.error) {
-                msg.innerHTML = '<span class="error">Wrong username or password.</span>';
-            } else {
-                localStorage.setItem('user_logged_in', 'true');
-                localStorage.setItem('username', username);
-                msg.innerHTML = '<span class="success">Logged in as ' + username + '!</span>';
-                document.getElementById('user-login-btn').disabled = true;
-                setTimeout(function() { window.location.href = 'index.html'; }, 1000);
-            }
-        });
-
-        // ── Admin login (Supabase Auth) ──
-        document.getElementById('login-btn').addEventListener('click', async function() {
-            var msg = document.getElementById('editor-message');
-            var email = document.getElementById('email').value.trim();
-            var pw = document.getElementById('password').value;
-
-            if (!email || !pw) { msg.innerHTML = '<span class="error">Enter email and password.</span>'; return; }
-
-            msg.innerHTML = '<span style="color:#888;">Logging in...</span>';
-
-            var result = await supabase.auth.signInWithPassword({ email: email, password: pw });
-
-            if (result.error) {
-                msg.innerHTML = '<span class="error">' + result.error.message + '</span>';
+                msg.innerHTML = '<span class="error">Wrong username/email or password.</span>';
                 return;
             }
 
-            var name = email.split('@')[0];
-            sessionStorage.setItem('editor_logged_in', 'true');
-            sessionStorage.setItem('editor_name', name);
-            msg.innerHTML = '<span class="success">Logged in as ' + name + '! <a href="admin.html">Go to admin panel</a></span>';
+            localStorage.setItem('user_logged_in', 'true');
+            localStorage.setItem('username', username);
+
+            if (email.indexOf('@hukodb.com') === -1) {
+                sessionStorage.setItem('editor_logged_in', 'true');
+                sessionStorage.setItem('editor_name', username);
+                msg.innerHTML = '<span class="success">Logged in as admin! <a href="admin.html">Go to admin panel</a></span>';
+            } else {
+                msg.innerHTML = '<span class="success">Logged in as ' + username + '!</span>';
+            }
+
+            document.getElementById('login-btn').disabled = true;
+            setTimeout(function() { window.location.href = 'index.html'; }, 1500);
         });
     </script>
 
     <script>
-        window.switchTab = function(tab) {
-            document.querySelectorAll('.tab-bar button').forEach(function(b) { b.classList.remove('active'); });
-            document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
-            document.getElementById('tab-' + tab).classList.add('active');
-            document.getElementById('content-' + tab).classList.add('active');
-        };
-
+        function hasSession() { return Object.keys(localStorage).some(function(k){return k.startsWith('sb-') && localStorage.getItem(k);}); }
         if (sessionStorage.getItem('editor_logged_in') === 'true') {
             document.getElementById('editor-dropdown').style.display = 'inline-block';
             document.getElementById('admin-link').style.display = 'inline';
@@ -179,7 +136,7 @@
             document.getElementById('login-link').style.display = 'none';
             document.getElementById('signup-link').style.display = 'none';
         }
-        if (localStorage.getItem('user_logged_in') === 'true') {
+        if (localStorage.getItem('user_logged_in') === 'true' || hasSession()) {
             document.getElementById('login-link').style.display = 'none';
             document.getElementById('signup-link').style.display = 'none';
             document.getElementById('logout-link').style.display = 'inline';

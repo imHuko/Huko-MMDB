@@ -288,11 +288,11 @@
         var PER_PAGE = 50, equipmentPage = 1, commentsPage = 1, equipmentTotal = 0, commentsTotal = 0, equipmentSearch = '', commentsSearch = '';
         var eqdbQueuePage = 1, eqdbQueueTotal = 0, scryingPage = 1, scryingTotal = 0;
 
-        // Check for active Supabase Auth session
+        // Check for active Supabase Auth session + admin (non-@hukodb.com email)
         var { data: { session } } = await supabase.auth.getSession();
-        var isAuthenticated = !!session;
-        if (!isAuthenticated) {
-            document.getElementById('admin-content').innerHTML = '<div style="padding:40px;text-align:center;"><h2>Access Denied</h2><p style="color:#888;">You must be logged in as an admin. <a href="login.html">Go to login</a></p></div>';
+        var isAdmin = session && session.user && session.user.email && session.user.email.indexOf('@hukodb.com') === -1;
+        if (!isAdmin) {
+            document.getElementById('admin-content').innerHTML = '<div style="padding:40px;text-align:center;"><h2>Access Denied</h2><p style="color:#888;">You must be logged in as an admin. <a href="login.html">Login</a></p></div>';
             document.getElementById('admin-content').style.display = 'block';
             document.getElementById('editor-dropdown').style.display = 'none';
             document.getElementById('admin-link').style.display = 'none';
