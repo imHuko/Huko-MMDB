@@ -63,7 +63,6 @@ require "wait"
 RELAY_URL = "https://mm-gear-relay.mm-gear.workers.dev"
 SUPABASE_URL = "https://fpvwpxtsrmrmdvnswrzx.supabase.co"
 SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY"
-RAW_URL = "https://raw.githubusercontent.com/imHuko/Huko-MMDB/master/mmgearcap.xml"
 UPDATE_URL = "https://hukodb.com/mmgearcap.xml"
 UPLOADER_NAME = ""
 
@@ -97,7 +96,7 @@ function checkForUpdateOnStartup()
   SetVariable("last_update_check", today)
 
   local resp = {}
-  local ok, status = http.request({ url = RAW_URL, sink = ltn12.sink.table(resp) })
+  local ok, status = http.request({ url = UPDATE_URL, sink = ltn12.sink.table(resp) })
   if not ok or status ~= 200 then return end
 
   local xml = table.concat(resp)
@@ -363,7 +362,7 @@ function mcg_update()
   ColourNote("yellow", "black", "[GearCap] Checking for update (current: v" .. cur .. ")...")
   wait.make(function()
     local resp = {}
-    local ok, status = http.request({ url = RAW_URL, sink = ltn12.sink.table(resp) })
+    local ok, status = http.request({ url = UPDATE_URL, sink = ltn12.sink.table(resp) })
     if not ok or (status ~= 200) then
       ColourNote("red", "black", "[GearCap] Update check failed: " .. tostring(status))
       return
@@ -392,7 +391,7 @@ function mcg_update()
 
     local plugin_file = GetPluginInfo(GetPluginID(), 6)
     if not plugin_file or plugin_file == "" then
-      ColourNote("red", "black", "[GearCap] Could not find plugin path. Download at: " .. RAW_URL)
+      ColourNote("red", "black", "[GearCap] Could not find plugin path. Download at: " .. UPDATE_URL)
       return
     end
 
@@ -404,7 +403,7 @@ function mcg_update()
       ColourNote("lime", "black", "[GearCap] Updated to v" .. remote_ver .. "! Reloading...")
       asyncReloadPlugin()
     else
-      ColourNote("red", "black", "[GearCap] Could not write file. Download at: " .. RAW_URL)
+      ColourNote("red", "black", "[GearCap] Could not write file. Download at: " .. UPDATE_URL)
     end
   end)
 end
