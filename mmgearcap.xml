@@ -361,19 +361,7 @@ function currentVersion()
 end
 
 function asyncReloadPlugin()
-  -- Uses DoAfterSpecial to reload the plugin after a 1-second delay.
-  -- This gets around MUSHclient's restriction on a plugin reloading itself.
-  if GetAlphaOption("script_prefix") == "" then
-    SetAlphaOption("script_prefix", "\\\\\\")
-  end
-  local scriptPrefix = GetAlphaOption("script_prefix")
-  Execute(
-    scriptPrefix .. "DoAfterSpecial("
-    ..    "1, "
-    ..    "\"" .. "ReloadPlugin('" .. GetPluginID() .. "')" .. "\", "
-    ..    sendto.script
-    .. ")"
-  )
+  DoAfterSpecial(2, "ReloadPlugin('" .. GetPluginID() .. "')", 12)
 end
 
 function mcg_update()
