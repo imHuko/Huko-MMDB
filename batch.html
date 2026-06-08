@@ -135,7 +135,6 @@
 
                 <a href="batch.html">Batch Import</a>
 
-                <a href="import-db.html">Import Database</a>
 
             </div>
 
@@ -151,6 +150,13 @@
     </nav>
 
     </div>
+
+    <div id="auth-required" style="text-align:center;padding:40px;display:none;">
+        <h2>Access Denied</h2>
+        <p style="color:#888;">You must be logged in to import hashes. <a href="login.html">Go to login</a></p>
+    </div>
+
+    <div id="import-content" style="display:none;">
 
     <h2>Import Hashes from Log</h2>
 
@@ -274,7 +280,14 @@
 
         var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        
+        // Auth check
+        var { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+            document.getElementById('import-content').style.display = 'block';
+        } else {
+            document.getElementById('auth-required').style.display = 'block';
+            throw new Error('Not authenticated');
+        }
 
         var eqdbHashes = [];
 
@@ -590,6 +603,8 @@
 
     </script>
 
+    </div><!-- /import-content -->
+
 <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"131579fcdf914a0f9aa2fb16db7f327e","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
     <script>
 
@@ -612,6 +627,7 @@
             document.getElementById('logout-link').style.display = 'inline';
         }
         function logout() {
+            Object.keys(localStorage).filter(function(k){return k.startsWith('sb-');}).forEach(function(k){localStorage.removeItem(k);});
             sessionStorage.removeItem('editor_logged_in');
             sessionStorage.removeItem('editor_name');
             localStorage.removeItem('user_logged_in');

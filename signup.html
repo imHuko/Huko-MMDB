@@ -62,7 +62,6 @@
             <div class="dropdown-content">
                 <a href="import.html">Add Equipment</a>
                 <a href="batch.html">Batch Import</a>
-                <a href="import-db.html">Import Database</a>
             </div>
         </div>
         <span id="login-link"><a href="login.html">Login</a></span>
@@ -76,14 +75,14 @@
     <h2>Create Account</h2>
     <hr>
 
-    <p class="info">No email required. Pick a username and password. Your password is scrambled before being stored — we never see the original.</p>
+    <p class="info">No email required. Pick a username and password.</p>
 
     <p id="message"></p>
 
     <div>
         <input type="text" id="username" placeholder="Username" maxlength="30" autocomplete="off">
         <br>
-        <input type="password" id="password" placeholder="Password (min 4 characters)" minlength="4">
+        <input type="password" id="password" placeholder="Password (min 6 characters)" minlength="6">
         <br>
         <input type="password" id="confirm" placeholder="Confirm password">
         <br>
@@ -98,13 +97,6 @@
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
         var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        async function hashPassword(password, username) {
-            var encoder = new TextEncoder();
-            var data = encoder.encode(password + ':' + username.toLowerCase() + ':hukodb');
-            var hash = await crypto.subtle.digest('SHA-256', data);
-            return Array.from(new Uint8Array(hash)).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
-        }
-
         document.getElementById('signup-btn').addEventListener('click', async function() {
             var msg = document.getElementById('message');
             var username = document.getElementById('username').value.trim();
@@ -113,33 +105,30 @@
 
             if (!username || username.length < 2) { msg.innerHTML = '<span class="error">Username must be at least 2 characters.</span>'; return; }
             if (!/^[a-zA-Z0-9_]+$/.test(username)) { msg.innerHTML = '<span class="error">Username can only contain letters, numbers, and underscores.</span>'; return; }
-            if (password.length < 4) { msg.innerHTML = '<span class="error">Password must be at least 4 characters.</span>'; return; }
+            if (password.length < 6) { msg.innerHTML = '<span class="error">Password must be at least 6 characters.</span>'; return; }
             if (password !== confirm) { msg.innerHTML = '<span class="error">Passwords do not match.</span>'; return; }
 
             msg.innerHTML = '<span style="color:#888;">Creating account...</span>';
 
-            var existing = await supabase.from('accounts').select('id').eq('username', username).limit(1);
-            if (existing.data && existing.data.length > 0) {
-                msg.innerHTML = '<span class="error">Username already taken.</span>';
+            var email = username + '@hukodb.com';
+            var result = await supabase.auth.signUp({ email: email, password: password });
+
+            if (result.error) {
+                if (result.error.message.includes('already registered') || result.error.message.includes('Database error saving new user')) {
+                    msg.innerHTML = '<span class="error">Username already taken.</span>';
+                } else {
+                    msg.innerHTML = '<span class="error">' + result.error.message + '</span>';
+                }
                 return;
             }
 
-            var hash = await hashPassword(password, username);
-            var result = await supabase.from('accounts').insert({ username: username, password_hash: hash });
+            await supabase.from('accounts').insert({ username: username }).catch(function(){});
 
-            if (result.error) {
-                if (result.error.code === '23505') {
-                    msg.innerHTML = '<span class="error">Username already taken.</span>';
-                } else {
-                    msg.innerHTML = '<span class="error">Error: ' + result.error.message + '</span>';
-                }
-            } else {
-                localStorage.setItem('user_logged_in', 'true');
-                localStorage.setItem('username', username);
-                msg.innerHTML = '<span class="success">Account created! Welcome, ' + username + '.</span>';
-                document.getElementById('signup-btn').disabled = true;
-                setTimeout(function() { window.location.href = 'index.html'; }, 1500);
-            }
+            localStorage.setItem('user_logged_in', 'true');
+            localStorage.setItem('username', username);
+            msg.innerHTML = '<span class="success">Account created! Welcome, ' + username + '.</span>';
+            document.getElementById('signup-btn').disabled = true;
+            setTimeout(function() { window.location.href = 'index.html'; }, 1500);
         });
     </script>
 
@@ -155,11 +144,13 @@
             document.getElementById('signup-link').style.display = 'none';
             document.getElementById('logout-link').style.display = 'inline';
         }
-        function logout() {
-            sessionStorage.removeItem('editor_logged_in');
-            localStorage.removeItem('user_logged_in');
-            localStorage.removeItem('username');
-            location.reload();
+        window.logout = function() {
+            supabase.auth.signOut().then(function() {
+                sessionStorage.removeItem('editor_logged_in');
+                localStorage.removeItem('user_logged_in');
+                localStorage.removeItem('username');
+                location.reload();
+            });
         }
     </script>
 </body>

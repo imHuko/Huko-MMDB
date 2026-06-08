@@ -99,7 +99,6 @@
             <div class="dropdown-content">
                 <a href="import.html">Add Equipment</a>
                 <a href="batch.html">Batch Import</a>
-                <a href="import-db.html">Import Database</a>
             </div>
         </div>
         <span id="login-link"><a href="login.html">Login</a></span>
@@ -288,6 +287,17 @@
         var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         var PER_PAGE = 50, equipmentPage = 1, commentsPage = 1, equipmentTotal = 0, commentsTotal = 0, equipmentSearch = '', commentsSearch = '';
         var eqdbQueuePage = 1, eqdbQueueTotal = 0, scryingPage = 1, scryingTotal = 0;
+
+        // Check for active Supabase Auth session
+        var { data: { session } } = await supabase.auth.getSession();
+        var isAuthenticated = !!session;
+        if (!isAuthenticated) {
+            document.getElementById('admin-content').innerHTML = '<div style="padding:40px;text-align:center;"><h2>Access Denied</h2><p style="color:#888;">You must be logged in as an admin. <a href="login.html">Go to login</a></p></div>';
+            document.getElementById('editor-dropdown').style.display = 'none';
+            document.getElementById('admin-link').style.display = 'none';
+            throw new Error('Not authenticated');
+        }
+
         loadDashboard();
         
         document.getElementById('tab-dashboard').addEventListener('click', function() { switchTab('dashboard'); });
@@ -578,7 +588,7 @@
                 for (var i = 0; i < data.length; i++) {
                     var s = data[i];
                     rows.push('<tr>' +
-                        '<td style="font-family:monospace;font-size:11px;cursor:pointer;" onclick="navigator.clipboard.writeText(\'' + s.hash + '\')">' + s.hash.substring(0, 20) + '...</td>' +
+                        '<td class="hash-cell" data-hash="' + s.hash.replace(/"/g, '&quot;') + '">' + s.hash.substring(0, 20) + '...</td>' +
                         '<td>' + escapeHtml(s.submitted_by) + '</td>' +
                         '<td>' + new Date(s.created_at).toLocaleDateString() + '</td>' +
                         '<td>' + (s.processed ? '<span style="color:#44aa44;">Processed</span>' : '<span style="color:#ffaa00;">Pending</span>') + '</td>' +
@@ -586,6 +596,12 @@
                         '</tr>');
                 }
                 tbody.innerHTML = rows.join('');
+                tbody.querySelectorAll('.hash-cell').forEach(function(cell) {
+                    cell.style.cssText = 'font-family:monospace;font-size:11px;cursor:pointer;';
+                    cell.addEventListener('click', function() {
+                        navigator.clipboard.writeText(this.getAttribute('data-hash'));
+                    });
+                });
             }
             document.querySelectorAll('#eqdb-queue-table .btn-delete').forEach(function(b) {
                 b.addEventListener('click', async function() { if (!confirm('Delete?')) return; await supabase.from('eqdb_queue').delete().eq('id', this.getAttribute('data-id')); loadEqdbQueue(); });
@@ -609,7 +625,7 @@
                 for (var i = 0; i < data.length; i++) {
                     var s = data[i];
                     rows.push('<tr>' +
-                        '<td style="font-family:monospace;font-size:11px;cursor:pointer;" onclick="navigator.clipboard.writeText(\'' + s.hash + '\')">' + s.hash.substring(0, 20) + '...</td>' +
+                        '<td class="hash-cell" data-hash="' + s.hash.replace(/"/g, '&quot;') + '">' + s.hash.substring(0, 20) + '...</td>' +
                         '<td>' + escapeHtml(s.submitted_by) + '</td>' +
                         '<td>' + new Date(s.created_at).toLocaleDateString() + '</td>' +
                         '<td>' + (s.approved ? '<span style="color:#44aa44;">Approved</span>' : (s.reviewed ? '<span style="color:#ffaa00;">Reviewed</span>' : '<span style="color:#888;">Pending</span>')) + '</td>' +
@@ -619,6 +635,12 @@
                         '</tr>');
                 }
                 tbody.innerHTML = rows.join('');
+                tbody.querySelectorAll('.hash-cell').forEach(function(cell) {
+                    cell.style.cssText = 'font-family:monospace;font-size:11px;cursor:pointer;';
+                    cell.addEventListener('click', function() {
+                        navigator.clipboard.writeText(this.getAttribute('data-hash'));
+                    });
+                });
             }
             document.querySelectorAll('#scrying-table .btn-delete').forEach(function(b) {
                 b.addEventListener('click', async function() { if (!confirm('Delete?')) return; await supabase.from('scrying_queue').delete().eq('id', this.getAttribute('data-id')); loadScrying(); });

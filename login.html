@@ -67,7 +67,6 @@
             <div class="dropdown-content">
                 <a href="import.html">Add Equipment</a>
                 <a href="batch.html">Batch Import</a>
-                <a href="import-db.html">Import Database</a>
             </div>
         </div>
         <span id="login-link"><a href="login.html">Login</a></span>
@@ -100,11 +99,11 @@
     </div>
 
     <div class="tab-content" id="content-editor">
-        <p style="color:#888;font-size:13px;">Editor login for administrators and content contributors.</p>
+        <p style="color:#888;font-size:13px;">Admin login — uses Supabase Auth credentials.</p>
         <div>
-            <input type="text" id="editor-name" placeholder="Your name (optional)" style="width:250px;">
+            <input type="email" id="email" placeholder="Admin email" style="width:250px;">
             <br>
-            <input type="password" id="password" placeholder="Editor password" style="width:250px;">
+            <input type="password" id="password" placeholder="Password" style="width:250px;">
             <br>
             <button id="login-btn">Login</button>
         </div>
@@ -118,13 +117,6 @@
         var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // ── User login ──
-        async function hashPassword(password, username) {
-            var encoder = new TextEncoder();
-            var data = encoder.encode(password + ':' + username.toLowerCase() + ':hukodb');
-            var hash = await crypto.subtle.digest('SHA-256', data);
-            return Array.from(new Uint8Array(hash)).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
-        }
-
         document.getElementById('user-login-btn').addEventListener('click', async function() {
             var msg = document.getElementById('user-message');
             var username = document.getElementById('user-username').value.trim();
@@ -134,12 +126,10 @@
 
             msg.innerHTML = '<span style="color:#888;">Logging in...</span>';
 
-            var hash = await hashPassword(password, username);
-            var result = await supabase.from('accounts').select('username, points').eq('username', username).eq('password_hash', hash).limit(1);
+            var email = username + '@hukodb.com';
+            var result = await supabase.auth.signInWithPassword({ email: email, password: password });
 
             if (result.error) {
-                msg.innerHTML = '<span class="error">Error: ' + result.error.message + '</span>';
-            } else if (!result.data || result.data.length === 0) {
                 msg.innerHTML = '<span class="error">Wrong username or password.</span>';
             } else {
                 localStorage.setItem('user_logged_in', 'true');
@@ -150,26 +140,27 @@
             }
         });
 
-        // ── Editor login ──
+        // ── Admin login (Supabase Auth) ──
         document.getElementById('login-btn').addEventListener('click', async function() {
             var msg = document.getElementById('editor-message');
+            var email = document.getElementById('email').value.trim();
             var pw = document.getElementById('password').value;
-            var name = document.getElementById('editor-name').value.trim() || 'editor';
 
-            if (!pw) { msg.innerHTML = '<span class="error">Enter password.</span>'; return; }
+            if (!email || !pw) { msg.innerHTML = '<span class="error">Enter email and password.</span>'; return; }
 
             msg.innerHTML = '<span style="color:#888;">Logging in...</span>';
 
-            var result = await supabase.from('admins').select('*').eq('password', pw).limit(1);
+            var result = await supabase.auth.signInWithPassword({ email: email, password: pw });
 
-            if (result.error || !result.data || result.data.length === 0) {
-                msg.innerHTML = '<span class="error">Wrong password.</span>';
+            if (result.error) {
+                msg.innerHTML = '<span class="error">' + result.error.message + '</span>';
                 return;
             }
 
+            var name = email.split('@')[0];
             sessionStorage.setItem('editor_logged_in', 'true');
             sessionStorage.setItem('editor_name', name);
-            msg.innerHTML = '<span class="success">Logged in as ' + name + '! <a href="index.html">Go to search</a></span>';
+            msg.innerHTML = '<span class="success">Logged in as ' + name + '! <a href="admin.html">Go to admin panel</a></span>';
         });
     </script>
 
@@ -193,12 +184,14 @@
             document.getElementById('signup-link').style.display = 'none';
             document.getElementById('logout-link').style.display = 'inline';
         }
-        function logout() {
-            sessionStorage.removeItem('editor_logged_in');
-            sessionStorage.removeItem('editor_name');
-            localStorage.removeItem('user_logged_in');
-            localStorage.removeItem('username');
-            location.reload();
+        window.logout = function() {
+            supabase.auth.signOut().then(function() {
+                sessionStorage.removeItem('editor_logged_in');
+                sessionStorage.removeItem('editor_name');
+                localStorage.removeItem('user_logged_in');
+                localStorage.removeItem('username');
+                location.reload();
+            });
         }
     </script>
 </body>

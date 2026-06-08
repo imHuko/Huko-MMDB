@@ -63,7 +63,6 @@
             <div class="dropdown-content">
                 <a href="import.html">Add Equipment</a>
                 <a href="batch.html">Batch Import</a>
-                <a href="import-db.html">Import Database</a>
             </div>
         </div>
         <span id="login-link"><a href="login.html">Login</a></span>
@@ -151,15 +150,37 @@
             }
 
             if (uniqueLocs.length > 0) {
+                // Look up room numbers from rooms_db
+                var roomNumMap = {};
+                var namedRooms = uniqueLocs.filter(function(l) { return l.room && l.room !== '-' && l.area; });
+                if (namedRooms.length > 0) {
+                    var roomNames = [...new Set(namedRooms.map(function(l) { return l.room; }))];
+                    var roomAreas = [...new Set(namedRooms.map(function(l) { return l.area; }))];
+                    var roomsResult = await supabase.from('rooms_db')
+                        .select('uid, name, area')
+                        .in('name', roomNames)
+                        .in('area', roomAreas)
+                        .limit(500);
+                    if (roomsResult.data) {
+                        roomsResult.data.forEach(function(r) {
+                            var key = (r.area || '') + '|' + (r.name || '');
+                            if (!roomNumMap[key]) roomNumMap[key] = String(r.uid);
+                        });
+                    }
+                }
+
                 html += '<h2 style="color:#C0C0C0;margin-top:20px;">Spawn Locations (' + uniqueLocs.length + ')</h2>';
                 html += '<p style="font-size:12px;color:#888;">🟢 5+ hits = confirmed | 🟡 2-4 hits = likely | 🔴 1 hit = rare</p>';
                 html += '<table>';
-                html += '<tr><th>Zone</th><th>Room</th><th>Hits</th></tr>';
+                html += '<tr><th>Zone</th><th>Room</th><th>Room #</th><th>Hits</th></tr>';
                 for (var i = 0; i < uniqueLocs.length; i++) {
                     var loc = uniqueLocs[i];
+                    var roomKey = (loc.area || '') + '|' + (loc.room || '');
+                    var roomNum = roomNumMap[roomKey] || '';
                     html += '<tr>';
                     html += '<td>' + escapeHtml(loc.area || '') + '</td>';
                     html += '<td>' + escapeHtml(loc.room || '-') + '</td>';
+                    html += '<td>' + (roomNum || '-') + '</td>';
                     html += '<td>' + hitBadge(loc.hits) + '</td>';
                     html += '</tr>';
                 }
@@ -241,6 +262,7 @@
             document.getElementById('logout-link').style.display = 'inline';
         }
         function logout() {
+            Object.keys(localStorage).filter(function(k){return k.startsWith('sb-');}).forEach(function(k){localStorage.removeItem(k);});
             sessionStorage.removeItem('editor_logged_in');
             sessionStorage.removeItem('editor_name');
             localStorage.removeItem('user_logged_in');

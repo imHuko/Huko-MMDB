@@ -104,7 +104,6 @@
             <div class="dropdown-content">
                 <a href="import.html">Add Equipment</a>
                 <a href="batch.html">Batch Import</a>
-                <a href="import-db.html">Import Database</a>
                 <a href="cleanup.html">Data Cleanup</a>
             </div>
         </div>
@@ -115,6 +114,13 @@
     </nav>
     <script>document.querySelectorAll('nav a').forEach(function(a){if(a.href&&a.href.split('/').pop()===location.pathname.split('/').pop())a.style.color='#00FFFF';});</script>
     </div>
+
+    <div id="auth-required" style="text-align:center;padding:40px;display:none;">
+        <h2>Access Denied</h2>
+        <p style="color:#888;">You must be logged in to use data cleanup. <a href="login.html">Go to login</a></p>
+    </div>
+
+    <div id="import-content" style="display:none;">
 
     <h2>Data Cleanup</h2>
     <p class="subtitle">Review items and mark them as legit, junk, or skip. Editor-only tool.</p>
@@ -154,6 +160,14 @@
         var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
         var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        var { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+            document.getElementById('import-content').style.display = 'block';
+        } else {
+            document.getElementById('auth-required').style.display = 'block';
+            throw new Error('Not authenticated');
+        }
 
         var mode      = 'random';
         var adminMode = false;
@@ -472,6 +486,8 @@
         loadQueue();
     </script>
 
+    </div><!-- /import-content -->
+
     <script>
         if (sessionStorage.getItem('editor_logged_in') === 'true') {
             document.getElementById('editor-dropdown').style.display = 'inline-block';
@@ -485,6 +501,7 @@
             document.getElementById('logout-link').style.display = 'inline';
         }
         function logout() {
+            Object.keys(localStorage).filter(function(k){return k.startsWith('sb-');}).forEach(function(k){localStorage.removeItem(k);});
             sessionStorage.removeItem('editor_logged_in');
             sessionStorage.removeItem('editor_name');
             localStorage.removeItem('user_logged_in');

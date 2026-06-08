@@ -99,7 +99,6 @@
             <div class="dropdown-content">
                 <a href="import.html">Add Equipment</a>
                 <a href="batch.html">Batch Import</a>
-                <a href="import-db.html">Import Database</a>
             </div>
         </div>
         <span id="login-link"><a href="login.html">Login</a></span>
@@ -484,6 +483,25 @@ if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
             resultsDiv.innerHTML = html;
             saveSearchState();
         }
+        function sanitizeHtml(html) {
+            if (!html) return '';
+            const d = document.createElement('div');
+            d.innerHTML = html;
+            const kill = d.querySelectorAll('script, iframe, object, embed, form, input, a, link, meta, style');
+            for (let i = 0; i < kill.length; i++) kill[i].remove();
+            const all = d.querySelectorAll('*');
+            for (let i = 0; i < all.length; i++) {
+                const attrs = all[i].attributes;
+                for (let j = attrs.length - 1; j >= 0; j--) {
+                    const name = attrs[j].name;
+                    if (name.startsWith('on') || name === 'href' || name === 'src') {
+                        all[i].removeAttribute(name);
+                    }
+                }
+            }
+            return d.innerHTML;
+        }
+
         function escapeHtml(text) {
             if (!text) return '';
             var div = document.createElement('div');
@@ -551,7 +569,7 @@ if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
         function colorize(html) {
             if (!html) return '';
             if (html.indexOf('<font') >= 0 || html.indexOf('<span') >= 0) {
-                return '<div style="white-space:pre-wrap;">' + html + '</div>';
+                return '<div style="white-space:pre-wrap;">' + sanitizeHtml(html) + '</div>';
             }
             return '<div style="white-space:pre-wrap;">' + colorizeMM(html) + '</div>';
         }
@@ -963,6 +981,7 @@ if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
             document.getElementById('logout-link').style.display = 'inline';
         }
         function logout() {
+            Object.keys(localStorage).filter(function(k){return k.startsWith('sb-');}).forEach(function(k){localStorage.removeItem(k);});
             sessionStorage.removeItem('editor_logged_in');
             sessionStorage.removeItem('editor_name');
             localStorage.removeItem('user_logged_in');

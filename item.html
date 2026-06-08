@@ -69,7 +69,6 @@
         <div class="dropdown-content">
             <a href="import.html">Add Equipment</a>
             <a href="batch.html">Batch Import</a>
-            <a href="import-db.html">Import Database</a>
         </div>
     </div>
     <span id="login-link"><a href="login.html">Login</a></span>
@@ -121,6 +120,7 @@
             document.getElementById('logout-link').style.display = 'inline';
         }
         function logout() {
+            Object.keys(localStorage).filter(function(k){return k.startsWith('sb-');}).forEach(function(k){localStorage.removeItem(k);});
             sessionStorage.removeItem('editor_logged_in');
             sessionStorage.removeItem('editor_name');
             localStorage.removeItem('user_logged_in');
@@ -167,6 +167,25 @@
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    function sanitizeHtml(html) {
+        if (!html) return '';
+        const d = document.createElement('div');
+        d.innerHTML = html;
+        const kill = d.querySelectorAll('script, iframe, object, embed, form, input, a, link, meta, style');
+        for (let i = 0; i < kill.length; i++) kill[i].remove();
+        const all = d.querySelectorAll('*');
+        for (let i = 0; i < all.length; i++) {
+            const attrs = all[i].attributes;
+            for (let j = attrs.length - 1; j >= 0; j--) {
+                const name = attrs[j].name;
+                if (name.startsWith('on') || name === 'href' || name === 'src') {
+                    all[i].removeAttribute(name);
+                }
+            }
+        }
+        return d.innerHTML;
     }
 
     function hitBadge(hits) {
@@ -243,7 +262,7 @@
         // --- Stats block ---
         if (item.description) {
             const alreadyColored = item.description.includes('<font color=') || item.description.includes('<span class=');
-            html += '<div class="mm-output">' + (alreadyColored ? item.description : colorizeMM(item.description)) + '</div>';
+            html += '<div class="mm-output">' + (alreadyColored ? sanitizeHtml(item.description) : colorizeMM(item.description)) + '</div>';
         } else if (!item.verified && (item.type === 'unknown' || !item.type)) {
             html += '<p style="color:#ffaa00;margin-top:10px;">Stats not yet available — awaiting capture from the MUD.</p>';
         }
@@ -304,19 +323,63 @@
         uniqueLocations.sort((a, b) => (b.hits || 0) - (a.hits || 0));
         if (uniqueLocations.length === 0) return '';
 
-        // Batch-resolve all mob names in one query instead of one per location
+        // Batch-resolve mob names, mob room numbers, and named room numbers in parallel
         const allMobIds = [...new Set(uniqueLocations.map(l => l.mobid).filter(Boolean).map(String))];
         const mobNameMap = {};
+        const mobRoomMap = {};
+        const roomNameToNum = {};
+
+        const queries = [];
         if (allMobIds.length > 0) {
-            const { data: mobRows } = await supabase.from('mobs_db').select('mobid, name').in('mobid', allMobIds);
-            if (mobRows) mobRows.forEach(m => { mobNameMap[String(m.mobid)] = m.name; });
+            queries.push(
+                supabase.from('mobs_db').select('mobid, name').in('mobid', allMobIds),
+                supabase.from('mobsloc_db').select('mobid, room').in('mobid', allMobIds).limit(500)
+            );
         }
 
-        // Build resolved list — room name comes directly from itemsloc_db row, no extra queries needed
+        // Look up room names in rooms_db to get room numbers
+        const namedRooms = uniqueLocations.filter(l => l.room && l.room !== '-' && l.area);
+        if (namedRooms.length > 0) {
+            const roomNames = [...new Set(namedRooms.map(l => l.room))];
+            const roomAreas = [...new Set(namedRooms.map(l => l.area))];
+            queries.push(
+                supabase.from('rooms_db')
+                    .select('uid, name, area')
+                    .in('name', roomNames)
+                    .in('area', roomAreas)
+                    .limit(500)
+            );
+        }
+
+        if (queries.length > 0) {
+            const results = await Promise.all(queries);
+            let idx = 0;
+            if (allMobIds.length > 0) {
+                const mobRows = results[idx++];
+                const mobLocRows = results[idx++];
+                if (mobRows.data) mobRows.data.forEach(m => { mobNameMap[String(m.mobid)] = m.name; });
+                if (mobLocRows.data) mobLocRows.data.forEach(m => {
+                    const id = String(m.mobid);
+                    const r = m.room && m.room !== '-' ? String(m.room) : '';
+                    if (r && !mobRoomMap[id]) mobRoomMap[id] = r;
+                });
+            }
+            if (namedRooms.length > 0) {
+                const roomRows = results[idx];
+                if (roomRows.data) roomRows.data.forEach(r => {
+                    const key = (r.area || '') + '|' + (r.name || '');
+                    if (!roomNameToNum[key]) roomNameToNum[key] = String(r.uid);
+                });
+            }
+        }
+
+        // Build resolved list — room name from itemsloc_db, room # from rooms_db or mobsloc_db
         const resolved = uniqueLocations.map(loc => {
             const roomName = (loc.room && loc.room !== '-') ? String(loc.room) : '';
-            const mobName  = loc.mobid ? (mobNameMap[String(loc.mobid)] || '') : '';
-            return { loc, roomNum: '', roomName, mobName };
+            const mobId    = loc.mobid ? String(loc.mobid) : '';
+            const mobName  = mobId ? (mobNameMap[mobId] || '') : '';
+            const roomNum  = mobId ? (mobRoomMap[mobId] || '') : (roomNameToNum[(loc.area || '') + '|' + roomName] || '');
+            return { loc, roomNum, roomName, mobName };
         });
 
         let html = '<h2 style="color:#C0C0C0;margin-top:20px;">Known Locations (' + uniqueLocations.length + ')</h2>';
