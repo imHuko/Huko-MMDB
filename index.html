@@ -204,6 +204,7 @@
             </div>
             <datalist id="affect-list"></datalist>
             <label style="color:#aaa;font-size:13px;cursor:pointer;"><input type="checkbox" id="filter-search-desc"> Search descriptions</label>
+            <label style="color:#FFD700;font-size:13px;cursor:pointer;" title="Items with 'When...' conditional effects (spell power / SKP procs)"><input type="checkbox" id="filter-when-proc"> Spell Power / SKP</label>
             <button id="clear-filters-btn" style="background:#555;font-size:12px;padding:2px 8px;">Clear Filters</button>
         </div>
     </div>
@@ -316,6 +317,7 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
             document.getElementById('filter-max-level').value = '';
             document.getElementById('filter-source').value = '';
             document.getElementById('filter-search-desc').checked = false;
+            document.getElementById('filter-when-proc').checked = false;
             activeAffects = [];
             renderAffectTags();
             searchEquipment();
@@ -333,6 +335,7 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
                 filterMaxLevel: document.getElementById('filter-max-level').value,
                 filterSource: document.getElementById('filter-source').value,
                 filterSearchDesc: document.getElementById('filter-search-desc').checked,
+                filterWhenProc: document.getElementById('filter-when-proc').checked,
                 filterAffects: activeAffects.slice(),
                 filtersVisible: document.getElementById('advanced-filters').style.display !== 'none',
                 lastSearch: document.getElementById('results').querySelector('.item-card') ? 'equipment' : 'mobs'
@@ -354,6 +357,7 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
                 document.getElementById('filter-max-level').value = state.filterMaxLevel || '';
                 document.getElementById('filter-source').value = state.filterSource || '';
                 if (state.filterSearchDesc) document.getElementById('filter-search-desc').checked = true;
+                if (state.filterWhenProc) document.getElementById('filter-when-proc').checked = true;
                 if (state.filterAffects && state.filterAffects.length) {
                     state.filterAffects.forEach(function(a) { addAffectTag(a); });
                 }
@@ -379,6 +383,7 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
             document.getElementById('filter-max-level').value = '';
             document.getElementById('filter-source').value = '';
             document.getElementById('filter-search-desc').checked = false;
+            document.getElementById('filter-when-proc').checked = false;
             activeAffects = [];
             renderAffectTags();
             sessionStorage.removeItem('eqdb_search');
@@ -408,9 +413,13 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
             
             let query = supabase.from('equipment').select('*', { count: 'exact' }).order('name', { ascending: true }).limit(200);
             
+            var skpChecked = document.getElementById('filter-when-proc').checked;
             if (searchTerm) {
                 var descChecked = document.getElementById('filter-search-desc').checked;
-                if (descChecked) {
+                if (skpChecked) {
+                    var escaped = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    query = query.filter('description', 'imatch', 'When [^\\n]*' + escaped);
+                } else if (descChecked) {
                     query = query.or('name.ilike.%' + searchTerm + '%,description.ilike.%' + searchTerm + '%');
                 } else {
                     query = query.ilike('name', '%' + searchTerm + '%');
@@ -438,6 +447,7 @@ if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
             if (maxLevel) query = query.lte('level_req', maxLevel);
             if (source === 'eqdb') query = query.eq('verified', true);
             if (source === 'personal') query = query.eq('verified', false);
+            if (skpChecked && !searchTerm) query = query.ilike('description', '%When %');
             
             var result = await query;
             var data = result.data;
