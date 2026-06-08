@@ -98,8 +98,12 @@ function checkForUpdateOnStartup()
   SetVariable("last_update_check", today)
 
   local resp = {}
-  local headers = { ["Accept"] = "application/json", ["User-Agent"] = "GearCap" }
-  local ok, status = http.request({ url = GITHUB_API, headers = headers, sink = ltn12.sink.table(resp) })
+  local ok, status, response_headers = http.request({
+    url = GITHUB_API,
+    headers = { ["Accept"] = "application/json", ["User-Agent"] = "GearCap" },
+    sink = ltn12.sink.table(resp),
+    redirect = true
+  })
   if not ok or status ~= 200 then return end
 
   local data = table.concat(resp)
@@ -370,8 +374,12 @@ function mcg_update()
   wait.make(function()
     -- Step 1: fetch release info from GitHub API
     local release_resp = {}
-    local headers = { ["Accept"] = "application/json", ["User-Agent"] = "GearCap" }
-    local ok, status = http.request({ url = GITHUB_API, headers = headers, sink = ltn12.sink.table(release_resp) })
+    local ok, status = http.request({
+      url = GITHUB_API,
+      headers = { ["Accept"] = "application/json", ["User-Agent"] = "GearCap" },
+      sink = ltn12.sink.table(release_resp),
+      redirect = true
+    })
     if not ok or (status ~= 200) then
       ColourNote("red", "black", "[GearCap] Update check failed: " .. tostring(status))
       return
