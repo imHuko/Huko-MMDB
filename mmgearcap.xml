@@ -12,7 +12,7 @@
    save_state="y"
    date_written="2026-05-17"
    requires="4.71"
-   version="8.0"
+   version="8.1"
    >
 
 <description trim="y">
@@ -52,6 +52,7 @@ Commands:
   <alias match="^mcg status$" enabled="y" regexp="y" send_to="12" sequence="105"><send>mcg_status()</send></alias>
   <alias match="^mcg help$" enabled="y" regexp="y" send_to="12" sequence="106"><send>OnHelp()</send></alias>
   <alias match="^mcg update$" enabled="y" regexp="y" send_to="12" sequence="108"><send>mcg_update()</send></alias>
+  <alias match="^mcg clearcache$" enabled="y" regexp="y" send_to="12" sequence="109"><send>mcg_clearcache()</send></alias>
   <alias match="^mm_gear_capture(|(\:| )help)$" regexp="y" enabled="y" script="OnHelp"/>
 </aliases>
 
@@ -102,7 +103,7 @@ function fetchUrl(url)
     if ok and result then return result end
   end
   local resp = {}
-  local ok, st = http.request({ url = UPDATE_URL, sink = ltn12.sink.table(resp) })
+  local ok, st = http.request({ url = url, sink = ltn12.sink.table(resp) })
   if ok and st == 200 then return table.concat(resp) end
   return nil
 end
@@ -180,6 +181,8 @@ function mcg_send()
 end
 
 function mcg_clear() raw_buffer = {}; captured_items = {}; captured_names = {}; send_queue = {}; SaveState(); ColourNote("yellow", "black", "[GearCap] Cleared") end
+
+function mcg_clearcache() captured_names = {}; SaveState(); ColourNote("yellow", "black", "[GearCap] Cache cleared. Previously seen items can be captured again.") end
 
 function mcg_status()
   local s = recording and "ON" or "OFF"; local sent = 0
@@ -346,6 +349,30 @@ function doSendItem(item)
   local body = json.encode({ name = item.name, type = item.itemtype, description = item.text, verified = item.is_eqdb, properties = props })
   local resp = {}; local ok, status = http.request({ url = RELAY_URL .. "/rest/v1/equipment", method = "POST", headers = { ["Content-Type"] = "application/json", ["Content-Length"] = tostring(string.len(body)), ["Prefer"] = "resolution=merge-duplicates" }, source = ltn12.source.string(body), sink = ltn12.sink.table(resp) })
   if status == 201 or status == 200 then item.sent = true; ColourNote("lime", "black", "  Sent!")
+  elseif status == 409 then
+    if item.is_eqdb then
+      local check_url = RELAY_URL .. "/rest/v1/equipment?name=eq." .. urlEncode(item.name) .. "&verified=eq.false&select=name"
+      local check_resp = {}
+      local c_ok, c_status = http.request({ url = check_url, sink = ltn12.sink.table(check_resp) })
+      if c_ok and c_status == 200 then
+        local data = table.concat(check_resp)
+        if data and data ~= "[]" then
+          -- existing is personal, new is EQDB: overwrite
+          ColourNote("yellow", "black", "  Upgrading personal -> EQDB")
+          local del_url = RELAY_URL .. "/rest/v1/equipment?name=eq." .. urlEncode(item.name)
+          http.request({ url = del_url, method = "DELETE", headers = { ["apikey"] = SUPABASE_ANON_KEY }, sink = ltn12.sink.table({}) })
+          local resp2 = {}; local ok2, status2 = http.request({ url = RELAY_URL .. "/rest/v1/equipment", method = "POST", headers = { ["Content-Type"] = "application/json", ["Content-Length"] = tostring(string.len(body)) }, source = ltn12.source.string(body), sink = ltn12.sink.table(resp2) })
+          if status2 == 201 or status2 == 200 then item.sent = true; ColourNote("lime", "black", "  Upgraded!")
+          else ColourNote("red", "black", "  Upgrade failed: " .. tostring(status2)); table.insert(send_queue, 1, item) end
+        else
+          item.sent = true; ColourNote("silver", "black", "  Already exists")
+        end
+      else
+        item.sent = true; ColourNote("silver", "black", "  Already exists")
+      end
+    else
+      item.sent = true; ColourNote("silver", "black", "  Already exists")
+    end
   else
     ColourNote("red", "black", "  Failed: " .. tostring(status)); table.insert(send_queue, 1, item)
   end
