@@ -110,7 +110,7 @@
     <h2>Admin Panel</h2>
     <hr>
     
-    <div id="admin-content">
+    <div id="admin-content" style="display:none;">
         <div class="tabs">
             <span class="tab active" id="tab-dashboard">Dashboard</span>
             <span class="tab" id="tab-equipment">Equipment</span>
@@ -293,11 +293,13 @@
         var isAuthenticated = !!session;
         if (!isAuthenticated) {
             document.getElementById('admin-content').innerHTML = '<div style="padding:40px;text-align:center;"><h2>Access Denied</h2><p style="color:#888;">You must be logged in as an admin. <a href="login.html">Go to login</a></p></div>';
+            document.getElementById('admin-content').style.display = 'block';
             document.getElementById('editor-dropdown').style.display = 'none';
             document.getElementById('admin-link').style.display = 'none';
             throw new Error('Not authenticated');
         }
 
+        document.getElementById('admin-content').style.display = 'block';
         loadDashboard();
         
         document.getElementById('tab-dashboard').addEventListener('click', function() { switchTab('dashboard'); });
