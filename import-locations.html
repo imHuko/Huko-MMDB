@@ -526,7 +526,7 @@
     </div><!-- /import-content -->
 
     <script>
-
+        function hasSession() { return Object.keys(localStorage).some(function(k){return k.startsWith('sb-') && localStorage.getItem(k);}); }
         if (sessionStorage.getItem('editor_logged_in') === 'true') {
 
             document.getElementById('editor-dropdown').style.display = 'inline-block';
@@ -540,7 +540,7 @@
 
         }
 
-                if (localStorage.getItem('user_logged_in') === 'true') {
+                if (localStorage.getItem('user_logged_in') === 'true' || hasSession()) {
             document.getElementById('login-link').style.display = 'none';
             document.getElementById('signup-link').style.display = 'none';
             document.getElementById('logout-link').style.display = 'inline';

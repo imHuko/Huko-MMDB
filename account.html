@@ -112,8 +112,9 @@
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
         var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+        function hasSession() { return Object.keys(localStorage).some(function(k){return k.startsWith('sb-') && localStorage.getItem(k);}); }
         var username = localStorage.getItem('username');
-        if (username && localStorage.getItem('user_logged_in') === 'true') {
+        if (username && (localStorage.getItem('user_logged_in') === 'true' || hasSession())) {
             document.getElementById('not-logged-in').style.display = 'none';
             document.getElementById('account-content').style.display = 'block';
             document.getElementById('account-username').textContent = username;
@@ -138,7 +139,7 @@
             document.getElementById('login-link').style.display = 'none';
             document.getElementById('signup-link').style.display = 'none';
         }
-        if (localStorage.getItem('user_logged_in') === 'true') {
+        if (localStorage.getItem('user_logged_in') === 'true' || hasSession()) {
             document.getElementById('login-link').style.display = 'none';
             document.getElementById('signup-link').style.display = 'none';
             document.getElementById('logout-link').style.display = 'inline';
