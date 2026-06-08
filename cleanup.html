@@ -209,7 +209,7 @@
                 });
             } else if (mode === 'suspect') {
                 var r = await supabase.from('itemsloc_db')
-                    .select('itemid, area, mobid')
+                    .select('itemid, area, mobid, room')
                     .limit(500);
                 var ids = [...new Set((r.data || []).map(function(x) { return String(x.itemid); }))];
                 var nameRes = await supabase.from('items_db').select('itemid, name').in('itemid', ids.slice(0, 200));
@@ -221,11 +221,11 @@
                         return n.match(/corpse|gold coin|ticket|voucher|credit|\(no short/i) || n.length < 3;
                     })
                     .map(function(row) {
-                        return { name: nameMap[String(row.itemid)] || 'Unknown', area: row.area, itemid: row.itemid, mobid: row.mobid };
+                        return { name: nameMap[String(row.itemid)] || 'Unknown', area: row.area, itemid: row.itemid, mobid: row.mobid, room: row.room };
                     });
             } else {
                 var r = await supabase.from('itemsloc_db')
-                    .select('itemid, area, mobid')
+                    .select('itemid, area, mobid, room')
                     .limit(500);
                 queue = [];
                 var ids = [...new Set((r.data || []).map(function(x) { return String(x.itemid); }))];
@@ -233,7 +233,7 @@
                 var nameMap = {};
                 (nameRes.data || []).forEach(function(n) { nameMap[String(n.itemid)] = n.name; });
                 queue = (r.data || []).map(function(row) {
-                    return { name: nameMap[String(row.itemid)] || null, area: row.area, itemid: row.itemid, mobid: row.mobid };
+                    return { name: nameMap[String(row.itemid)] || null, area: row.area, itemid: row.itemid, mobid: row.mobid, room: row.room };
                 }).filter(function(x) { return x.name; });
                 queue.sort(function() { return Math.random() - 0.5; });
             }
@@ -252,6 +252,15 @@
             current = queue[qIndex];
             renderCard();
             updateProgress();
+        }
+
+        var mobNameCache = {};
+        async function getMobName(mobid) {
+            if (!mobid) return '';
+            if (mobNameCache[mobid]) return mobNameCache[mobid];
+            var r = await supabase.from('mobs_db').select('name').eq('mobid', String(mobid)).limit(1);
+            if (r.data && r.data.length > 0) { mobNameCache[mobid] = r.data[0].name; return r.data[0].name; }
+            return '';
         }
 
         function renderCard() {
@@ -279,6 +288,28 @@
                 card.appendChild(meta1);
             }
 
+            if (current.mobid) {
+                var meta2 = document.createElement('div');
+                meta2.className = 'card-meta';
+                meta2.id = 'mob-info';
+                meta2.innerHTML = 'Mob: <span style="color:#888;">loading...</span>';
+                card.appendChild(meta2);
+                getMobName(current.mobid).then(function(mn) {
+                    if (mn) {
+                        document.getElementById('mob-info').innerHTML = 'Mob: <span><a href="mob.html?mobid=' + encodeURIComponent(current.mobid) + '">' + escHtml(mn) + '</a></span>';
+                    } else {
+                        document.getElementById('mob-info').innerHTML = 'Mob: <span style="color:#888;">' + escHtml(current.mobid) + '</span>';
+                    }
+                });
+            }
+
+            if (current.room && current.room !== '-') {
+                var meta3 = document.createElement('div');
+                meta3.className = 'card-meta';
+                meta3.innerHTML = 'Room: <span>' + escHtml(current.room) + '</span>';
+                card.appendChild(meta3);
+            }
+
             if (current.flagged) {
                 var badge = document.createElement('div');
                 badge.className = 'flag-badge';
@@ -286,13 +317,26 @@
                 card.appendChild(badge);
             }
 
-            var link = document.createElement('a');
-            link.className = 'card-link';
-            link.href = 'item.html?name=' + encodeURIComponent(current.name);
-            link.target = '_blank';
-            link.textContent = 'View full item page &rarr;';
-            card.appendChild(link);
+            var links = document.createElement('div');
+            links.style.cssText = 'margin-top:10px;display:flex;gap:12px;flex-wrap:wrap;';
 
+            var itemLink = document.createElement('a');
+            itemLink.className = 'card-link';
+            itemLink.href = 'item.html?name=' + encodeURIComponent(current.name);
+            itemLink.target = '_blank';
+            itemLink.textContent = 'View item page &rarr;';
+            links.appendChild(itemLink);
+
+            if (current.area) {
+                var zoneLink = document.createElement('a');
+                zoneLink.className = 'card-link';
+                zoneLink.href = 'zone.html?area=' + encodeURIComponent(current.area);
+                zoneLink.target = '_blank';
+                zoneLink.textContent = 'View zone page &rarr;';
+                links.appendChild(zoneLink);
+            }
+
+            card.appendChild(links);
             area.appendChild(card);
 
             var btnRow = document.createElement('div');
