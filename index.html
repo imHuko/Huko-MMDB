@@ -203,6 +203,8 @@
                 <input type="text" id="filter-affect" placeholder="add stat..." style="border:none;background:transparent;color:#ccc;outline:none;padding:2px;width:100px;font-size:13px;" list="affect-list" autocomplete="off">
             </div>
             <datalist id="affect-list"></datalist>
+            <label style="color:#aaa;font-size:13px;cursor:pointer;"><input type="checkbox" id="filter-search-desc"> Search descriptions</label>
+            <button id="clear-filters-btn" style="background:#555;font-size:12px;padding:2px 8px;">Clear Filters</button>
         </div>
     </div>
     </div>
@@ -301,8 +303,23 @@
         });
         document.getElementById('search-btn').addEventListener('click', searchEquipment);
 		document.getElementById('mob-search-btn').addEventListener('click', searchMobs);
+        document.getElementById('clear-filters-btn').addEventListener('click', clearFilters);
 document.getElementById('mob-search-input').addEventListener('keyup', function(e) { if (e.key === 'Enter') searchMobs(); });
         document.getElementById('search-input').addEventListener('keyup', function(e) { if (e.key === 'Enter') searchEquipment(); });
+        
+        function clearFilters() {
+            document.getElementById('filter-type').value = '';
+            document.getElementById('filter-weapon-type').value = '';
+            document.getElementById('filter-wear-slot').value = '';
+            document.getElementById('filter-material').value = '';
+            document.getElementById('filter-min-level').value = '';
+            document.getElementById('filter-max-level').value = '';
+            document.getElementById('filter-source').value = '';
+            document.getElementById('filter-search-desc').checked = false;
+            activeAffects = [];
+            renderAffectTags();
+            searchEquipment();
+        }
         
         function saveSearchState() {
             sessionStorage.setItem('eqdb_search', JSON.stringify({
@@ -315,6 +332,7 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
                 filterMinLevel: document.getElementById('filter-min-level').value,
                 filterMaxLevel: document.getElementById('filter-max-level').value,
                 filterSource: document.getElementById('filter-source').value,
+                filterSearchDesc: document.getElementById('filter-search-desc').checked,
                 filterAffects: activeAffects.slice(),
                 filtersVisible: document.getElementById('advanced-filters').style.display !== 'none',
                 lastSearch: document.getElementById('results').querySelector('.item-card') ? 'equipment' : 'mobs'
@@ -335,6 +353,7 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
                 document.getElementById('filter-min-level').value = state.filterMinLevel || '';
                 document.getElementById('filter-max-level').value = state.filterMaxLevel || '';
                 document.getElementById('filter-source').value = state.filterSource || '';
+                if (state.filterSearchDesc) document.getElementById('filter-search-desc').checked = true;
                 if (state.filterAffects && state.filterAffects.length) {
                     state.filterAffects.forEach(function(a) { addAffectTag(a); });
                 }
@@ -359,6 +378,7 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
             document.getElementById('filter-min-level').value = '';
             document.getElementById('filter-max-level').value = '';
             document.getElementById('filter-source').value = '';
+            document.getElementById('filter-search-desc').checked = false;
             activeAffects = [];
             renderAffectTags();
             sessionStorage.removeItem('eqdb_search');
@@ -386,9 +406,16 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
             var resultsDiv = document.getElementById('results');
             resultsDiv.innerHTML = '<p>Searching...</p>';
             
-            let query = supabase.from('equipment').select('*', { count: 'exact' }).order('name', { ascending: true }).limit(100);
+            let query = supabase.from('equipment').select('*', { count: 'exact' }).order('name', { ascending: true }).limit(200);
             
-            if (searchTerm) query = query.ilike('name', '%' + searchTerm + '%');
+            if (searchTerm) {
+                var descChecked = document.getElementById('filter-search-desc').checked;
+                if (descChecked) {
+                    query = query.or('name.ilike.%' + searchTerm + '%,description.ilike.%' + searchTerm + '%');
+                } else {
+                    query = query.ilike('name', '%' + searchTerm + '%');
+                }
+            }
             
             var itemType = document.getElementById('filter-type').value;
             var weaponType = document.getElementById('filter-weapon-type').value;
@@ -403,7 +430,6 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
 if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
             if (material) query = query.ilike('description', '%made of ' + material + '%');
 			            if (activeAffects.length > 0) {
-                console.log('Filtering by affects:', activeAffects);
                 for (var af = 0; af < activeAffects.length; af++) {
                     query = query.ilike('description', '%Affects ' + activeAffects[af] + '%');
                 }
@@ -422,7 +448,7 @@ if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
             
             if (!data || data.length === 0) {
                 if (searchTerm) {
-                    var dbFallback = await supabase.from('items_db').select('name, itemid').ilike('name', '%' + searchTerm + '%').limit(100);
+                    var dbFallback = await supabase.from('items_db').select('name, itemid').ilike('name', '%' + searchTerm + '%').limit(200);
                     if (dbFallback.data && dbFallback.data.length > 0) {
                         var fallbackHtml = '';
                         for (var f = 0; f < dbFallback.data.length; f++) {
@@ -449,13 +475,12 @@ if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
                 html += '[' + escapeHtml(item.type) + '] ';
                 if (item.slot) html += 'Slot: ' + escapeHtml(item.slot) + ' ';
                 if (item.level_req > 0) html += 'Level: ' + item.level_req + ' ';
-                if (item.value > 0) html += 'Value: ' + item.value + ' gold ';
                 html += item.verified ? '<span style="color:#44aa44;">EQDB</span>' : '<span style="color:#ffaa00;">Personal</span>';
                 html += '</div>';
                 html += '</div>';
             }
             
-            html += '<p style="color:#888;margin-top:20px;">Found ' + count + ' items</p>';
+            html += '<p style="color:#888;margin-top:20px;">Found ' + count + ' items' + (count > 200 ? ' (showing first 200)' : '') + '</p>';
             resultsDiv.innerHTML = html;
             saveSearchState();
         }
