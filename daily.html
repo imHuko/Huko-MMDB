@@ -123,8 +123,30 @@
         var todayKey = getTodayKey();
         var state = loadState();
         var itemData = null;
-        var allNames = [];
         var acSelected = -1;
+
+        function getStatHint(item) {
+            if (item.affects && item.affects.length > 0) {
+                var a = item.affects[0];
+                return 'Affects ' + a.stat + ' by ' + a.value + '. {' + a.frequency + '}';
+            }
+            if (item.when_procs && item.when_procs.length > 0) {
+                var w = item.when_procs[0];
+                var hint = w.effect;
+                if (w.condition) hint += ' (when ' + w.condition + ')';
+                hint += ' {' + w.frequency + '}';
+                return hint;
+            }
+            if (item.grants_knowledge && item.grants_knowledge.length > 0) {
+                var g = item.grants_knowledge[0];
+                return 'Grants knowledge of \'' + g.skill + '\' by ' + g.pct + '%. {' + g.frequency + '}';
+            }
+            if (item.procs && item.procs.length > 0) {
+                var raw = item.procs[0].replace(/^\++\s*/, '');
+                return raw.length > 150 ? raw.slice(0, 150) + '...' : raw;
+            }
+            return 'No stat data';
+        }
 
         function getTodayKey() {
             var d = new Date();
@@ -162,27 +184,47 @@
         }
 
         async function loadGame() {
-            var result = await supabase.from('equipment')
-                .select('name, type, description')
-                .not('description', 'is', null)
-                .neq('description', '')
-                .order('name', { ascending: true });
+            // Fetch all items in pages of 1000 (Supabase server caps at 1000 per request)
+            var allItems = [];
+            var pageSize = 1000;
+            for (var page = 0; page < 8; page++) {
+                var from = page * pageSize;
+                var to = from + pageSize - 1;
+                var res = await supabase.from('equipment_parsed')
+                    .select('name, type, level_req, affects, when_procs, grants_knowledge, procs')
+                    .order('name', { ascending: true })
+                    .range(from, to);
+                if (!res.data || res.data.length === 0) break;
+                allItems = allItems.concat(res.data);
+            }
 
-            var items = result.data || [];
+            // Only include items with actual stat hints (affects, procs, etc.)
+            var items = allItems.filter(function(item) {
+                return (item.affects && item.affects.length > 0)
+                    || (item.when_procs && item.when_procs.length > 0)
+                    || (item.grants_knowledge && item.grants_knowledge.length > 0)
+                    || (item.procs && item.procs.length > 0);
+            });
+            console.log('[daily] total:', allItems.length, 'with hints:', items.length);
+
             if (items.length === 0) {
-                document.getElementById('game-area').innerHTML = '<p style="color:#ff4444;">Could not load items.</p>';
+                document.getElementById('game-area').innerHTML = '<p style="color:#ff4444;">No items with stats available.</p>';
                 return;
             }
 
+            // Pick today's item
             var idx = dateSeed() % items.length;
             itemData = items[idx];
-            allNames = items.map(function(i) { return i.name; });
+            console.log('[daily] idx:', idx, 'name:', itemData.name);
 
-            var itemsDbResult = await supabase.from('items_db').select('itemid').eq('name', itemData.name).limit(1);
-            var itemId = itemsDbResult.data && itemsDbResult.data.length > 0 ? itemsDbResult.data[0].itemid : null;
+            var itemType = itemData.type || 'unknown';
+            var statHint = getStatHint(itemData);
 
+            // Look up zone and mob (case-insensitive name match)
             var zone = 'Unknown';
             var mobName = 'Unknown';
+            var itemsDbRes = await supabase.from('items_db').select('itemid').ilike('name', itemData.name).limit(1);
+            var itemId = itemsDbRes.data && itemsDbRes.data.length > 0 ? itemsDbRes.data[0].itemid : null;
             if (itemId) {
                 var locRes = await supabase.from('itemsloc_db').select('area, mobid').eq('itemid', String(itemId)).limit(1);
                 if (locRes.data && locRes.data.length > 0) {
@@ -194,12 +236,6 @@
                     }
                 }
             }
-
-            var typeMatch = (itemData.description || '').match(/is type ([^\s,]+)/i);
-            var itemType = typeMatch ? typeMatch[1] : (itemData.type || 'unknown');
-
-            var statMatch = (itemData.description || '').match(/Affects\s+(\S+)\s+by\s+([+-]?\d+)/i);
-            var statHint = statMatch ? ('Affects ' + statMatch[1] + ' by ' + statMatch[2]) : null;
 
             itemData._zone    = zone;
             itemData._mob     = mobName;
@@ -358,23 +394,29 @@
             var ac = document.getElementById('guess-ac');
             if (!ac) return;
             if (!val || val.length < 2) { ac.classList.remove('open'); return; }
-            var lower = val.toLowerCase();
-            var matches = allNames.filter(function(n) { return n.toLowerCase().indexOf(lower) >= 0; }).slice(0, 10);
-            if (!matches.length) { ac.classList.remove('open'); return; }
-            ac.innerHTML = '';
-            acSelected = -1;
-            matches.forEach(function(m) {
-                var item = document.createElement('div');
-                item.className = 'ac-item';
-                item.textContent = m;
-                item.addEventListener('mousedown', function(e) {
-                    e.preventDefault();
-                    document.getElementById('guess-input').value = m;
-                    ac.classList.remove('open');
+            supabase.from('equipment_parsed')
+                .select('name')
+                .ilike('name', '%' + val.replace(/'/g, "''") + '%')
+                .order('name', { ascending: true })
+                .limit(10)
+                .then(function(res) {
+                    var matches = (res.data || []).map(function(r) { return r.name; });
+                    if (!matches.length) { ac.classList.remove('open'); return; }
+                    ac.innerHTML = '';
+                    acSelected = -1;
+                    matches.forEach(function(m) {
+                        var item = document.createElement('div');
+                        item.className = 'ac-item';
+                        item.textContent = m;
+                        item.addEventListener('mousedown', function(e) {
+                            e.preventDefault();
+                            document.getElementById('guess-input').value = m;
+                            ac.classList.remove('open');
+                        });
+                        ac.appendChild(item);
+                    });
+                    ac.classList.add('open');
                 });
-                ac.appendChild(item);
-            });
-            ac.classList.add('open');
         };
 
         document.addEventListener('click', function(e) {
