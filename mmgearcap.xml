@@ -143,10 +143,14 @@ function fetchUrl(url)
     local thread = async.request(u, "HTTPS")
     if thread then
       while thread:alive() do wait.time(0.1) end
-      local ok, _, res = thread:join()
-      if ok and type(res) == "table" then
+      local ok, r1, r2, r3, r4, r5 = thread:join()
+      if debug_mode then
+        ColourNote("cyan", "black", "[GearCap-DEBUG]   join: ok=" .. tostring(ok) .. " r1=" .. tostring(r1) .. "(" .. type(r1) .. ") r2=" .. tostring(r2) .. "(" .. type(r2) .. ") r3=" .. tostring(r3) .. "(" .. type(r3) .. ")")
+      end
+      if ok and type(r3) == "table" then
+        local res = r3
         if debug_mode then
-          ColourNote("cyan", "black", "[GearCap-DEBUG]   async.request: ok=" .. tostring(res.ok) .. " status=" .. tostring(res.status) .. " body_len=" .. tostring(type(res.body) == "string" and #res.body or "?"))
+          ColourNote("cyan", "black", "[GearCap-DEBUG]   async.request: res.ok=" .. tostring(res.ok) .. " status=" .. tostring(res.status) .. " body_len=" .. tostring(type(res.body) == "string" and #res.body or "?"))
         end
         if res.ok and type(res.body) == "string" and #res.body > 100 then
           if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] async.request OK: " .. tostring(#res.body) .. " bytes") end
@@ -154,7 +158,7 @@ function fetchUrl(url)
           break
         end
       else
-        if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   async.request join failed: ok=" .. tostring(ok)) end
+        if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   async.request: no table - r2=" .. tostring(r2) .. "(" .. type(r2) .. ")") end
       end
     else
       if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   async.request returned nil") end
