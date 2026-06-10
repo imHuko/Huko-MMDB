@@ -486,6 +486,13 @@ if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
                 html += '[' + escapeHtml(item.type) + '] ';
                 if (item.slot) html += 'Slot: ' + escapeHtml(item.slot) + ' ';
                 if (item.level_req > 0) html += 'Level: ' + item.level_req + ' ';
+                if (activeAffects.length > 0 && item.description) {
+                    for (var af = 0; af < activeAffects.length; af++) {
+                        var re = new RegExp('Affects\\s+' + activeAffects[af] + '\\s+by\\s+(-?[\\d.]+)', 'i');
+                        var m = item.description.match(re);
+                        if (m) html += escapeHtml(activeAffects[af]) + ' ' + m[1] + ' ';
+                    }
+                }
                 html += item.verified ? '<span style="color:#44aa44;">EQDB</span>' : '<span style="color:#ffaa00;">Personal</span>';
                 html += '</div>';
                 html += '</div>';
