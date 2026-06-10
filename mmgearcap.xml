@@ -92,19 +92,22 @@ function OnPluginInstall()
 end
 
 function fetchUrl(url)
-  local xhr = utils and utils.xmlhttp and utils.xmlhttp()
-  if xhr then
-    local ok, result = pcall(function()
-      xhr:Open("GET", url, false)
-      xhr:SetRequestHeader("User-Agent", "GearCap")
-      xhr:Send()
-      if xhr.Status == 200 then return xhr.ResponseText end
-    end)
-    if ok and result then return result end
+  local urls = (type(url) == "table") and url or { url }
+  for _, u in ipairs(urls) do
+    local xhr = utils and utils.xmlhttp and utils.xmlhttp()
+    if xhr then
+      local ok, result = pcall(function()
+        xhr:Open("GET", u, false)
+        xhr:SetRequestHeader("User-Agent", "GearCap")
+        xhr:Send()
+        if xhr.Status == 200 then return xhr.ResponseText end
+      end)
+      if ok and result then return result end
+    end
+    local resp = {}
+    local ok, st = http.request({ url = u, sink = ltn12.sink.table(resp) })
+    if ok and st == 200 then return table.concat(resp) end
   end
-  local resp = {}
-  local ok, st = http.request({ url = url, sink = ltn12.sink.table(resp) })
-  if ok and st == 200 then return table.concat(resp) end
   return nil
 end
 
@@ -115,7 +118,7 @@ function checkForUpdateOnStartup()
   SetVariable("last_update_check", today)
 
   wait.make(function()
-    local xml = fetchUrl(GITHUB_URL)
+    local xml = fetchUrl({ GITHUB_URL, UPDATE_URL })
     if not xml then return end
     local remote_ver = string.match(xml, '<plugin[^>]-version="([%d%.]+)"')
     if not remote_ver then return end
@@ -406,9 +409,9 @@ function mcg_update()
   local cur = currentVersion()
   ColourNote("yellow", "black", "[GearCap] Checking for update (current: v" .. cur .. ")...")
   wait.make(function()
-    local xml = fetchUrl(GITHUB_URL)
+    local xml = fetchUrl({ GITHUB_URL, UPDATE_URL })
     if not xml then
-      ColourNote("red", "black", "[GearCap] Update check failed.")
+      ColourNote("red", "black", "[GearCap] Update check failed (tried GitHub and hukodb.com).")
       return
     end
     local remote_ver = string.match(xml, '<plugin[^>]-version="([%d%.]+)"')
