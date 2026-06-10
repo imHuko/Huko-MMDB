@@ -12,7 +12,7 @@
    save_state="y"
    date_written="2026-05-17"
    requires="4.71"
-    version="8.8"
+    version="8.9"
    >
 
 <description trim="y">
@@ -61,6 +61,7 @@ Commands:
 <![CDATA[
 
 require "wait"
+require "async"
 
 RELAY_URL = "https://mm-gear-relay.mm-gear.workers.dev"
 SUPABASE_URL = "https://fpvwpxtsrmrmdvnswrzx.supabase.co"
@@ -99,12 +100,47 @@ function fetchUrl(url)
   for _, u in ipairs(urls) do
     if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying URL: " .. u) end
 
-    -- Method 1: MSXML
+    -- Method 1: async.request (llthreads2 + ssl.https, non-blocking, follows redirects)
+    if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying async.request...") end
+    local ok, result = pcall(function()
+      local t = async.request(u, "HTTPS")
+      if not t then return nil end
+      while t:alive() do wait.time(0.1) end
+      local r1, r2, r3, r4 = t:join()
+      if type(r1) == "string" and #r1 > 0 then return r1 end
+      if type(r2) == "string" and #r2 > 0 then return r2 end
+      if type(r3) == "string" and #r3 > 0 then return r3 end
+      return nil
+    end)
+    if ok and result then
+      if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] async.request OK: " .. tostring(#result) .. " bytes") end
+      return result
+    end
+    if debug_mode then
+      if not ok then ColourNote("red", "black", "[GearCap-DEBUG] async.request error: " .. tostring(result)) end
+      if ok and not result then ColourNote("red", "black", "[GearCap-DEBUG] async.request returned nil") end
+    end
+
+    -- Method 2: ssl.https direct (blocking but has SSL + redirect following)
+    if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying ssl.https direct...") end
+    local ok2, body2 = pcall(function()
+      local https = require("ssl.https")
+      return https.request(u)
+    end)
+    if ok2 and body2 then
+      if type(body2) == "string" and #body2 > 0 then
+        if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] ssl.https OK: " .. tostring(#body2) .. " bytes") end
+        return body2
+      end
+    end
+    if debug_mode and not ok2 then ColourNote("red", "black", "[GearCap-DEBUG] ssl.https error: " .. tostring(body2)) end
+
+    -- Method 3: MSXML
     local has_xhr = (utils and utils.xmlhttp) ~= nil
     if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] utils.xmlhttp available: " .. tostring(has_xhr)) end
     if has_xhr then
       local xhr = utils.xmlhttp()
-      local ok, result = pcall(function()
+      local ok3, result3 = pcall(function()
         xhr:Open("GET", u, false)
         xhr:SetRequestHeader("User-Agent", "GearCap")
         xhr:Send()
@@ -112,60 +148,28 @@ function fetchUrl(url)
         if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] MSXML status: " .. tostring(status)) end
         if status == 200 then return xhr.ResponseText end
       end)
-      if ok and result then
-        if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] MSXML success: " .. tostring(#result) .. " bytes") end
-        return result
+      if ok3 and result3 then
+        if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] MSXML success: " .. tostring(#result3) .. " bytes") end
+        return result3
       end
       if debug_mode then
-        if not ok then ColourNote("red", "black", "[GearCap-DEBUG] MSXML error: " .. tostring(result)) end
-        if ok and not result then ColourNote("red", "black", "[GearCap-DEBUG] MSXML returned non-200 status") end
+        if not ok3 then ColourNote("red", "black", "[GearCap-DEBUG] MSXML error: " .. tostring(result3)) end
+        if ok3 and not result3 then ColourNote("red", "black", "[GearCap-DEBUG] MSXML returned non-200 status") end
       end
     end
 
-    -- Method 2: LuaSocket with manual redirect following
+    -- Method 4: LuaSocket direct (plain TCP, no SSL — last resort)
     if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying LuaSocket HTTP...") end
-    local fetch_url = u
-    for redirect_count = 1, 5 do
-      if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG]   Fetch: " .. fetch_url) end
-      local resp = {}
-      local ok, st, resp_hdrs = http.request({ url = fetch_url, sink = ltn12.sink.table(resp) })
-      if ok and st == 200 then
-        local body = table.concat(resp)
-        if #body > 0 then
-          if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] LuaSocket OK: " .. tostring(#body) .. " bytes") end
-          return body
-        end
-      end
-      if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG]   status: " .. tostring(st)) end
-      if ok and (st == 301 or st == 302) then
-        if resp_hdrs and type(resp_hdrs) == "table" then
-          if debug_mode then
-            -- Dump all headers to find the redirect location
-            for k, v in pairs(resp_hdrs) do ColourNote("cyan", "black", "[GearCap-DEBUG]   hdr " .. tostring(k) .. "=" .. tostring(v)) end
-          end
-          local loc = resp_hdrs.location or resp_hdrs.Location or ""
-          if loc ~= "" then
-            fetch_url = loc
-            if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG]   -> " .. loc) end
-          else
-            if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   no Location header") end
-            break
-          end
-        else
-          if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   no headers table (type: " .. type(resp_hdrs) .. ")") end
-          -- Try getting the body anyway (some servers return content with 301)
-          local body = table.concat(resp)
-          if #body > 0 then
-            if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG]   body from redirect: " .. tostring(#body) .. " bytes") end
-            return body
-          end
-          break
-        end
-      else
-        break
+    local resp = {}
+    local ok4, st4 = http.request({ url = u, sink = ltn12.sink.table(resp) })
+    if ok4 and st4 == 200 then
+      local body4 = table.concat(resp)
+      if #body4 > 0 then
+        if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] LuaSocket OK: " .. tostring(#body4) .. " bytes") end
+        return body4
       end
     end
-    if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG] LuaSocket exhausted") end
+    if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG]   status: " .. tostring(st4)) end
   end
   if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG] All URLs exhausted, returning nil") end
   return nil
