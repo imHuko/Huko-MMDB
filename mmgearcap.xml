@@ -123,31 +123,47 @@ function fetchUrl(url)
 
     -- Method 2: LuaSocket
     if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying LuaSocket HTTP...") end
-    local resp = {}
-    local ok, st, resp_hdrs, status_line = http.request({ url = u, redirect = true, sink = ltn12.sink.table(resp) })
-    if debug_mode then
-      ColourNote("cyan", "black", "[GearCap-DEBUG] LuaSocket ok: " .. tostring(ok) .. ", status: " .. tostring(st) .. ", status_line: " .. tostring(status_line))
-      if resp_hdrs and type(resp_hdrs) == "table" then
-        for k, v in pairs(resp_hdrs) do ColourNote("cyan", "black", "[GearCap-DEBUG]   Header " .. tostring(k) .. ": " .. tostring(v)) end
+    -- Try up to 3 redirects
+    local fetch_url = u
+    for redirect_count = 1, 3 do
+      if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG]   Fetching: " .. fetch_url) end
+      local resp = {}
+      local ok, st, resp_hdrs, status_line = http.request({ url = fetch_url, sink = ltn12.sink.table(resp) })
+      if debug_mode then
+        ColourNote("cyan", "black", "[GearCap-DEBUG]   ok: " .. tostring(ok) .. ", status: " .. tostring(st))
+        if st == 301 or st == 302 then
+          -- Use pcall to safely check first header value
+          local loc = pcall(function() return resp_hdrs["location"] or resp_hdrs["Location"] or "" end)
+          ColourNote("cyan", "black", "[GearCap-DEBUG]   Redirect target: " .. tostring(loc))
+        end
       end
-    end
-    if ok and (st == 200 or st == 301 or st == 302) then
-      local body = table.concat(resp)
-      if #body > 0 then
-        if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] LuaSocket success: " .. tostring(#body) .. " bytes") end
-        return body
-      end
-    end
-    -- Manual follow redirect if redirect=true was ignored
-    if ok and (st == 301 or st == 302) and resp_hdrs and resp_hdrs.location then
-      if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Following redirect to: " .. resp_hdrs.location) end
-      local resp2 = {}
-      local ok2, st2 = http.request({ url = resp_hdrs.location, redirect = true, sink = ltn12.sink.table(resp2) })
-      if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Redirect ok: " .. tostring(ok2) .. ", status: " .. tostring(st2)) end
-      if ok2 and st2 == 200 then
-        local body = table.concat(resp2)
-        if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] Redirect success: " .. tostring(#body) .. " bytes") end
-        return body
+      if ok then
+        if st == 200 then
+          local body = table.concat(resp)
+          if #body > 0 then
+            if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] LuaSocket success: " .. tostring(#body) .. " bytes") end
+            return body
+          end
+        end
+        if st == 301 or st == 302 then
+          local ok_loc, loc = pcall(function()
+            local h = resp_hdrs or {}
+            return h.location or h.Location or ""
+          end)
+          if ok_loc and loc and loc ~= "" then
+            fetch_url = loc
+            if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG]   Following redirect #" .. redirect_count .. " to: " .. loc) end
+          else
+            if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   No Location header in redirect response") end
+            break
+          end
+        else
+          if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   Unexpected status: " .. tostring(st)) end
+          break
+        end
+      else
+        if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   LuaSocket request failed") end
+        break
       end
     end
   end
