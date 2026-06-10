@@ -101,24 +101,23 @@ function fetchUrl(url)
     if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying URL: " .. u) end
 
     -- Method 1: async.request (llthreads2 + ssl.https, non-blocking, follows redirects)
+    -- NOTE: cannot wrap in pcall — wait.time yields across C-call boundary
     if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying async.request...") end
-    local ok, result = pcall(function()
-      local t = async.request(u, "HTTPS")
-      if not t then return nil end
-      while t:alive() do wait.time(0.1) end
-      local r1, r2, r3, r4 = t:join()
-      if type(r1) == "string" and #r1 > 0 then return r1 end
-      if type(r2) == "string" and #r2 > 0 then return r2 end
-      if type(r3) == "string" and #r3 > 0 then return r3 end
-      return nil
-    end)
-    if ok and result then
-      if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] async.request OK: " .. tostring(#result) .. " bytes") end
-      return result
-    end
-    if debug_mode then
-      if not ok then ColourNote("red", "black", "[GearCap-DEBUG] async.request error: " .. tostring(result)) end
-      if ok and not result then ColourNote("red", "black", "[GearCap-DEBUG] async.request returned nil") end
+    local thread = async.request(u, "HTTPS")
+    if thread then
+      while thread:alive() do wait.time(0.1) end
+      local r1, r2, r3 = thread:join()
+      local body = (type(r1) == "string" and #r1 > 0) and r1
+                or (type(r2) == "string" and #r2 > 0) and r2
+                or (type(r3) == "string" and #r3 > 0) and r3
+                or nil
+      if body then
+        if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] async.request OK: " .. tostring(#body) .. " bytes") end
+        return body
+      end
+      if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG] async.request thread finished but no body found") end
+    else
+      if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG] async.request returned nil") end
     end
 
     -- Method 2: ssl.https direct (blocking but has SSL + redirect following)
