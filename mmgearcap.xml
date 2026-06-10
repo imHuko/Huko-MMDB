@@ -83,6 +83,28 @@ json = require("json")
 http = require("socket.http")
 ltn12 = require("ltn12")
 
+-- own async fetch with redirect following (bypasses async.lua's single-return limitation)
+local _llthreads, fetch_thread_fn, has_custom_fetch
+pcall(function()
+  local t = require("llthreads2")
+  local fn = string.dump(function(arg)
+    local https = require("ssl.https")
+    local url = arg.url
+    for i = 1, 5 do
+      local body, code, headers = https.request(url)
+      if type(body) == "string" and code == 200 and #body > 0 then return body end
+      if (code == 301 or code == 302) and type(headers) == "table" then
+        local loc = headers.location or headers.Location or ""
+        if loc ~= "" then url = loc else return nil end
+      else return nil end
+    end
+    return nil
+  end)
+  _llthreads = t
+  fetch_thread_fn = fn
+  has_custom_fetch = true
+end)
+
 
 function OnPluginInstall()
   wait.make(function()
@@ -100,68 +122,26 @@ function fetchUrl(url)
   for _, u in ipairs(urls) do
     if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying URL: " .. u) end
 
-    -- Method 1: async.request (llthreads2 + ssl.https, non-blocking)
-    -- We handle redirects manually since ssl.https blocks socket.http's redirect following
-    if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying async.request...") end
-    local fetch_url = u
-    local redirect_ok = true
-    for redirect_count = 1, 5 do
-      if not redirect_ok then break end
-      redirect_ok = false
-      if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG]   Fetch: " .. fetch_url) end
-      local thread = async.request(fetch_url, "HTTPS")
-      if not thread then
-        if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   async.request returned nil") end
-        break
-      end
-      while thread:alive() do wait.time(0.1) end
-      local ok_join, results
-      -- join might throw if thread crashed
-      ok_join, results = pcall(function()
-        local r1, r2, r3 = thread:join()
-        return {r1, r2, r3}
-      end)
-      if not ok_join then
-        if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   thread:join() threw: " .. tostring(results)) end
-        break
-      end
-      local r1, r2, r3 = results[1], results[2], results[3]
-      if debug_mode then
-        ColourNote("cyan", "black", "[GearCap-DEBUG]   join returns: r1=" .. type(r1) .. " r2=" .. type(r2) .. " r3=" .. type(r3))
-      end
-      -- Determine: body string, status code number, headers table
-      local body_str, status_code, resp_hdrs
-      if type(r1) == "string" and type(r2) == "number" then
-        body_str, status_code, resp_hdrs = r1, r2, r3
-      elseif type(r2) == "string" and type(r3) == "number" then
-        body_str, status_code = r2, r3
-      elseif type(r1) == "number" and type(r2) == "string" then
-        status_code, body_str = r1, r2
-      end
-      if status_code == 200 and body_str and #body_str > 0 then
-        if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] async.request OK: " .. tostring(#body_str) .. " bytes") end
-        return body_str
-      end
-      if status_code == 301 or status_code == 302 then
-        local loc = ""
-        if type(resp_hdrs) == "table" then
-          loc = resp_hdrs.location or resp_hdrs.Location or ""
-          if debug_mode then
-            for k, v in pairs(resp_hdrs) do ColourNote("cyan", "black", "[GearCap-DEBUG]   hdr " .. tostring(k) .. "=" .. tostring(v)) end
-          end
+    -- Method 1: our own llthreads2 fetch with ssl.https + redirect following
+    if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying llthreads2 fetch...") end
+    if has_custom_fetch then
+      local t = _llthreads.new(fetch_thread_fn, {url = u})
+      if t then
+        t:start()
+        while t:alive() do wait.time(0.1) end
+        local ok, _, result = t:join()
+        if type(ok) == "boolean" and ok and type(result) == "string" and #result > 0 then
+          if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] llthreads2 OK: " .. tostring(#result) .. " bytes") end
+          return result
         end
-        if loc ~= "" then
-          fetch_url = loc
-          redirect_ok = true
-          if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG]   -> " .. loc) end
-        else
-          if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   no Location header") end
-          break
+        if debug_mode then
+          ColourNote("red", "black", "[GearCap-DEBUG]   llthreads2 join: ok=" .. tostring(ok) .. " result=" .. tostring(type(result) == "string" and #result or result or "nil"))
         end
       else
-        if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   status: " .. tostring(status_code) .. ", body: " .. tostring(body_str and #body_str or 0) .. " bytes") end
-        break
+        if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   _llthreads.new returned nil") end
       end
+    else
+      if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   custom fetch not available") end
     end
 
     -- Method 2: ssl.https direct (blocking but has SSL + redirect following)
