@@ -138,19 +138,23 @@ function fetchUrl(url)
   for _, u in ipairs(urls) do
     if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying URL: " .. u) end
 
-    -- Method 1: async.request via async.lua (ssl.https in thread, returns body as string)
+    -- Method 1: async.request via async.lua (ssl.https in thread, returns table with body/status)
     if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying async.request...") end
     local thread = async.request(u, "HTTPS")
     if thread then
       while thread:alive() do wait.time(0.1) end
-      local ok, _, body = thread:join()
-      if type(ok) == "boolean" and ok and type(body) == "string" and #body > 100 then
-        if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] async.request OK: " .. tostring(#body) .. " bytes") end
-        result = body
-        break
-      end
-      if debug_mode then
-        ColourNote("red", "black", "[GearCap-DEBUG]   async.request: ok=" .. tostring(ok) .. " body=" .. tostring(type(body) == "string" and #body or body or "nil"))
+      local ok, _, res = thread:join()
+      if ok and type(res) == "table" then
+        if debug_mode then
+          ColourNote("cyan", "black", "[GearCap-DEBUG]   async.request: ok=" .. tostring(res.ok) .. " status=" .. tostring(res.status) .. " body_len=" .. tostring(type(res.body) == "string" and #res.body or "?"))
+        end
+        if res.ok and type(res.body) == "string" and #res.body > 100 then
+          if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] async.request OK: " .. tostring(#res.body) .. " bytes") end
+          result = res.body
+          break
+        end
+      else
+        if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   async.request join failed: ok=" .. tostring(ok)) end
       end
     else
       if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   async.request returned nil") end
