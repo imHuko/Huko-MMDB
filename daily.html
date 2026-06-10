@@ -212,35 +212,70 @@
                 return;
             }
 
-            // Pick today's item
-            var idx = dateSeed() % items.length;
-            itemData = items[idx];
-            console.log('[daily] idx:', idx, 'name:', itemData.name);
+            // Try items from the seed until we find one with all hints populated
+            var startIdx = dateSeed() % items.length;
+            itemData = null;
+            for (var offset = 0; offset < items.length; offset++) {
+                var idx = (startIdx + offset) % items.length;
+                var candidate = items[idx];
 
-            var itemType = itemData.type || 'unknown';
-            var statHint = getStatHint(itemData);
+                var itemType = candidate.type || 'unknown';
+                var statHint = getStatHint(candidate);
 
-            // Look up zone and mob (case-insensitive name match)
-            var zone = 'Unknown';
-            var mobName = 'Unknown';
-            var itemsDbRes = await supabase.from('items_db').select('itemid').ilike('name', itemData.name).limit(1);
-            var itemId = itemsDbRes.data && itemsDbRes.data.length > 0 ? itemsDbRes.data[0].itemid : null;
-            if (itemId) {
-                var locRes = await supabase.from('itemsloc_db').select('area, mobid').eq('itemid', String(itemId)).limit(1);
-                if (locRes.data && locRes.data.length > 0) {
-                    zone = locRes.data[0].area || 'Unknown';
-                    var mobId = locRes.data[0].mobid;
-                    if (mobId) {
-                        var mobRes = await supabase.from('mobs_db').select('name').eq('mobid', String(mobId)).limit(1);
-                        if (mobRes.data && mobRes.data.length > 0) mobName = mobRes.data[0].name;
+                var zone = 'Unknown';
+                var mobName = 'Unknown';
+                var itemsDbRes = await supabase.from('items_db').select('itemid').ilike('name', candidate.name).limit(1);
+                var itemId = itemsDbRes.data && itemsDbRes.data.length > 0 ? itemsDbRes.data[0].itemid : null;
+                if (itemId) {
+                    var locRes = await supabase.from('itemsloc_db').select('area, mobid').eq('itemid', String(itemId)).limit(1);
+                    if (locRes.data && locRes.data.length > 0) {
+                        zone = locRes.data[0].area || 'Unknown';
+                        var mobId = locRes.data[0].mobid;
+                        if (mobId) {
+                            var mobRes = await supabase.from('mobs_db').select('name').eq('mobid', String(mobId)).limit(1);
+                            if (mobRes.data && mobRes.data.length > 0) mobName = mobRes.data[0].name;
+                        }
                     }
                 }
+
+                if (zone !== 'Unknown' && mobName !== 'Unknown') {
+                    itemData = candidate;
+                    itemData._zone = zone;
+                    itemData._mob  = mobName;
+                    itemData._type = itemType;
+                    itemData._stat = statHint;
+                    console.log('[daily] picked idx:', idx, 'name:', itemData.name);
+                    break;
+                }
+                console.log('[daily] skip idx:', idx, 'name:', candidate.name, '(zone/mob unknown)');
             }
 
-            itemData._zone    = zone;
-            itemData._mob     = mobName;
-            itemData._type    = itemType;
-            itemData._stat    = statHint;
+            // Fallback: use the seed item even if hints are incomplete
+            if (!itemData) {
+                var idx = startIdx % items.length;
+                itemData = items[idx];
+                var itemType = itemData.type || 'unknown';
+                var zone = 'Unknown';
+                var mobName = 'Unknown';
+                var itemsDbRes = await supabase.from('items_db').select('itemid').ilike('name', itemData.name).limit(1);
+                var itemId = itemsDbRes.data && itemsDbRes.data.length > 0 ? itemsDbRes.data[0].itemid : null;
+                if (itemId) {
+                    var locRes = await supabase.from('itemsloc_db').select('area, mobid').eq('itemid', String(itemId)).limit(1);
+                    if (locRes.data && locRes.data.length > 0) {
+                        zone = locRes.data[0].area || 'Unknown';
+                        var mobId = locRes.data[0].mobid;
+                        if (mobId) {
+                            var mobRes = await supabase.from('mobs_db').select('name').eq('mobid', String(mobId)).limit(1);
+                            if (mobRes.data && mobRes.data.length > 0) mobName = mobRes.data[0].name;
+                        }
+                    }
+                }
+                itemData._zone = zone;
+                itemData._mob  = mobName;
+                itemData._type = itemType;
+                itemData._stat = getStatHint(itemData);
+                console.log('[daily] fallback idx:', idx, 'name:', itemData.name);
+            }
 
             updateStats();
             renderGame();

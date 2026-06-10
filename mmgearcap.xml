@@ -221,6 +221,8 @@ function parseBuffer()
         local nextLine = raw_buffer[i]
         if nextLine == "" then i = i + 1; break end
         if string.find(nextLine, "%d+hp %d+sp %d+st") then break end
+        if string.find(nextLine, "^%((Social)%)$") then break end
+        if string.find(nextLine, "^%(Mount: .+%)$") then break end
         if string.find(nextLine, "^You focus") then break end
         if string.find(nextLine, "^check eqlookup") then break end
         if string.find(nextLine, "^check equipment") then break end
