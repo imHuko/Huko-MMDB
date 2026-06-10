@@ -106,7 +106,7 @@ function fetchUrl(url)
     if thread then
       while thread:alive() do wait.time(0.1) end
       local ok, _, body = thread:join()
-      if type(ok) == "boolean" and ok and type(body) == "string" and #body > 0 then
+      if type(ok) == "boolean" and ok and type(body) == "string" and #body > 100 then
         if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] async.request OK: " .. tostring(#body) .. " bytes") end
         return body
       end
