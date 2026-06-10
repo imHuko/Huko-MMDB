@@ -100,24 +100,53 @@ function fetchUrl(url)
   for _, u in ipairs(urls) do
     if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying URL: " .. u) end
 
-    -- Method 1: async.request (llthreads2 + ssl.https, non-blocking, follows redirects)
-    -- NOTE: cannot wrap in pcall — wait.time yields across C-call boundary
+    -- Method 1: async.request (llthreads2 + ssl.https, non-blocking)
+    -- We handle redirects manually since ssl.https blocks socket.http's redirect following
     if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying async.request...") end
-    local thread = async.request(u, "HTTPS")
-    if thread then
+    local fetch_url = u
+    local redirect_ok = true
+    for redirect_count = 1, 5 do
+      if not redirect_ok then break end
+      redirect_ok = false
+      if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG]   Fetch: " .. fetch_url) end
+      local thread = async.request(fetch_url, "HTTPS")
+      if not thread then
+        if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   async.request returned nil") end
+        break
+      end
       while thread:alive() do wait.time(0.1) end
       local r1, r2, r3 = thread:join()
-      local body = (type(r1) == "string" and #r1 > 0) and r1
-                or (type(r2) == "string" and #r2 > 0) and r2
-                or (type(r3) == "string" and #r3 > 0) and r3
-                or nil
-      if body then
-        if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] async.request OK: " .. tostring(#body) .. " bytes") end
-        return body
+      -- Determine: body string, status code number, headers table
+      local body_str, status_code, resp_hdrs
+      if type(r1) == "string" and type(r2) == "number" then
+        body_str, status_code, resp_hdrs = r1, r2, r3
+      elseif type(r2) == "string" and type(r3) == "number" then
+        body_str, status_code = r2, r3
       end
-      if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG] async.request thread finished but no body found") end
-    else
-      if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG] async.request returned nil") end
+      if status_code == 200 and body_str and #body_str > 0 then
+        if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] async.request OK: " .. tostring(#body_str) .. " bytes") end
+        return body_str
+      end
+      if status_code == 301 or status_code == 302 then
+        local loc = ""
+        if type(resp_hdrs) == "table" then
+          loc = resp_hdrs.location or resp_hdrs.Location or ""
+          if debug_mode then
+            for k, v in pairs(resp_hdrs) do ColourNote("cyan", "black", "[GearCap-DEBUG]   hdr " .. tostring(k) .. "=" .. tostring(v)) end
+          end
+        end
+        if loc ~= "" then
+          fetch_url = loc
+          redirect_ok = true
+          if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG]   -> " .. loc) end
+        else
+          if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   no Location header") end
+          break
+        end
+      else
+        if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   status: " .. tostring(status_code) .. ", body: " .. tostring(body_str and #body_str or 0) .. " bytes") end
+        break
+      end
     end
 
     -- Method 2: ssl.https direct (blocking but has SSL + redirect following)
