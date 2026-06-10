@@ -1,2 +1,0 @@
-# Redirect HTTP to HTTPS
-http://*/* https://:host/:splat 301
