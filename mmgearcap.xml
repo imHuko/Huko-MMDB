@@ -12,7 +12,7 @@
    save_state="y"
    date_written="2026-05-17"
    requires="4.71"
-    version="8.4"
+    version="8.5"
    >
 
 <description trim="y">
@@ -53,6 +53,7 @@ Commands:
   <alias match="^mcg help$" enabled="y" regexp="y" send_to="12" sequence="106"><send>OnHelp()</send></alias>
   <alias match="^mcg update$" enabled="y" regexp="y" send_to="12" sequence="108"><send>mcg_update()</send></alias>
   <alias match="^mcg clearcache$" enabled="y" regexp="y" send_to="12" sequence="109"><send>mcg_clearcache()</send></alias>
+  <alias match="^mcg debug$" enabled="y" regexp="y" send_to="12" sequence="110"><send>mcg_toggle_debug()</send></alias>
   <alias match="^mm_gear_capture(|(\:| )help)$" regexp="y" enabled="y" script="OnHelp"/>
 </aliases>
 
@@ -74,6 +75,7 @@ captured_items = {}
 captured_names = {}
 send_queue = {}
 sending = false
+debug_mode = false
 
 json = require("json")
 http = require("socket.http")
@@ -94,20 +96,45 @@ end
 function fetchUrl(url)
   local urls = (type(url) == "table") and url or { url }
   for _, u in ipairs(urls) do
-    local xhr = utils and utils.xmlhttp and utils.xmlhttp()
-    if xhr then
+    if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying URL: " .. u) end
+
+    -- Method 1: MSXML
+    local has_xhr = (utils and utils.xmlhttp) ~= nil
+    if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] utils.xmlhttp available: " .. tostring(has_xhr)) end
+    if has_xhr then
+      local xhr = utils.xmlhttp()
       local ok, result = pcall(function()
         xhr:Open("GET", u, false)
         xhr:SetRequestHeader("User-Agent", "GearCap")
         xhr:Send()
-        if xhr.Status == 200 then return xhr.ResponseText end
+        local status = xhr.Status
+        if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] MSXML status: " .. tostring(status)) end
+        if status == 200 then return xhr.ResponseText end
       end)
-      if ok and result then return result end
+      if ok and result then
+        if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] MSXML success: " .. tostring(#result) .. " bytes") end
+        return result
+      end
+      if debug_mode then
+        if not ok then ColourNote("red", "black", "[GearCap-DEBUG] MSXML error: " .. tostring(result)) end
+        if ok and not result then ColourNote("red", "black", "[GearCap-DEBUG] MSXML returned non-200 status") end
+      end
     end
+
+    -- Method 2: LuaSocket
+    if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying LuaSocket HTTP...") end
     local resp = {}
-    local ok, st = http.request({ url = u, sink = ltn12.sink.table(resp) })
-    if ok and st == 200 then return table.concat(resp) end
+    local ok, st, resp_hdrs, status_line = http.request({ url = u, sink = ltn12.sink.table(resp) })
+    if debug_mode then
+      ColourNote("cyan", "black", "[GearCap-DEBUG] LuaSocket ok: " .. tostring(ok) .. ", status: " .. tostring(st) .. ", status_line: " .. tostring(status_line))
+    end
+    if ok and st == 200 then
+      local body = table.concat(resp)
+      if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] LuaSocket success: " .. tostring(#body) .. " bytes") end
+      return body
+    end
   end
+  if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG] All URLs exhausted, returning nil") end
   return nil
 end
 
@@ -186,6 +213,11 @@ end
 function mcg_clear() raw_buffer = {}; captured_items = {}; captured_names = {}; send_queue = {}; SaveState(); ColourNote("yellow", "black", "[GearCap] Cleared") end
 
 function mcg_clearcache() captured_names = {}; SaveState(); ColourNote("yellow", "black", "[GearCap] Cache cleared. Previously seen items can be captured again.") end
+
+function mcg_toggle_debug()
+  debug_mode = not debug_mode
+  ColourNote("lime", "black", "[GearCap] Debug mode: " .. (debug_mode and "ON" or "OFF"))
+end
 
 function mcg_status()
   local s = recording and "ON" or "OFF"; local sent = 0
