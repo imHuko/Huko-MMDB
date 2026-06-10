@@ -83,6 +83,43 @@ json = require("json")
 http = require("socket.http")
 ltn12 = require("ltn12")
 
+-- fallback base64 decoder if mime.core unavailable
+local b64chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+local function base64_decode(s)
+  s = string.gsub(s, '[^' .. b64chars .. '=]', '')
+  local result = {}
+  for pos = 1, #s, 4 do
+    local a = string.find(b64chars, string.sub(s, pos, pos), 1, true) or 65
+    local b = string.find(b64chars, string.sub(s, pos + 1, pos + 1), 1, true) or 65
+    local c = string.find(b64chars, string.sub(s, pos + 2, pos + 2), 1, true) or 65
+    local d = string.find(b64chars, string.sub(s, pos + 3, pos + 3), 1, true) or 65
+    local n = (a - 1) * 262144 + (b - 1) * 4096 + (c - 1) * 64 + (d - 1)
+    table.insert(result, string.char(math.floor(n / 65536)))
+    if c ~= 65 then table.insert(result, string.char(math.floor(n / 256) % 256)) end
+    if d ~= 65 then table.insert(result, string.char(n % 256)) end
+  end
+  return table.concat(result)
+end
+
+-- extract plugin XML from GitHub API JSON response
+function decodeGitHubContent(body)
+  if type(body) ~= "string" or string.sub(body, 1, 1) ~= "{" then return nil end
+  local ok, data = pcall(function() return json.decode(body) end)
+  if not ok or type(data) ~= "table" or not data.content or data.encoding ~= "base64" then return nil end
+  local ok2, raw = pcall(function()
+    local m = require("mime")
+    return m.unb64(data.content)
+  end)
+  if not ok2 or type(raw) ~= "string" then
+    raw = base64_decode(data.content)
+  end
+  if raw and #raw > 0 then
+    if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] Decoded GitHub API content: " .. tostring(#raw) .. " bytes") end
+    return raw
+  end
+  return nil
+end
+
 
 function OnPluginInstall()
   wait.make(function()
@@ -97,6 +134,7 @@ end
 
 function fetchUrl(url)
   local urls = (type(url) == "table") and url or { url }
+  local result
   for _, u in ipairs(urls) do
     if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying URL: " .. u) end
 
@@ -108,7 +146,8 @@ function fetchUrl(url)
       local ok, _, body = thread:join()
       if type(ok) == "boolean" and ok and type(body) == "string" and #body > 100 then
         if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] async.request OK: " .. tostring(#body) .. " bytes") end
-        return body
+        result = body
+        break
       end
       if debug_mode then
         ColourNote("red", "black", "[GearCap-DEBUG]   async.request: ok=" .. tostring(ok) .. " body=" .. tostring(type(body) == "string" and #body or body or "nil"))
@@ -117,55 +156,68 @@ function fetchUrl(url)
       if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   async.request returned nil") end
     end
 
-    -- Method 2: ssl.https direct (blocking but has SSL + redirect following)
-    if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying ssl.https direct...") end
-    local ok2, body2 = pcall(function()
-      local https = require("ssl.https")
-      return https.request(u)
-    end)
-    if ok2 and body2 then
-      if type(body2) == "string" and #body2 > 0 then
-        if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] ssl.https OK: " .. tostring(#body2) .. " bytes") end
-        return body2
-      end
-    end
-    if debug_mode and not ok2 then ColourNote("red", "black", "[GearCap-DEBUG] ssl.https error: " .. tostring(body2)) end
-
-    -- Method 3: MSXML
-    local has_xhr = (utils and utils.xmlhttp) ~= nil
-    if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] utils.xmlhttp available: " .. tostring(has_xhr)) end
-    if has_xhr then
-      local xhr = utils.xmlhttp()
-      local ok3, result3 = pcall(function()
-        xhr:Open("GET", u, false)
-        xhr:SetRequestHeader("User-Agent", "GearCap")
-        xhr:Send()
-        local status = xhr.Status
-        if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] MSXML status: " .. tostring(status)) end
-        if status == 200 then return xhr.ResponseText end
+    if not result then
+      -- Method 2: ssl.https direct (blocking but has SSL)
+      if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying ssl.https direct...") end
+      local ok2, body2 = pcall(function()
+        local https = require("ssl.https")
+        return https.request(u)
       end)
-      if ok3 and result3 then
-        if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] MSXML success: " .. tostring(#result3) .. " bytes") end
-        return result3
+      if ok2 and body2 and type(body2) == "string" and #body2 > 0 then
+        if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] ssl.https OK: " .. tostring(#body2) .. " bytes") end
+        result = body2
+        break
       end
-      if debug_mode then
-        if not ok3 then ColourNote("red", "black", "[GearCap-DEBUG] MSXML error: " .. tostring(result3)) end
-        if ok3 and not result3 then ColourNote("red", "black", "[GearCap-DEBUG] MSXML returned non-200 status") end
+      if debug_mode and not ok2 then ColourNote("red", "black", "[GearCap-DEBUG] ssl.https error: " .. tostring(body2)) end
+    end
+
+    if not result then
+      -- Method 3: MSXML
+      local has_xhr = (utils and utils.xmlhttp) ~= nil
+      if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] utils.xmlhttp available: " .. tostring(has_xhr)) end
+      if has_xhr then
+        local xhr = utils.xmlhttp()
+        local ok3, result3 = pcall(function()
+          xhr:Open("GET", u, false)
+          xhr:SetRequestHeader("User-Agent", "GearCap")
+          xhr:Send()
+          local status = xhr.Status
+          if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] MSXML status: " .. tostring(status)) end
+          if status == 200 then return xhr.ResponseText end
+        end)
+        if ok3 and result3 then
+          if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] MSXML success: " .. tostring(#result3) .. " bytes") end
+          result = result3
+          break
+        end
+        if debug_mode then
+          if not ok3 then ColourNote("red", "black", "[GearCap-DEBUG] MSXML error: " .. tostring(result3)) end
+          if ok3 and not result3 then ColourNote("red", "black", "[GearCap-DEBUG] MSXML returned non-200 status") end
+        end
       end
     end
 
-    -- Method 4: LuaSocket direct (plain TCP, no SSL — last resort)
-    if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying LuaSocket HTTP...") end
-    local resp = {}
-    local ok4, st4 = http.request({ url = u, sink = ltn12.sink.table(resp) })
-    if ok4 and st4 == 200 then
-      local body4 = table.concat(resp)
-      if #body4 > 0 then
-        if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] LuaSocket OK: " .. tostring(#body4) .. " bytes") end
-        return body4
+    if not result then
+      -- Method 4: LuaSocket direct (plain TCP, no SSL — last resort)
+      if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying LuaSocket HTTP...") end
+      local resp = {}
+      local ok4, st4 = http.request({ url = u, sink = ltn12.sink.table(resp) })
+      if ok4 and st4 == 200 then
+        local body4 = table.concat(resp)
+        if #body4 > 0 then
+          if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] LuaSocket OK: " .. tostring(#body4) .. " bytes") end
+          result = body4
+          break
+        end
       end
+      if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG]   status: " .. tostring(st4)) end
     end
-    if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG]   status: " .. tostring(st4)) end
+  end
+
+  if result then
+    local decoded = decodeGitHubContent(result)
+    if decoded then return decoded end
+    return result
   end
   if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG] All URLs exhausted, returning nil") end
   return nil
