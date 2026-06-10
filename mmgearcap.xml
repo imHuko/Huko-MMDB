@@ -12,7 +12,7 @@
    save_state="y"
    date_written="2026-05-17"
    requires="4.71"
-     version="8.55"
+     version="8.56"
    >
 
 <description trim="y">
@@ -83,6 +83,28 @@ json = require("json")
 http = require("socket.http")
 ltn12 = require("ltn12")
 
+-- Self-contained HTTPS fetch: llthreads2 + ssl.https with TLS 1.2 (no async.lua dependency)
+local has_llthreads, _llthreads, fetch_thread_fn
+pcall(function()
+  _llthreads = require("llthreads2")
+  fetch_thread_fn = string.dump(function(arg)
+    local https = require("ssl.https")
+    local ltn12 = require("ltn12")
+    local result_table = {}
+    local r, code = https.request({
+      url = arg.url,
+      sink = ltn12.sink.table(result_table),
+      protocol = "tlsv1_2",
+    })
+    if r then
+      return {ok=true, status=code, body=table.concat(result_table)}
+    else
+      return {ok=false, body=tostring(code)}
+    end
+  end)
+  has_llthreads = true
+end)
+
 -- fallback base64 decoder if mime.core unavailable
 local b64chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 local function base64_decode(s)
@@ -138,49 +160,75 @@ function fetchUrl(url)
   for _, u in ipairs(urls) do
     if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying URL: " .. u) end
 
-    -- Method 1: async.request via async.lua (ssl.https in thread, returns table with body/status)
-    if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying async.request...") end
-    local thread = async.request(u, "HTTPS")
-    if thread then
+    -- Method 1: custom llthreads2 + ssl.https with TLS 1.2 (self-contained, no async.lua dependency)
+    if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying custom TLS 1.2 thread...") end
+    if has_llthreads then
+      local thread = _llthreads.new(fetch_thread_fn, {url = u})
+      thread:start()
       while thread:alive() do wait.time(0.1) end
-      local ok, r1, r2, r3 = thread:join()
-      if debug_mode and ok then
-        ColourNote("cyan", "black", "[GearCap-DEBUG]   join: ok=" .. tostring(ok) .. " r1=" .. tostring(r1) .. "(" .. type(r1) .. ") r2=" .. tostring(r2) .. "(" .. type(r2) .. ")")
-      end
+      local ok, r1 = thread:join()
       if ok and type(r1) == "table" then
-        local res = r1
         if debug_mode then
-          ColourNote("cyan", "black", "[GearCap-DEBUG]   async.request: res.ok=" .. tostring(res.ok) .. " status=" .. tostring(res.status) .. " body_len=" .. tostring(type(res.body) == "string" and #res.body or "?"))
+          ColourNote("cyan", "black", "[GearCap-DEBUG]   custom thread: ok=" .. tostring(r1.ok) .. " status=" .. tostring(r1.status) .. " body_len=" .. tostring(type(r1.body) == "string" and #r1.body or "?"))
         end
-        if res.ok and type(res.body) == "string" and #res.body > 100 then
-          if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] async.request OK: " .. tostring(#res.body) .. " bytes") end
-          result = res.body
+        if r1.ok and type(r1.body) == "string" and #r1.body > 100 then
+          if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] custom thread OK: " .. tostring(#r1.body) .. " bytes") end
+          result = r1.body
           break
         end
       else
-        if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   async.request: no table") end
+        if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   custom thread failed: ok=" .. tostring(ok)) end
       end
     else
-      if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   async.request returned nil") end
+      if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   llthreads2 not available") end
     end
 
+    -- Method 2: async.request fallback (for users with modified async.lua)
     if not result then
-      -- Method 2: ssl.https direct (blocking but has SSL)
-      if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying ssl.https direct...") end
+      if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying async.request fallback...") end
+      local thread = async.request(u, "HTTPS")
+      if thread then
+        while thread:alive() do wait.time(0.1) end
+        local ok, r1 = thread:join()
+        if ok and type(r1) == "table" then
+          if debug_mode then
+            ColourNote("cyan", "black", "[GearCap-DEBUG]   async.request: ok=" .. tostring(r1.ok) .. " status=" .. tostring(r1.status) .. " body_len=" .. tostring(type(r1.body) == "string" and #r1.body or "?"))
+          end
+          if r1.ok and type(r1.body) == "string" and #r1.body > 100 then
+            if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] async.request OK: " .. tostring(#r1.body) .. " bytes") end
+            result = r1.body
+            break
+          end
+        end
+      end
+    end
+
+    -- Method 3: ssl.https direct with TLS 1.2 (blocking but works without llthreads2)
+    if not result then
+      if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying ssl.https direct (TLS 1.2)...") end
+      local resp = {}
       local ok2, body2 = pcall(function()
         local https = require("ssl.https")
-        return https.request(u)
+        return https.request({
+          url = u,
+          sink = ltn12.sink.table(resp),
+          protocol = "tlsv1_2",
+        })
       end)
-      if ok2 and body2 and type(body2) == "string" and #body2 > 0 then
-        if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] ssl.https OK: " .. tostring(#body2) .. " bytes") end
-        result = body2
-        break
+      if ok2 and body2 then
+        -- ssl.https.request(table_url) returns (1 or nil, code, ...) on success, body is in resp
+        local body = table.concat(resp)
+        if #body > 0 then
+          if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] ssl.https direct OK: " .. tostring(#body) .. " bytes") end
+          result = body
+          break
+        end
       end
       if debug_mode and not ok2 then ColourNote("red", "black", "[GearCap-DEBUG] ssl.https error: " .. tostring(body2)) end
     end
 
     if not result then
-      -- Method 3: MSXML
+      -- Method 4: MSXML
       local has_xhr = (utils and utils.xmlhttp) ~= nil
       if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] utils.xmlhttp available: " .. tostring(has_xhr)) end
       if has_xhr then
@@ -206,7 +254,7 @@ function fetchUrl(url)
     end
 
     if not result then
-      -- Method 4: LuaSocket direct (plain TCP, no SSL — last resort)
+      -- Method 5: LuaSocket direct (plain TCP, no SSL — last resort)
       if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying LuaSocket HTTP...") end
       local resp = {}
       local ok4, st4 = http.request({ url = u, sink = ltn12.sink.table(resp) })
