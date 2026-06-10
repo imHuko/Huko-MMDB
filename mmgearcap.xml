@@ -90,15 +90,29 @@ pcall(function()
   local fn = string.dump(function(arg)
     local https = require("ssl.https")
     local url = arg.url
+    local diag = {}
     for i = 1, 5 do
-      local body, code, headers = https.request(url)
-      if type(body) == "string" and code == 200 and #body > 0 then return body end
-      if (code == 301 or code == 302) and type(headers) == "table" then
-        local loc = headers.location or headers.Location or ""
-        if loc ~= "" then url = loc else return nil end
-      else return nil end
+      local b, c, h = https.request(url)
+      table.insert(diag, "try" .. i .. ":b=" .. type(b) .. " c=" .. tostring(c) .. " h=" .. type(h))
+      if type(b) == "string" and type(c) == "number" and c == 200 and #b > 0 then
+        return b
+      end
+      if type(c) == "number" and (c == 301 or c == 302) and type(h) == "table" then
+        local loc = h.location or h.Location or ""
+        table.insert(diag, "loc=" .. loc)
+        if loc ~= "" then url = loc else break end
+      else
+        if type(h) == "table" then
+          for k, v in pairs(h) do
+            if type(k) == "string" and type(v) == "string" then
+              table.insert(diag, "hdr:" .. k .. "=" .. v)
+            end
+          end
+        end
+        break
+      end
     end
-    return nil
+    return table.concat(diag, "|")
   end)
   _llthreads = t
   fetch_thread_fn = fn
@@ -130,12 +144,17 @@ function fetchUrl(url)
         t:start()
         while t:alive() do wait.time(0.1) end
         local ok, _, result = t:join()
-        if type(ok) == "boolean" and ok and type(result) == "string" and #result > 0 then
-          if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] llthreads2 OK: " .. tostring(#result) .. " bytes") end
-          return result
-        end
-        if debug_mode then
-          ColourNote("red", "black", "[GearCap-DEBUG]   llthreads2 join: ok=" .. tostring(ok) .. " result=" .. tostring(type(result) == "string" and #result or result or "nil"))
+        if type(ok) == "boolean" then
+          if ok and type(result) == "string" and #result > 0 then
+            -- Check if result is the actual body (looks like XML) or diagnostic info
+            if string.find(result, "<plugin") or string.find(result, "<muclient>") then
+              if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] llthreads2 OK: " .. tostring(#result) .. " bytes") end
+              return result
+            end
+          end
+          if debug_mode then
+            ColourNote("red", "black", "[GearCap-DEBUG]   llthreads2: ok=" .. tostring(ok) .. " result=" .. tostring(type(result) == "string" and result or tostring(result)))
+          end
         end
       else
         if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   _llthreads.new returned nil") end
