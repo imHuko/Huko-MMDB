@@ -12,7 +12,7 @@
    save_state="y"
    date_written="2026-05-17"
    requires="4.71"
-    version="8.6"
+    version="8.7"
    >
 
 <description trim="y">
@@ -121,51 +121,64 @@ function fetchUrl(url)
       end
     end
 
-    -- Method 2: LuaSocket
-    if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying LuaSocket HTTP...") end
-    -- Try up to 3 redirects
-    local fetch_url = u
-    for redirect_count = 1, 3 do
-      if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG]   Fetching: " .. fetch_url) end
-      local resp = {}
-      local ok, st, resp_hdrs, status_line = http.request({ url = fetch_url, sink = ltn12.sink.table(resp) })
-      if debug_mode then
-        ColourNote("cyan", "black", "[GearCap-DEBUG]   ok: " .. tostring(ok) .. ", status: " .. tostring(st))
-        if st == 301 or st == 302 then
-          -- Use pcall to safely check first header value
-          local loc = pcall(function() return resp_hdrs["location"] or resp_hdrs["Location"] or "" end)
-          ColourNote("cyan", "black", "[GearCap-DEBUG]   Redirect target: " .. tostring(loc))
+    -- Method 2: PowerShell Invoke-WebRequest (handles redirects natively)
+    if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying PowerShell...") end
+    local tmpfile = os.tmpname() or GetPluginInfo(GetPluginID(), 6) .. ".fetch.tmp"
+    local cmd = 'powershell -Command "try { $r = Invoke-WebRequest -Uri \'' .. u .. '\' -UseBasicParsing -UserAgent \'GearCap\' -TimeoutSec 30; [System.IO.File]::WriteAllText(\'' .. tmpfile .. '\', $r.Content) } catch { exit 1 }"'
+    local f = io.popen(cmd, "r")
+    if f then
+      f:close()
+      local f2 = io.open(tmpfile, "r")
+      if f2 then
+        local content = f2:read("*a")
+        f2:close()
+        os.remove(tmpfile)
+        if content and #content > 0 then
+          if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] PowerShell success: " .. tostring(#content) .. " bytes") end
+          return content
         end
       end
-      if ok then
-        if st == 200 then
-          local body = table.concat(resp)
-          if #body > 0 then
-            if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] LuaSocket success: " .. tostring(#body) .. " bytes") end
-            return body
-          end
-        end
-        if st == 301 or st == 302 then
-          local ok_loc, loc = pcall(function()
-            local h = resp_hdrs or {}
-            return h.location or h.Location or ""
-          end)
-          if ok_loc and loc and loc ~= "" then
-            fetch_url = loc
-            if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG]   Following redirect #" .. redirect_count .. " to: " .. loc) end
-          else
-            if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   No Location header in redirect response") end
-            break
+    end
+    if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG] PowerShell fetch failed") end
+
+    -- Method 3: LuaSocket with manual redirect following
+    if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying LuaSocket HTTP...") end
+    local fetch_url = u
+    for redirect_count = 1, 5 do
+      if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG]   Fetching: " .. fetch_url) end
+      local resp = {}
+      local ok, st, resp_hdrs = http.request({ url = fetch_url, sink = ltn12.sink.table(resp) })
+      if debug_mode then
+        ColourNote("cyan", "black", "[GearCap-DEBUG]   ok: " .. tostring(ok) .. ", status: " .. tostring(st))
+        if resp_hdrs and type(resp_hdrs) == "table" then
+          for k, v in pairs(resp_hdrs) do
+            ColourNote("cyan", "black", "[GearCap-DEBUG]   Header [" .. tostring(k) .. "] = " .. tostring(v))
           end
         else
-          if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   Unexpected status: " .. tostring(st)) end
+          ColourNote("cyan", "black", "[GearCap-DEBUG]   Headers type: " .. type(resp_hdrs))
+        end
+      end
+      if ok and st == 200 then
+        local body = table.concat(resp)
+        if #body > 0 then
+          if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] LuaSocket success: " .. tostring(#body) .. " bytes") end
+          return body
+        end
+      end
+      if ok and (st == 301 or st == 302) and resp_hdrs and type(resp_hdrs) == "table" then
+        local loc = resp_hdrs.location or resp_hdrs.Location or ""
+        if loc ~= "" then
+          fetch_url = loc
+          if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG]   Redirect " .. redirect_count .. " -> " .. loc) end
+        else
+          if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   No Location header for redirect") end
           break
         end
       else
-        if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   LuaSocket request failed") end
         break
       end
     end
+    if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG] LuaSocket exhausted") end
   end
   if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG] All URLs exhausted, returning nil") end
   return nil
