@@ -12,7 +12,7 @@
    save_state="y"
    date_written="2026-05-17"
    requires="4.71"
-    version="8.7"
+    version="8.8"
    >
 
 <description trim="y">
@@ -66,6 +66,7 @@ RELAY_URL = "https://mm-gear-relay.mm-gear.workers.dev"
 SUPABASE_URL = "https://fpvwpxtsrmrmdvnswrzx.supabase.co"
 SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY"
 GITHUB_URL = "https://raw.githubusercontent.com/imHuko/Huko-MMDB/master/mmgearcap.xml"
+GITHUB_API_URL = "https://api.github.com/repos/imHuko/Huko-MMDB/contents/mmgearcap.xml?ref=master"
 UPDATE_URL = "https://hukodb.com/mmgearcap.xml"
 UPLOADER_NAME = ""
 
@@ -121,57 +122,43 @@ function fetchUrl(url)
       end
     end
 
-    -- Method 2: PowerShell Invoke-WebRequest (handles redirects natively)
-    if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying PowerShell...") end
-    local tmpfile = os.tmpname() or GetPluginInfo(GetPluginID(), 6) .. ".fetch.tmp"
-    local cmd = 'powershell -Command "try { $r = Invoke-WebRequest -Uri \'' .. u .. '\' -UseBasicParsing -UserAgent \'GearCap\' -TimeoutSec 30; [System.IO.File]::WriteAllText(\'' .. tmpfile .. '\', $r.Content) } catch { exit 1 }"'
-    local f = io.popen(cmd, "r")
-    if f then
-      f:close()
-      local f2 = io.open(tmpfile, "r")
-      if f2 then
-        local content = f2:read("*a")
-        f2:close()
-        os.remove(tmpfile)
-        if content and #content > 0 then
-          if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] PowerShell success: " .. tostring(#content) .. " bytes") end
-          return content
-        end
-      end
-    end
-    if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG] PowerShell fetch failed") end
-
-    -- Method 3: LuaSocket with manual redirect following
+    -- Method 2: LuaSocket with manual redirect following
     if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying LuaSocket HTTP...") end
     local fetch_url = u
     for redirect_count = 1, 5 do
-      if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG]   Fetching: " .. fetch_url) end
+      if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG]   Fetch: " .. fetch_url) end
       local resp = {}
       local ok, st, resp_hdrs = http.request({ url = fetch_url, sink = ltn12.sink.table(resp) })
-      if debug_mode then
-        ColourNote("cyan", "black", "[GearCap-DEBUG]   ok: " .. tostring(ok) .. ", status: " .. tostring(st))
-        if resp_hdrs and type(resp_hdrs) == "table" then
-          for k, v in pairs(resp_hdrs) do
-            ColourNote("cyan", "black", "[GearCap-DEBUG]   Header [" .. tostring(k) .. "] = " .. tostring(v))
-          end
-        else
-          ColourNote("cyan", "black", "[GearCap-DEBUG]   Headers type: " .. type(resp_hdrs))
-        end
-      end
       if ok and st == 200 then
         local body = table.concat(resp)
         if #body > 0 then
-          if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] LuaSocket success: " .. tostring(#body) .. " bytes") end
+          if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] LuaSocket OK: " .. tostring(#body) .. " bytes") end
           return body
         end
       end
-      if ok and (st == 301 or st == 302) and resp_hdrs and type(resp_hdrs) == "table" then
-        local loc = resp_hdrs.location or resp_hdrs.Location or ""
-        if loc ~= "" then
-          fetch_url = loc
-          if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG]   Redirect " .. redirect_count .. " -> " .. loc) end
+      if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG]   status: " .. tostring(st)) end
+      if ok and (st == 301 or st == 302) then
+        if resp_hdrs and type(resp_hdrs) == "table" then
+          if debug_mode then
+            -- Dump all headers to find the redirect location
+            for k, v in pairs(resp_hdrs) do ColourNote("cyan", "black", "[GearCap-DEBUG]   hdr " .. tostring(k) .. "=" .. tostring(v)) end
+          end
+          local loc = resp_hdrs.location or resp_hdrs.Location or ""
+          if loc ~= "" then
+            fetch_url = loc
+            if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG]   -> " .. loc) end
+          else
+            if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   no Location header") end
+            break
+          end
         else
-          if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   No Location header for redirect") end
+          if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   no headers table (type: " .. type(resp_hdrs) .. ")") end
+          -- Try getting the body anyway (some servers return content with 301)
+          local body = table.concat(resp)
+          if #body > 0 then
+            if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG]   body from redirect: " .. tostring(#body) .. " bytes") end
+            return body
+          end
           break
         end
       else
@@ -191,7 +178,7 @@ function checkForUpdateOnStartup()
   SetVariable("last_update_check", today)
 
   wait.make(function()
-    local xml = fetchUrl({ GITHUB_URL, UPDATE_URL })
+    local xml = fetchUrl({ GITHUB_URL, UPDATE_URL, GITHUB_API_URL })
     if not xml then return end
     local remote_ver = string.match(xml, '<plugin[^>]-version="([%d%.]+)"')
     if not remote_ver then return end
@@ -487,9 +474,9 @@ function mcg_update()
   local cur = currentVersion()
   ColourNote("yellow", "black", "[GearCap] Checking for update (current: v" .. cur .. ")...")
   wait.make(function()
-    local xml = fetchUrl({ GITHUB_URL, UPDATE_URL })
+    local xml = fetchUrl({ GITHUB_URL, UPDATE_URL, GITHUB_API_URL })
     if not xml then
-      ColourNote("red", "black", "[GearCap] Update check failed (tried GitHub and hukodb.com).")
+      ColourNote("red", "black", "[GearCap] Update check failed.")
       return
     end
     local remote_ver = string.match(xml, '<plugin[^>]-version="([%d%.]+)"')
