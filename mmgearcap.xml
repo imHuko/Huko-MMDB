@@ -83,18 +83,6 @@ json = require("json")
 http = require("socket.http")
 ltn12 = require("ltn12")
 
--- own async fetch with redirect following (bypasses async.lua's single-return limitation)
-local _llthreads, fetch_thread_fn, has_custom_fetch
-pcall(function()
-  local t = require("llthreads2")
-  local fn = string.dump(function(arg)
-    return "HELLO:" .. arg.url
-  end)
-  _llthreads = t
-  fetch_thread_fn = fn
-  has_custom_fetch = true
-end)
-
 
 function OnPluginInstall()
   wait.make(function()
@@ -112,25 +100,21 @@ function fetchUrl(url)
   for _, u in ipairs(urls) do
     if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying URL: " .. u) end
 
-    -- Method 1: our own llthreads2 fetch with ssl.https + redirect following
-    if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying llthreads2 fetch...") end
-    if has_custom_fetch then
-      local t = _llthreads.new(fetch_thread_fn, {url = u})
-      if t then
-        t:start()
-        while t:alive() do wait.time(0.1) end
-        local ok, _, result = t:join()
-        if debug_mode then
-          ColourNote("cyan", "black", "[GearCap-DEBUG]   llthreads2: ok=" .. tostring(ok) .. " result=" .. tostring(result))
-        end
-        if type(ok) == "boolean" and ok and type(result) == "string" and #result > 0 then
-          return result
-        end
-      else
-        if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   _llthreads.new returned nil") end
+    -- Method 1: async.request via async.lua (ssl.https in thread, returns body as string)
+    if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying async.request...") end
+    local thread = async.request(u, "HTTPS")
+    if thread then
+      while thread:alive() do wait.time(0.1) end
+      local ok, _, body = thread:join()
+      if type(ok) == "boolean" and ok and type(body) == "string" and #body > 0 then
+        if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] async.request OK: " .. tostring(#body) .. " bytes") end
+        return body
+      end
+      if debug_mode then
+        ColourNote("red", "black", "[GearCap-DEBUG]   async.request: ok=" .. tostring(ok) .. " body=" .. tostring(type(body) == "string" and #body or body or "nil"))
       end
     else
-      if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   custom fetch not available") end
+      if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG]   async.request returned nil") end
     end
 
     -- Method 2: ssl.https direct (blocking but has SSL + redirect following)
