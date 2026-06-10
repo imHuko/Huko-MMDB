@@ -12,7 +12,7 @@
    save_state="y"
    date_written="2026-05-17"
    requires="4.71"
-    version="8.5"
+    version="8.6"
    >
 
 <description trim="y">
@@ -124,14 +124,31 @@ function fetchUrl(url)
     -- Method 2: LuaSocket
     if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Trying LuaSocket HTTP...") end
     local resp = {}
-    local ok, st, resp_hdrs, status_line = http.request({ url = u, sink = ltn12.sink.table(resp) })
+    local ok, st, resp_hdrs, status_line = http.request({ url = u, redirect = true, sink = ltn12.sink.table(resp) })
     if debug_mode then
       ColourNote("cyan", "black", "[GearCap-DEBUG] LuaSocket ok: " .. tostring(ok) .. ", status: " .. tostring(st) .. ", status_line: " .. tostring(status_line))
+      if resp_hdrs and type(resp_hdrs) == "table" then
+        for k, v in pairs(resp_hdrs) do ColourNote("cyan", "black", "[GearCap-DEBUG]   Header " .. tostring(k) .. ": " .. tostring(v)) end
+      end
     end
-    if ok and st == 200 then
+    if ok and (st == 200 or st == 301 or st == 302) then
       local body = table.concat(resp)
-      if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] LuaSocket success: " .. tostring(#body) .. " bytes") end
-      return body
+      if #body > 0 then
+        if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] LuaSocket success: " .. tostring(#body) .. " bytes") end
+        return body
+      end
+    end
+    -- Manual follow redirect if redirect=true was ignored
+    if ok and (st == 301 or st == 302) and resp_hdrs and resp_hdrs.location then
+      if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Following redirect to: " .. resp_hdrs.location) end
+      local resp2 = {}
+      local ok2, st2 = http.request({ url = resp_hdrs.location, redirect = true, sink = ltn12.sink.table(resp2) })
+      if debug_mode then ColourNote("cyan", "black", "[GearCap-DEBUG] Redirect ok: " .. tostring(ok2) .. ", status: " .. tostring(st2)) end
+      if ok2 and st2 == 200 then
+        local body = table.concat(resp2)
+        if debug_mode then ColourNote("lime", "black", "[GearCap-DEBUG] Redirect success: " .. tostring(#body) .. " bytes") end
+        return body
+      end
     end
   end
   if debug_mode then ColourNote("red", "black", "[GearCap-DEBUG] All URLs exhausted, returning nil") end
