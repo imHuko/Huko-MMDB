@@ -107,7 +107,7 @@
             var result = await supabase.auth.signInWithPassword({ email: email, password: password });
 
             if (result.error) {
-                msg.innerHTML = '<span class="error">Wrong username/email or password.</span>';
+                msg.innerHTML = '<span class="error">' + result.error.message + '</span>';
                 return;
             }
 
@@ -142,13 +142,12 @@
             document.getElementById('logout-link').style.display = 'inline';
         }
         window.logout = function() {
-            supabase.auth.signOut().then(function() {
-                sessionStorage.removeItem('editor_logged_in');
-                sessionStorage.removeItem('editor_name');
-                localStorage.removeItem('user_logged_in');
-                localStorage.removeItem('username');
-                location.reload();
-            });
+            Object.keys(localStorage).filter(function(k){return k.startsWith('sb-');}).forEach(function(k){localStorage.removeItem(k);});
+            sessionStorage.removeItem('editor_logged_in');
+            sessionStorage.removeItem('editor_name');
+            localStorage.removeItem('user_logged_in');
+            localStorage.removeItem('username');
+            location.reload();
         }
     </script>
 </body>
