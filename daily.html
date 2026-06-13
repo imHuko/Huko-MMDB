@@ -154,12 +154,9 @@
         }
 
         function dateSeed() {
-            var s = todayKey.replace(/-/g, '');
-            var h = 0;
-            for (var i = 0; i < s.length; i++) {
-                h = Math.imul(31, h) + s.charCodeAt(i) | 0;
-            }
-            return Math.abs(h);
+            // Days since epoch, multiplied by golden-ratio prime to scatter
+            // consecutive-day indices far apart.
+            return (Math.floor(Date.now() / 86400000) * 2654435761) >>> 0;
         }
 
         function loadState() {
