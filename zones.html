@@ -75,8 +75,8 @@
         </div>
         <span id="login-link"><a href="login.html">Login</a></span>
         <span id="signup-link"><a href="signup.html" style="color:#44aa44;">Sign Up</a></span>
-        <span id="admin-link" style="display:none;"><a href="admin.html" style="color:#FFD700;font-weight:bold;">Admin Panel</a></span>
         <span id="logout-link" style="display:none;"><a href="#" onclick="logout()">Logout</a></span>
+        <span id="admin-link" style="display:none;"><a href="admin.html" style="color:#FFD700;font-weight:bold;">Admin Panel</a></span>
     </nav>
     <script>document.querySelectorAll('nav a').forEach(function(a){if(a.href.split('/').pop()===location.pathname.split('/').pop())a.style.color='#00FFFF';});</script>
     </div>
@@ -207,6 +207,7 @@
                 if (localStorage.getItem('user_logged_in') === 'true' || hasSession()) {
             document.getElementById('login-link').style.display = 'none';
             document.getElementById('signup-link').style.display = 'none';
+            document.getElementById('admin-link').style.display = 'inline';
             document.getElementById('logout-link').style.display = 'inline';
         }
         function logout() {
