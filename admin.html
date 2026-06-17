@@ -130,6 +130,7 @@
             <span class="tab" id="tab-lfg">LFG Posts</span>
             <span class="tab" id="tab-market">Market Listings</span>
             <span class="tab" id="tab-bugs">Bug Reports</span>
+            <span class="tab" id="tab-pastes">Pastes</span>
         </div>
         
         <div id="dashboard-section" class="section active">
@@ -269,6 +270,18 @@
             </table>
             <div class="pagination" id="bugs-pagination"></div>
         </div>
+        <div id="pastes-section" class="section">
+            <div class="toolbar">
+                <button id="refresh-pastes-btn" style="background:#4488ff;color:white;">Refresh</button>
+                <button id="delete-all-pastes-btn" style="background:#ff4444;color:white;">Delete All</button>
+                <span id="pastes-status" style="font-size:13px;color:#888;"></span>
+            </div>
+            <table>
+                <thead><tr><th>ID</th><th>Preview</th><th>Date</th><th>Actions</th></tr></thead>
+                <tbody id="pastes-table"></tbody>
+            </table>
+            <div class="pagination" id="pastes-pagination"></div>
+        </div>
     </div>
     
     <div class="modal-overlay hidden" id="edit-modal" style="display:none;">
@@ -320,6 +333,7 @@
         document.getElementById('tab-lfg').addEventListener('click', function() { switchTab('lfg'); });
         document.getElementById('tab-market').addEventListener('click', function() { switchTab('market'); });
         document.getElementById('tab-bugs').addEventListener('click', function() { switchTab('bugs'); });
+        document.getElementById('tab-pastes').addEventListener('click', function() { switchTab('pastes'); });
         
         document.getElementById('copy-eqdb-btn').addEventListener('click', function() {
             if (window.eqdbHashes && window.eqdbHashes.length > 0) {
@@ -370,6 +384,7 @@
             if (tab === 'lfg') loadLfgPosts();
             if (tab === 'market') loadMarketListings();
             if (tab === 'bugs') loadBugReports();
+            if (tab === 'pastes') loadPastes();
             if (tab === 'dashboard') loadDashboard();
         }
         
@@ -690,6 +705,7 @@
             else if (type === 'lfg') { lfgPage = page; loadLfgPosts(); }
             else if (type === 'market') { marketPage = page; loadMarketListings(); }
             else if (type === 'bugs') { bugsPage = page; loadBugReports(); }
+            else if (type === 'pastes') { pastesPage = page; loadPastes(); }
         }
         
         async function openEditModal(id) {
@@ -1099,7 +1115,7 @@
         // ============================================
         // BUG REPORTS
         // ============================================
-        var bugsPage = 1, bugsTotal = 0;
+        var bugsPage = 1, bugsTotal = 0, pastesPage = 1, pastesTotal = 0;
 
         async function loadBugReports() {
             var status = document.getElementById('bugs-status');
@@ -1139,6 +1155,47 @@
             var r = await supabase.from('bug_reports').delete().neq('id', 0);
             if (r.error) { document.getElementById('bugs-status').textContent = 'Error: ' + r.error.message; }
             else { loadBugReports(); }
+        });
+
+        // ── Pastes ──
+        async function loadPastes() {
+            var status = document.getElementById('pastes-status');
+            status.textContent = 'Loading...';
+            var from = (pastesPage - 1) * PER_PAGE, to = from + PER_PAGE - 1;
+            var r = await supabase.from('pastes').select('*', { count: 'exact' }).order('created_at', { ascending: false }).range(from, to);
+            pastesTotal = r.count || 0;
+            var tbody = document.getElementById('pastes-table');
+            if (r.error) { tbody.innerHTML = '<tr><td colspan="4">Error: ' + r.error.message + '</td></tr>'; status.textContent = ''; return; }
+            if (!r.data || r.data.length === 0) { tbody.innerHTML = '<tr><td colspan="4">No pastes.</td></tr>'; status.textContent = '0 pastes'; return; }
+            var rows = [];
+            for (var i = 0; i < r.data.length; i++) {
+                var p = r.data[i];
+                var preview = (p.content || '').substring(0, 80).replace(/\r?\n/g, ' ');
+                rows.push('<tr>' +
+                    '<td style="font-size:11px;font-family:monospace;">' + escapeHtml(p.id.substring(0, 8)) + '&hellip;</td>' +
+                    '<td>' + escapeHtml(preview) + '</td>' +
+                    '<td>' + new Date(p.created_at).toLocaleDateString() + '</td>' +
+                    '<td><a href="paste.html?id=' + encodeURIComponent(p.id) + '" target="_blank" style="margin-right:8px;">View</a><button class="btn-delete" data-id="' + p.id + '">Delete</button></td>' +
+                    '</tr>');
+            }
+            tbody.innerHTML = rows.join('');
+            status.textContent = pastesTotal + ' total pastes';
+            document.querySelectorAll('#pastes-table .btn-delete').forEach(function(b) {
+                b.addEventListener('click', async function() {
+                    if (!confirm('Delete this paste?')) return;
+                    await supabase.from('pastes').delete().eq('id', this.getAttribute('data-id'));
+                    loadPastes();
+                });
+            });
+            renderPagination('pastes', pastesPage, Math.ceil(pastesTotal / PER_PAGE));
+        }
+
+        document.getElementById('refresh-pastes-btn').addEventListener('click', loadPastes);
+        document.getElementById('delete-all-pastes-btn').addEventListener('click', async function() {
+            if (!confirm('Delete ALL pastes? This cannot be undone.')) return;
+            var r = await supabase.from('pastes').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+            if (r.error) { document.getElementById('pastes-status').textContent = 'Error: ' + r.error.message; }
+            else { loadPastes(); }
         });
 
         // ============================================

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paste - HukoDB</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: "Inter", sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+        a { color: #8787FF; }
+        h2 { color: #C0C0C0; }
+        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; }
+        nav a { margin-right: 15px; color: #8787FF; text-decoration: none; }
+        nav a:hover { color: #C0C0C0; }
+        nav .dropdown { position: relative; display: inline-block; margin-right: 15px; }
+        nav .dropbtn { cursor: pointer; color: #8787FF; }
+        nav .dropdown-content { display: none; position: absolute; top: 100%; left: 0; background: #333; min-width: 160px; border: 1px solid #444; border-radius: 3px; z-index: 1000; }
+        nav .dropdown-content a { display: block; padding: 8px 12px; margin: 0; white-space: nowrap; }
+        nav .dropdown-content a:hover { background: #444; color: #C0C0C0; }
+        nav .dropdown:hover .dropdown-content { display: block; }
+        #sticky-header { position: sticky; top: 0; z-index: 100; background: #1a1a1a; }
+        .paste-box { background: #111; border: 1px solid #333; border-radius: 5px; padding: 20px; margin: 15px 0; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; font-family: "Courier New", monospace; font-size: 13px; line-height: 1.4; color: #ddd; min-height: 100px; }
+        .meta { color: #888; font-size: 13px; margin-bottom: 10px; }
+        .error { color: #ff4444; text-align: center; padding: 40px; }
+        .loading { color: #555; text-align: center; padding: 40px; }
+        hr { border: none; border-top: 1px solid #333; margin: 20px 0; }
+        .copy-btn { padding: 8px 16px; background: #8787FF; color: #000; border: none; border-radius: 3px; cursor: pointer; font-size: 13px; }
+        .copy-btn:hover { background: #6666CC; }
+    </style>
+</head>
+<body>
+    <div style="margin-bottom:6px;text-align:center;"><img src="images/logo.png" alt="HukoDB" style="height:130px;"></div>
+    <div id="sticky-header">
+    <nav>
+        <a href="index.html">Search</a>
+        <a href="zones.html">Zones</a>
+        <a href="leaderboard.html">Leaderboard</a>
+        <div class="dropdown">
+            <span class="dropbtn">Games ▼</span>
+            <div class="dropdown-content">
+                <a href="daily.html">Daily</a>
+                <a href="zonequiz.html">Zone Quiz</a>
+                <a href="mobguess.html">Mob Guess</a>
+            </div>
+        </div>
+        <div class="dropdown">
+            <span class="dropbtn">Community Tools ▼</span>
+            <div class="dropdown-content">
+                <a href="market.html">Market</a>
+                <a href="lfg.html">LFG</a>
+            </div>
+        </div>
+        <div class="dropdown">
+            <span class="dropbtn">More ▼</span>
+            <div class="dropdown-content">
+                <a href="info.html">About</a>
+                <a href="ideas.html">Ideas</a>
+            </div>
+        </div>
+        <div class="dropdown">
+            <span class="dropbtn">Sites ▼</span>
+            <div class="dropdown-content">
+                <a href="https://annwn.info" target="_blank" rel="noopener">Annwn</a>
+                <a href="https://ooc.dune.net" target="_blank" rel="noopener">OOC</a>
+                <a href="https://alyria-online.com" target="_blank" rel="noopener">Alyria-Online</a>
+            </div>
+        </div>
+        <div class="dropdown" id="editor-dropdown" style="display:none;">
+            <span class="dropbtn">Editor ▼</span>
+            <div class="dropdown-content">
+                <a href="import.html">Add Equipment</a>
+                <a href="batch.html">Batch Import</a>
+            </div>
+        </div>
+        <span id="login-link"><a href="login.html">Login</a></span>
+        <span id="signup-link"><a href="signup.html" style="color:#44aa44;">Sign Up</a></span>
+        <span id="logout-link" style="display:none;"><a href="#" onclick="logout()">Logout</a></span>
+        <span id="admin-link" style="display:none;"><a href="admin.html" style="color:#FFD700;font-weight:bold;">Admin Panel</a></span>
+    </nav>
+    <script>document.querySelectorAll('nav a').forEach(function(a){if(a.href&&a.href.split('/').pop()===location.pathname.split('/').pop())a.style.color='#00FFFF';});</script>
+    </div>
+
+    <h2>Paste</h2>
+    <hr>
+    <div id="paste-area"><p class="loading">Loading paste...</p></div>
+
+    <script type="module">
+        var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
+        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+        var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        var params = new URLSearchParams(location.search);
+        var pasteId = params.get('id');
+
+        if (!pasteId) {
+            document.getElementById('paste-area').innerHTML = '<p class="error">No paste ID specified.</p>';
+        } else {
+            var res = await supabase.from('pastes').select('content, created_at').eq('id', pasteId).limit(1);
+            if (res.data && res.data.length > 0) {
+                var p = res.data[0];
+                var area = document.getElementById('paste-area');
+                area.innerHTML = '<div class="meta">Created: ' + new Date(p.created_at).toLocaleString() + ' &mdash; <a href="' + location.href + '">Permalink</a></div>'
+                    + '<pre class="paste-box">' + escHtml(p.content) + '</pre>'
+                    + '<button class="copy-btn" onclick="navigator.clipboard.writeText(document.querySelector(\'.paste-box\').textContent)">Copy to Clipboard</button>';
+            } else if (res.error) {
+                document.getElementById('paste-area').innerHTML = '<p class="error">Error: ' + escHtml(res.error.message) + '</p>';
+            } else {
+                document.getElementById('paste-area').innerHTML = '<p class="error">Paste not found.</p>';
+            }
+        }
+
+        function escHtml(s) {
+            if (!s) return '';
+            var d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+    </script>
+
+    <script>
+        function hasSession() { return Object.keys(localStorage).some(function(k){return k.startsWith('sb-') && localStorage.getItem(k);}); }
+        if (sessionStorage.getItem('editor_logged_in') === 'true') {
+            document.getElementById('editor-dropdown').style.display = 'inline-block';
+            document.getElementById('admin-link').style.display = 'inline';
+            document.getElementById('logout-link').style.display = 'inline';
+            document.getElementById('login-link').style.display = 'none';
+            document.getElementById('signup-link').style.display = 'none';
+        }
+        if (localStorage.getItem('user_logged_in') === 'true' || hasSession()) {
+            document.getElementById('login-link').style.display = 'none';
+            document.getElementById('signup-link').style.display = 'none';
+            document.getElementById('logout-link').style.display = 'inline';
+            document.getElementById('admin-link').style.display = 'inline';
+        }
+        function logout() {
+            Object.keys(localStorage).filter(function(k){return k.startsWith('sb-');}).forEach(function(k){localStorage.removeItem(k);});
+            sessionStorage.removeItem('editor_logged_in');
+            sessionStorage.removeItem('editor_name');
+            localStorage.removeItem('user_logged_in');
+            localStorage.removeItem('username');
+            location.reload();
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE muclient>
+
+<muclient>
+<plugin
+   name="HukoDB_Paste"
+   author="HukoDB"
+   id="a1b2c3d4e5f6a7b8c9d0e1f2"
+   language="Lua"
+   purpose="Posts selected text to hukodb.com pastebin"
+   save_state="n"
+   date_written="2026-06-13"
+   requires="4.00"
+   version="1.0"
+   >
+
+<description trim="y">
+Posts selected text from the output window to the HukoDB pastebin.
+A shareable link is copied to clipboard.
+
+To use: highlight text and press Ctrl+P
+
+Requires: LuaSocket, LuaSec, json (dkjson or json.lua)
+</description>
+
+</plugin>
+
+<script>
+<![CDATA[
+
+local RELAY_URL = "https://mm-gear-relay.mm-gear.workers.dev"
+local MUD_NAME = "MyMUD"
+local has_http, http = pcall(require, "socket.http")
+local has_ltn12, ltn12 = pcall(require, "ltn12")
+local has_json, json = pcall(require, "json")
+if not has_json then
+  local ok, dkjson = pcall(require, "dkjson")
+  if ok then json = dkjson end
+end
+
+-- Try to load ssl.https so socket.http can handle HTTPS
+pcall(require, "ssl.https")
+
+function OnPluginListChanged()
+end
+
+function CopyScript(name, line, wildcs)
+  local first_line, last_line = GetSelectionStartLine(),
+    math.min(GetSelectionEndLine(), GetLinesInBufferCount())
+  local first_column, last_column = GetSelectionStartColumn(), GetSelectionEndColumn()
+
+  if first_line <= 0 then
+    DoCommand("copy")
+    return
+  end
+
+  if not http or not ltn12 or not json then
+    ColourNote("red", "", "HukoDB_Paste: Missing required Lua modules (socket.http, ltn12, json)")
+    return
+  end
+
+  local cpstr = ""
+  for line = first_line, last_line do
+    local line_info = GetLineInfo(line)
+    local line_text = line_info.text or ""
+    if line < last_line then
+      if first_column > 1 then
+        line_text = line_text:sub(first_column)
+      end
+      cpstr = cpstr .. line_text
+      first_column = 1
+      if GetLineInfo(line, 3) then
+        cpstr = cpstr .. "\r\n"
+      end
+    else
+      if first_column <= last_column - 1 then
+        cpstr = cpstr .. line_text:sub(first_column, last_column - 1)
+      end
+    end
+  end
+
+  cpstr = cpstr:gsub("^\r\n", "")
+
+  PostText(cpstr)
+end
+
+function PostText(text)
+  if #text == 0 then
+    ColourNote("yellow", "", "HukoDB_Paste: No text selected.")
+    return
+  end
+
+  local prefix = "[" .. MUD_NAME .. "]\r\n"
+  local body = json.encode({
+    content = prefix .. text
+  })
+  local resp = {}
+  local ok, status = http.request({
+    url = RELAY_URL .. "/rest/v1/pastes",
+    method = "POST",
+    headers = {
+      ["Content-Type"] = "application/json",
+      ["Content-Length"] = tostring(#body),
+      ["Prefer"] = "return=representation"
+    },
+    source = ltn12.source.string(body),
+    sink = ltn12.sink.table(resp)
+  })
+
+  if ok and status == 201 then
+    local data = json.decode(table.concat(resp))
+    if data and type(data) == "table" and data[1] and data[1].id then
+      local link = "https://hukodb.com/paste.html?id=" .. data[1].id
+      SetClipboard(link)
+      ColourNote("CornFlowerBlue", "", "*** Pasted " .. #text .. " chars to HukoDB")
+      ColourTell("CornFlowerBlue", "", "*** ")
+      Hyperlink(link, link, "[paste link]", "cornflowerblue", "", true)
+      ColourTell("CornFlowerBlue", "", " has been copied to clipboard.")
+      print("")
+    else
+      ColourNote("red", "", "HukoDB_Paste: Unexpected response from server.")
+    end
+  else
+    local msg = (ok == nil and "HTTP request failed (check internet/LuaSec)")
+      or "HTTP " .. tostring(status or "?")
+    ColourNote("red", "", "HukoDB_Paste: Failed to post. " .. msg)
+  end
+end
+
+-- Set up Ctrl+P accelerator
+AcceleratorTo("Ctrl+P",
+  "CallPlugin ('a1b2c3d4e5f6a7b8c9d0e1f2', 'CopyScript', '')",
+  sendto.script)
+
+ColourNote("CornFlowerBlue", "", "*** HukoDB_Paste loaded. Select text and press Ctrl+P to post.")
+
+]]>
+</script>
+</muclient>
