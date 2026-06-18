@@ -7,7 +7,7 @@
    author="HukoDB"
    id="a1b2c3d4e5f6a7b8c9d0e1f2"
    language="Lua"
-   purpose="Posts selected text to hukodb.com pastebin"
+   purpose="Posts selected text (with colors) to hukodb.com pastebin"
    save_state="n"
    date_written="2026-06-13"
    requires="4.00"
@@ -15,7 +15,8 @@
    >
 
 <description trim="y">
-Posts selected text from the output window to the HukoDB pastebin.
+Posts selected text from the output window to the HukoDB pastebin,
+preserving foreground/background colors, bold, italic, and underline.
 A shareable link is copied to clipboard.
 
 To use: highlight text and press Ctrl+P
@@ -29,7 +30,7 @@ Requires: LuaSocket, LuaSec, json (dkjson or json.lua)
 <![CDATA[
 
 local RELAY_URL = "https://mm-gear-relay.mm-gear.workers.dev"
-local MUD_NAME = "MyMUD"
+local MUD_NAME = "MateriaMagica"
 local has_http, http = pcall(require, "socket.http")
 local has_ltn12, ltn12 = pcall(require, "ltn12")
 local has_json, json = pcall(require, "json")
@@ -42,6 +43,63 @@ end
 pcall(require, "ssl.https")
 
 function OnPluginListChanged()
+end
+
+function escapeHtml(s)
+  if not s then return "" end
+  s = s:gsub("&", "&amp;")
+  s = s:gsub("<", "&lt;")
+  s = s:gsub(">", "&gt;")
+  return s
+end
+
+-- Convert a packed RGB number to a hex colour string
+function rgbToHex(rgb)
+  if type(rgb) ~= "number" then return "#C0C0C0" end
+  local r = math.floor(rgb / 65536) % 256
+  local g = math.floor(rgb / 256) % 256
+  local b = rgb % 256
+  return string.format("#%02X%02X%02X", r, g, b)
+end
+
+-- Convert MUSHclient style runs into HTML with inline styles
+-- styles: array from GetStyleInfo(line)
+-- start_col / last_col: selection boundaries (1-based character positions)
+function stylesToHtml(styles, start_col, last_col)
+  local result = {}
+  local pos = 0
+
+  for _, run in ipairs(styles) do
+    local t = run.text or ""
+    local run_len = #t
+    local run_end = pos + run_len
+
+    if run_end > start_col and pos < last_col then
+      local seg_start = math.max(1, start_col - pos)
+      local seg_end = math.min(run_len, last_col - pos)
+
+      if seg_start <= seg_end then
+        local visible = t:sub(seg_start, seg_end)
+        local style_parts = {"color:" .. rgbToHex(run.textcolour)}
+
+        if run.backcolour and run.backcolour ~= 0 then
+          table.insert(style_parts, "background-color:" .. rgbToHex(run.backcolour))
+        end
+
+        if run.bold then table.insert(style_parts, "font-weight:bold") end
+        if run.italic then table.insert(style_parts, "font-style:italic") end
+        if run.underline then table.insert(style_parts, "text-decoration:underline") end
+
+        table.insert(result, '<span style="' .. table.concat(style_parts, ";") .. '">'
+          .. escapeHtml(visible) .. '</span>')
+      end
+    end
+
+    pos = run_end
+    if pos >= last_col then break end
+  end
+
+  return table.concat(result)
 end
 
 function CopyScript(name, line, wildcs)
@@ -59,40 +117,36 @@ function CopyScript(name, line, wildcs)
     return
   end
 
-  local cpstr = ""
+  local html_parts = {}
   for line = first_line, last_line do
-    local line_info = GetLineInfo(line)
-    local line_text = line_info.text or ""
+    local styles = GetStyleInfo(line)
+    local line_len = GetLineInfo(line).length or 0
     if line < last_line then
-      if first_column > 1 then
-        line_text = line_text:sub(first_column)
-      end
-      cpstr = cpstr .. line_text
+      table.insert(html_parts, stylesToHtml(styles, first_column, line_len))
       first_column = 1
       if GetLineInfo(line, 3) then
-        cpstr = cpstr .. "\r\n"
+        table.insert(html_parts, "<br>")
       end
     else
-      if first_column <= last_column - 1 then
-        cpstr = cpstr .. line_text:sub(first_column, last_column - 1)
-      end
+      table.insert(html_parts, stylesToHtml(styles, first_column, last_column - 1))
     end
   end
 
-  cpstr = cpstr:gsub("^\r\n", "")
+  local html = table.concat(html_parts)
+  html = html:gsub("^<br>", "")
 
-  PostText(cpstr)
-end
-
-function PostText(text)
-  if #text == 0 then
+  if #html == 0 then
     ColourNote("yellow", "", "HukoDB_Paste: No text selected.")
     return
   end
 
-  local prefix = "[" .. MUD_NAME .. "]\r\n"
+  PostText(html)
+end
+
+function PostText(html)
+  local header = '<div style="color:#888;font-size:11px;margin-bottom:8px;">&#91;' .. escapeHtml(MUD_NAME) .. '&#93;</div>'
   local body = json.encode({
-    content = prefix .. text
+    content = header .. html
   })
   local resp = {}
   local ok, status = http.request({
@@ -112,7 +166,7 @@ function PostText(text)
     if data and type(data) == "table" and data[1] and data[1].id then
       local link = "https://hukodb.com/paste.html?id=" .. data[1].id
       SetClipboard(link)
-      ColourNote("CornFlowerBlue", "", "*** Pasted " .. #text .. " chars to HukoDB")
+      ColourNote("CornFlowerBlue", "", "*** Pasted " .. #html .. " chars (with colors) to HukoDB")
       ColourTell("CornFlowerBlue", "", "*** ")
       Hyperlink(link, link, "[paste link]", "cornflowerblue", "", true)
       ColourTell("CornFlowerBlue", "", " has been copied to clipboard.")

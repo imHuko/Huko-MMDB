@@ -21,7 +21,7 @@
         nav .dropdown-content a:hover { background: #444; color: #C0C0C0; }
         nav .dropdown:hover .dropdown-content { display: block; }
         #sticky-header { position: sticky; top: 0; z-index: 100; background: #1a1a1a; }
-        .paste-box { background: #111; border: 1px solid #333; border-radius: 5px; padding: 20px; margin: 15px 0; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; font-family: "Courier New", monospace; font-size: 13px; line-height: 1.4; color: #ddd; min-height: 100px; }
+        .paste-box { background: #111; border: 1px solid #333; border-radius: 5px; padding: 20px; margin: 15px 0; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; font-family: "Courier New", monospace; font-size: 13px; line-height: 1.4; min-height: 100px; }
         .meta { color: #888; font-size: 13px; margin-bottom: 10px; }
         .error { color: #ff4444; text-align: center; padding: 40px; }
         .loading { color: #555; text-align: center; padding: 40px; }
@@ -103,8 +103,8 @@
                 var p = res.data[0];
                 var area = document.getElementById('paste-area');
                 area.innerHTML = '<div class="meta">Created: ' + new Date(p.created_at).toLocaleString() + ' &mdash; <a href="' + location.href + '">Permalink</a></div>'
-                    + '<pre class="paste-box">' + escHtml(p.content) + '</pre>'
-                    + '<button class="copy-btn" onclick="navigator.clipboard.writeText(document.querySelector(\'.paste-box\').textContent)">Copy to Clipboard</button>';
+                    + '<div class="paste-box">' + p.content + '</div>'
+                    + '<button class="copy-btn" onclick="navigator.clipboard.writeText(document.querySelector(\'.paste-box\').innerText)">Copy to Clipboard</button>';
             } else if (res.error) {
                 document.getElementById('paste-area').innerHTML = '<p class="error">Error: ' + escHtml(res.error.message) + '</p>';
             } else {
