@@ -9,9 +9,9 @@
    language="Lua"
    purpose="Posts selected text (with colors) to hukodb.com pastebin"
    save_state="n"
-   date_written="2026-06-13"
+   date_written="2026-06-19"
    requires="4.00"
-   version="1.0"
+   version="1.1"
    >
 
 <description trim="y">
@@ -41,6 +41,24 @@ end
 
 -- Try to load ssl.https so socket.http can handle HTTPS
 pcall(require, "ssl.https")
+
+local BASE62 = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+local SHORT_ID_LEN = 7
+local _seeded = false
+
+function generateShortId()
+  if not _seeded then
+    math.randomseed(os.time())
+    _seeded = true
+    math.random(); math.random(); math.random()
+  end
+  local chars = {}
+  for i = 1, SHORT_ID_LEN do
+    local idx = math.random(1, #BASE62)
+    chars[i] = BASE62:sub(idx, idx)
+  end
+  return table.concat(chars)
+end
 
 function OnPluginListChanged()
 end
@@ -145,40 +163,46 @@ end
 
 function PostText(html)
   local header = '<div style="color:#888;font-size:11px;margin-bottom:8px;">&#91;' .. escapeHtml(MUD_NAME) .. '&#93;</div>'
-  local body = json.encode({
-    content = header .. html
-  })
-  local resp = {}
-  local ok, status = http.request({
-    url = RELAY_URL .. "/rest/v1/pastes",
-    method = "POST",
-    headers = {
-      ["Content-Type"] = "application/json",
-      ["Content-Length"] = tostring(#body),
-      ["Prefer"] = "return=representation"
-    },
-    source = ltn12.source.string(body),
-    sink = ltn12.sink.table(resp)
-  })
+  local content = header .. html
 
-  if ok and status == 201 then
-    local data = json.decode(table.concat(resp))
-    if data and type(data) == "table" and data[1] and data[1].id then
-      local link = "https://hukodb.com/paste.html?id=" .. data[1].id
+  for attempt = 1, 3 do
+    local short_id = generateShortId()
+    local body = json.encode({
+      id = short_id,
+      content = content
+    })
+    local resp = {}
+    local ok, status = http.request({
+      url = RELAY_URL .. "/rest/v1/pastes",
+      method = "POST",
+      headers = {
+        ["Content-Type"] = "application/json",
+        ["Content-Length"] = tostring(#body),
+        ["Prefer"] = "return=representation"
+      },
+      source = ltn12.source.string(body),
+      sink = ltn12.sink.table(resp)
+    })
+
+    if ok and status == 201 then
+      local link = "https://hukodb.com/paste.html?id=" .. short_id
       SetClipboard(link)
       ColourNote("CornFlowerBlue", "", "*** Pasted " .. #html .. " chars (with colors) to HukoDB")
       ColourTell("CornFlowerBlue", "", "*** ")
       Hyperlink(link, link, "[paste link]", "cornflowerblue", "", true)
       ColourTell("CornFlowerBlue", "", " has been copied to clipboard.")
       print("")
+      return
+    elseif status == 409 then
+      -- ID collision, retry with a new random ID
     else
-      ColourNote("red", "", "HukoDB_Paste: Unexpected response from server.")
+      local msg = (ok == nil and "HTTP request failed (check internet/LuaSec)")
+        or "HTTP " .. tostring(status or "?")
+      ColourNote("red", "", "HukoDB_Paste: Failed to post. " .. msg)
+      return
     end
-  else
-    local msg = (ok == nil and "HTTP request failed (check internet/LuaSec)")
-      or "HTTP " .. tostring(status or "?")
-    ColourNote("red", "", "HukoDB_Paste: Failed to post. " .. msg)
   end
+  ColourNote("red", "", "HukoDB_Paste: ID collision after 3 attempts. Try again.")
 end
 
 -- Set up Ctrl+P accelerator
