@@ -292,6 +292,21 @@
         if (isEditor()) {
             document.getElementById('add-location-section').style.display = 'block';
             setupLocationSubmit(item.name);
+            document.querySelectorAll('.btn-queue-delete').forEach(function(btn) {
+                btn.addEventListener('click', async function() {
+                    var tr = this.closest('tr');
+                    var rowData = JSON.parse(tr.getAttribute('data-row'));
+                    await supabase.from('deletion_queue').insert({
+                        table_name: 'itemsloc_db',
+                        row_data: rowData,
+                        item_name: item.name,
+                        created_by: localStorage.getItem('username') || 'unknown'
+                    });
+                    tr.style.opacity = '0.3';
+                    this.textContent = 'Queued';
+                    this.disabled = true;
+                });
+            });
         }
 
         return true;
@@ -401,18 +416,21 @@
             + '<th style="color:#888;text-align:left;padding:5px;border-bottom:1px solid #444;">Room Name</th>'
             + '<th style="color:#888;text-align:left;padding:5px;border-bottom:1px solid #444;">Mob</th>'
             + '<th style="color:#888;text-align:left;padding:5px;border-bottom:1px solid #444;">Hits</th>'
+            + (isEditor() ? '<th style="color:#888;text-align:left;padding:5px;border-bottom:1px solid #444;">Actions</th>' : '')
             + '</tr>';
 
         for (const { loc, roomNum, roomName, mobName } of resolved) {
             const mobCell = loc.mobid
                 ? '<a href="mob.html?mobid=' + escapeHtml(String(loc.mobid)) + '">' + escapeHtml(mobName) + '</a>'
                 : '-';
-            html += '<tr>'
+            const rowData = JSON.stringify({ area: loc.area, room: loc.room, mobid: loc.mobid, itemid: loc.itemid, hits: loc.hits });
+            html += '<tr' + (isEditor() ? ' class="loc-row" data-row=\'' + rowData.replace(/'/g, '&#39;') + '\'' : '') + '>'
                 + '<td style="padding:5px;border-bottom:1px solid #333;">' + escapeHtml(loc.area || '') + '</td>'
                 + '<td style="padding:5px;border-bottom:1px solid #333;">' + (roomNum  || '-') + '</td>'
                 + '<td style="padding:5px;border-bottom:1px solid #333;">' + (roomName || '-') + '</td>'
                 + '<td style="padding:5px;border-bottom:1px solid #333;">' + mobCell           + '</td>'
                 + '<td style="padding:5px;border-bottom:1px solid #333;">' + hitBadge(loc.hits) + '</td>'
+                + (isEditor() ? '<td style="padding:5px;border-bottom:1px solid #333;"><button class="btn-queue-delete" style="background:#cc3333;color:white;padding:2px 8px;font-size:12px;">Delete</button></td>' : '')
                 + '</tr>';
         }
         html += '</table>';

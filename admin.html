@@ -131,6 +131,7 @@
             <span class="tab" id="tab-market">Market Listings</span>
             <span class="tab" id="tab-bugs">Bug Reports</span>
             <span class="tab" id="tab-pastes">Pastes</span>
+            <span class="tab" id="tab-deletion-queue">Deletion Queue</span>
         </div>
         
         <div id="dashboard-section" class="section active">
@@ -282,6 +283,17 @@
             </table>
             <div class="pagination" id="pastes-pagination"></div>
         </div>
+        
+        <div id="deletion-queue-section" class="section">
+            <div class="toolbar">
+                <span id="deletion-queue-status" style="font-size:13px;color:#888;"></span>
+            </div>
+            <table>
+                <thead><tr><th>Item</th><th>Zone</th><th>Room</th><th>Mob</th><th>Hits</th><th>Queued</th><th>By</th><th>Actions</th></tr></thead>
+                <tbody id="deletion-queue-table"></tbody>
+            </table>
+            <div class="pagination" id="deletion-queue-pagination"></div>
+        </div>
     </div>
     
     <div class="modal-overlay hidden" id="edit-modal" style="display:none;">
@@ -334,6 +346,7 @@
         document.getElementById('tab-market').addEventListener('click', function() { switchTab('market'); });
         document.getElementById('tab-bugs').addEventListener('click', function() { switchTab('bugs'); });
         document.getElementById('tab-pastes').addEventListener('click', function() { switchTab('pastes'); });
+        document.getElementById('tab-deletion-queue').addEventListener('click', function() { switchTab('deletion-queue'); });
         
         document.getElementById('copy-eqdb-btn').addEventListener('click', function() {
             if (window.eqdbHashes && window.eqdbHashes.length > 0) {
@@ -385,6 +398,7 @@
             if (tab === 'market') loadMarketListings();
             if (tab === 'bugs') loadBugReports();
             if (tab === 'pastes') loadPastes();
+            if (tab === 'deletion-queue') loadDeletionQueue();
             if (tab === 'dashboard') loadDashboard();
         }
         
@@ -555,7 +569,8 @@
                 for (var c = 0; c < data.length; c++) {
                     var comment = data[c], itemName = '(deleted)';
                     if (comment.equipment_id) { var eq = await supabase.from('equipment').select('name').eq('id', comment.equipment_id).single(); if (eq.data) itemName = eq.data.name; }
-                    rows.push('<tr><td>' + escapeHtml(comment.comment_text).substring(0, 80) + '</td><td>' + escapeHtml(comment.display_name) + '</td><td>' + escapeHtml(itemName) + '</td><td>' + new Date(comment.created_at).toLocaleDateString() + '</td><td><button class="btn-delete" data-id="' + comment.id + '">Delete</button></td></tr>');
+                    var itemLink = comment.equipment_id ? '<a href="item.html?id=' + comment.equipment_id + '" target="_blank">' + escapeHtml(itemName) + '</a>' : escapeHtml(itemName);
+                    rows.push('<tr><td>' + escapeHtml(comment.comment_text).substring(0, 80) + '</td><td>' + escapeHtml(comment.display_name) + '</td><td>' + itemLink + '</td><td>' + new Date(comment.created_at).toLocaleDateString() + '</td><td><button class="btn-delete" data-id="' + comment.id + '">Delete</button></td></tr>');
                 }
                 tbody.innerHTML = rows.join('');
             }
@@ -706,6 +721,7 @@
             else if (type === 'market') { marketPage = page; loadMarketListings(); }
             else if (type === 'bugs') { bugsPage = page; loadBugReports(); }
             else if (type === 'pastes') { pastesPage = page; loadPastes(); }
+            else if (type === 'deletion-queue') { deletionQueuePage = page; loadDeletionQueue(); }
         }
         
         async function openEditModal(id) {
@@ -1115,7 +1131,7 @@
         // ============================================
         // BUG REPORTS
         // ============================================
-        var bugsPage = 1, bugsTotal = 0, pastesPage = 1, pastesTotal = 0;
+        var bugsPage = 1, bugsTotal = 0, pastesPage = 1, pastesTotal = 0, deletionQueuePage = 1, deletionQueueTotal = 0;
 
         async function loadBugReports() {
             var status = document.getElementById('bugs-status');
@@ -1197,6 +1213,68 @@
             if (r.error) { document.getElementById('pastes-status').textContent = 'Error: ' + r.error.message; }
             else { loadPastes(); }
         });
+
+        // ============================================
+        // DELETION QUEUE
+        // ============================================
+        async function loadDeletionQueue() {
+            var status = document.getElementById('deletion-queue-status');
+            status.textContent = 'Loading...';
+            var from = (deletionQueuePage - 1) * PER_PAGE, to = from + PER_PAGE - 1;
+            var r = await supabase.from('deletion_queue').select('*', { count: 'exact' }).eq('status', 'pending').order('created_at', { ascending: false }).range(from, to);
+            deletionQueueTotal = r.count || 0;
+            var tbody = document.getElementById('deletion-queue-table');
+            if (r.error) { tbody.innerHTML = '<tr><td colspan="8">Error: ' + r.error.message + '</td></tr>'; status.textContent = ''; return; }
+            if (!r.data || r.data.length === 0) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888;">No pending deletions.</td></tr>'; status.textContent = '0 pending'; return; }
+            var rows = [];
+            for (var i = 0; i < r.data.length; i++) {
+                var d = r.data[i];
+                var rd = d.row_data || {};
+                var zone = escapeHtml(rd.area || '-');
+                var room = escapeHtml(rd.room || '-');
+                var mob = rd.mobid ? '<a href="mob.html?mobid=' + encodeURIComponent(rd.mobid) + '" target="_blank">' + escapeHtml(String(rd.mobid)) + '</a>' : '-';
+                var hits = rd.hits != null ? rd.hits : '-';
+                var itemLink = d.item_name ? '<a href="item.html?name=' + encodeURIComponent(d.item_name) + '" target="_blank">' + escapeHtml(d.item_name) + '</a>' : escapeHtml(d.item_name || '-');
+                rows.push('<tr>' +
+                    '<td>' + itemLink + '</td>' +
+                    '<td>' + zone + '</td>' +
+                    '<td>' + room + '</td>' +
+                    '<td>' + mob + '</td>' +
+                    '<td>' + hits + '</td>' +
+                    '<td>' + new Date(d.created_at).toLocaleDateString() + '</td>' +
+                    '<td>' + escapeHtml(d.created_by || '') + '</td>' +
+                    '<td><button class="btn-confirm-delete" data-id="' + d.id + '" style="background:#cc3333;color:white;padding:2px 8px;font-size:12px;">Perma Delete</button> <button class="btn-reject-delete" data-id="' + d.id + '" style="background:#555;color:white;padding:2px 8px;font-size:12px;">Reject</button></td>' +
+                    '</tr>');
+            }
+            tbody.innerHTML = rows.join('');
+            status.textContent = deletionQueueTotal + ' pending';
+            document.querySelectorAll('#deletion-queue-table .btn-confirm-delete').forEach(function(b) {
+                b.addEventListener('click', async function() {
+                    if (!confirm('Permanently delete this location row? This cannot be undone.')) return;
+                    var id = this.getAttribute('data-id');
+                    var row = r.data.find(function(x) { return x.id === id; });
+                    if (!row) return;
+                    var rd = row.row_data;
+                    var delQuery = supabase.from(row.table_name).delete();
+                    if (rd.area) delQuery = delQuery.eq('area', rd.area);
+                    if (rd.room) delQuery = delQuery.eq('room', rd.room);
+                    if (rd.mobid) delQuery = delQuery.eq('mobid', rd.mobid);
+                    if (rd.itemid) delQuery = delQuery.eq('itemid', String(rd.itemid));
+                    if (rd.hits != null) delQuery = delQuery.eq('hits', rd.hits);
+                    await delQuery;
+                    await supabase.from('deletion_queue').update({ status: 'deleted' }).eq('id', id);
+                    loadDeletionQueue();
+                });
+            });
+            document.querySelectorAll('#deletion-queue-table .btn-reject-delete').forEach(function(b) {
+                b.addEventListener('click', async function() {
+                    if (!confirm('Reject this deletion request?')) return;
+                    await supabase.from('deletion_queue').update({ status: 'rejected' }).eq('id', this.getAttribute('data-id'));
+                    loadDeletionQueue();
+                });
+            });
+            renderPagination('deletion-queue', deletionQueuePage, Math.ceil(deletionQueueTotal / PER_PAGE));
+        }
 
         // ============================================
         // MM COLORIZER ENGINE
