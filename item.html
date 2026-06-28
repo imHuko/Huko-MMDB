@@ -295,7 +295,7 @@
             document.querySelectorAll('.btn-queue-delete').forEach(function(btn) {
                 btn.addEventListener('click', async function() {
                     var tr = this.closest('tr');
-                    var rowData = JSON.parse(tr.getAttribute('data-row'));
+                    var rowData = JSON.parse(decodeURIComponent(tr.getAttribute('data-row')));
                     await supabase.from('deletion_queue').insert({
                         table_name: 'itemsloc_db',
                         row_data: rowData,
@@ -423,8 +423,8 @@
             const mobCell = loc.mobid
                 ? '<a href="mob.html?mobid=' + escapeHtml(String(loc.mobid)) + '">' + escapeHtml(mobName) + '</a>'
                 : '-';
-            const rowData = JSON.stringify({ area: loc.area, room: loc.room, mobid: loc.mobid, itemid: loc.itemid, hits: loc.hits });
-            html += '<tr' + (isEditor() ? ' class="loc-row" data-row=\'' + rowData.replace(/'/g, '&#39;') + '\'' : '') + '>'
+            const rowData = encodeURIComponent(JSON.stringify({ area: loc.area, room: loc.room, mobid: loc.mobid, itemid: loc.itemid, hits: loc.hits }));
+            html += '<tr' + (isEditor() ? ' class="loc-row" data-row="' + rowData + '"' : '') + '>'
                 + '<td style="padding:5px;border-bottom:1px solid #333;">' + escapeHtml(loc.area || '') + '</td>'
                 + '<td style="padding:5px;border-bottom:1px solid #333;">' + (roomNum  || '-') + '</td>'
                 + '<td style="padding:5px;border-bottom:1px solid #333;">' + (roomName || '-') + '</td>'
