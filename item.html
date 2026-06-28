@@ -122,7 +122,6 @@
     function isEditor() {
         return sessionStorage.getItem('editor_logged_in') === 'true';
     }
-    console.log('HukoDB_DEBUG: isEditor() defined, editor_logged_in=', sessionStorage.getItem('editor_logged_in'), 'user_logged_in=', localStorage.getItem('user_logged_in'));
     function hasSession() { return Object.keys(localStorage).some(function(k){return k.startsWith('sb-') && localStorage.getItem(k);}); }
             if (localStorage.getItem('user_logged_in') === 'true' || hasSession()) {
             document.getElementById('login-link').style.display = 'none';
@@ -163,6 +162,11 @@
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+    // Restore editor status from Supabase session (survives page reload)
+    var { data: { session } } = await supabase.auth.getSession();
+    if (session && session.user && session.user.email && session.user.email.indexOf('@hukodb.com') === -1) {
+        sessionStorage.setItem('editor_logged_in', 'true');
+    }
     // ============================================
     // URL PARAMS
     // ============================================
@@ -290,13 +294,10 @@
         document.getElementById('breadcrumb-item').textContent = escapeHtml(item.name);
 
         // Show editor controls only after item is rendered (and pass name to avoid closure issues)
-        console.log('HukoDB_DEBUG: isEditor=', isEditor(), 'editor_logged_in=', sessionStorage.getItem('editor_logged_in'), 'user_logged_in=', localStorage.getItem('user_logged_in'), 'hasSession=', hasSession(), 'locationsHtml.length=', locationsHtml.length);
         if (isEditor()) {
             document.getElementById('add-location-section').style.display = 'block';
             setupLocationSubmit(item.name);
-            var deleteBtns = document.querySelectorAll('.btn-queue-delete');
-            console.log('HukoDB_DEBUG: found', deleteBtns.length, '.btn-queue-delete elements');
-            deleteBtns.forEach(function(btn) {
+            document.querySelectorAll('.btn-queue-delete').forEach(function(btn) {
                 btn.addEventListener('click', async function() {
                     var tr = this.closest('tr');
                     var rowData = JSON.parse(decodeURIComponent(tr.getAttribute('data-row')));
@@ -411,7 +412,6 @@
             return { loc, roomNum, roomName, mobName };
         });
 
-        console.log('HukoDB_DEBUG: buildLocationsHtml', uniqueLocations.length, 'locations, isEditor=', isEditor());
         let html = '<h2 style="color:#C0C0C0;margin-top:20px;">Known Locations (' + uniqueLocations.length + ')</h2>';
         html += '<p style="font-size:12px;color:#888;">🟢 5+ hits = confirmed | 🟡 2-4 hits = likely | 🔴 1 hit = possible player drop</p>';
         html += '<table style="width:100%;border-collapse:collapse;">'
@@ -429,7 +429,6 @@
                 ? '<a href="mob.html?mobid=' + escapeHtml(String(loc.mobid)) + '">' + escapeHtml(mobName) + '</a>'
                 : '-';
             const rowData = encodeURIComponent(JSON.stringify({ area: loc.area, room: loc.room, mobid: loc.mobid, itemid: loc.itemid, hits: loc.hits }));
-            if (isEditor()) console.log('HukoDB_DEBUG: adding row with data-row=', rowData, 'area=', loc.area);
             html += '<tr' + (isEditor() ? ' class="loc-row" data-row="' + rowData + '"' : '') + '>'
                 + '<td style="padding:5px;border-bottom:1px solid #333;">' + escapeHtml(loc.area || '') + '</td>'
                 + '<td style="padding:5px;border-bottom:1px solid #333;">' + (roomNum  || '-') + '</td>'
@@ -440,7 +439,6 @@
                 + '</tr>';
         }
         html += '</table>';
-        console.log('HukoDB_DEBUG: locations HTML contains btn-queue-delete:', html.indexOf('btn-queue-delete') !== -1);
         return html;
     }
 
