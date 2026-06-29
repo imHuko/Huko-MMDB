@@ -151,26 +151,68 @@
 
     async function doSearch() {
         searchQuery = document.getElementById('room-search').value.trim();
-        if (!searchQuery) { document.getElementById('results').innerHTML = '<p style="color:#888;">Enter a room name to search.</p>'; return; }
+        if (!searchQuery) { document.getElementById('results').innerHTML = '<p style="color:#888;">Enter a room name or number to search.</p>'; return; }
         currentPage = 1;
         document.getElementById('status').textContent = 'Searching...';
-        var from = (currentPage - 1) * PER_PAGE, to = from + PER_PAGE - 1;
-        var r = await supabase.from('itemsloc_db').select('*', { count: 'exact' }).ilike('room', '%' + searchQuery.replace(/'/g, "''") + '%').range(from, to);
-        if (r.error) { document.getElementById('results').innerHTML = '<p class="error">Error: ' + escapeHtml(r.error.message) + '</p>'; document.getElementById('status').textContent = ''; return; }
-        allRows = r.data || [];
-        var total = r.count || 0;
-        document.getElementById('status').textContent = total + ' results';
-        await renderResults();
-        renderPagination(Math.ceil(total / PER_PAGE));
+        var escaped = searchQuery.replace(/'/g, "''");
+
+        // Search rooms_db for matching name or uid (room number)
+        var roomQueries = [
+            supabase.from('rooms_db').select('area, name, uid').ilike('name', '%' + escaped + '%').limit(200)
+        ];
+        if (/^\d+$/.test(searchQuery)) {
+            roomQueries.push(supabase.from('rooms_db').select('area, name, uid').eq('uid', searchQuery).limit(200));
+        }
+        var roomResults = await Promise.all(roomQueries);
+        var matchedRooms = [];
+        roomResults.forEach(function(rs) { if (rs.data) rs.data.forEach(function(r) { matchedRooms.push(r); }); });
+
+        // Deduplicate matched rooms by area+name
+        var roomSeen = {};
+        var uniqueRooms = matchedRooms.filter(function(r) {
+            var key = (r.area || '') + '|' + (r.name || '');
+            if (roomSeen[key]) return false;
+            roomSeen[key] = true;
+            return true;
+        });
+
+        // Fetch itemsloc_db rows for each matched room
+        var locPromises = [];
+        uniqueRooms.forEach(function(r) {
+            locPromises.push(
+                supabase.from('itemsloc_db').select('*').eq('area', r.area || '').eq('room', r.name || '').limit(200)
+            );
+        });
+        // Also search itemsloc_db directly by room name (handles partial name matches)
+        locPromises.push(
+            supabase.from('itemsloc_db').select('*').ilike('room', '%' + escaped + '%').limit(500)
+        );
+
+        var locResults = await Promise.all(locPromises);
+        var seen = {};
+        allRows = [];
+        locResults.forEach(function(lr) {
+            if (lr.data) lr.data.forEach(function(row) {
+                var key = (row.area || '') + '|' + (row.room || '') + '|' + (row.mobid || '0') + '|' + (row.itemid || '0');
+                if (!seen[key]) { seen[key] = true; allRows.push(row); }
+            });
+        });
+
+        document.getElementById('status').textContent = allRows.length + ' results (including ' + uniqueRooms.length + ' rooms from rooms_db)';
+        var totalPages = Math.ceil(allRows.length / PER_PAGE);
+        var start = (currentPage - 1) * PER_PAGE;
+        var pageRows = allRows.slice(start, start + PER_PAGE);
+        await renderResults(pageRows);
+        renderPagination(totalPages);
     }
 
-    async function renderResults() {
+    async function renderResults(pageRows) {
         var div = document.getElementById('results');
-        if (allRows.length === 0) { div.innerHTML = '<p style="color:#888;">No results found.</p>'; return; }
+        if (!pageRows || pageRows.length === 0) { div.innerHTML = '<p style="color:#888;">No results found.</p>'; return; }
 
         // Batch resolve item names and mob names
-        var itemIds = [...new Set(allRows.map(function(x) { return x.itemid; }).filter(Boolean).map(String))];
-        var mobIds  = [...new Set(allRows.map(function(x) { return x.mobid; }).filter(Boolean).map(String))];
+        var itemIds = [...new Set(pageRows.map(function(x) { return x.itemid; }).filter(Boolean).map(String))];
+        var mobIds  = [...new Set(pageRows.map(function(x) { return x.mobid; }).filter(Boolean).map(String))];
         var queries = [];
         if (itemIds.length > 0) queries.push(supabase.from('items_db').select('itemid, name').in('itemid', itemIds));
         if (mobIds.length > 0) queries.push(supabase.from('mobs_db').select('mobid, name').in('mobid', mobIds));
@@ -195,8 +237,8 @@
             (isEditor() ? '<th style="color:#888;text-align:left;padding:5px;border-bottom:1px solid #444;">Actions</th>' : '') +
             '</tr>';
 
-        for (var i = 0; i < allRows.length; i++) {
-            var row = allRows[i];
+        for (var i = 0; i < pageRows.length; i++) {
+            var row = pageRows[i];
             var itemName = resolvedItems[String(row.itemid)] || 'unknown';
             var mobName = resolvedMobs[String(row.mobid)] || '';
             var mobid = row.mobid ? String(row.mobid) : '';
@@ -258,14 +300,13 @@
 
     async function goToPage(page) {
         currentPage = page;
-        var from = (currentPage - 1) * PER_PAGE, to = from + PER_PAGE - 1;
-        var r = await supabase.from('itemsloc_db').select('*', { count: 'exact' }).ilike('room', '%' + searchQuery.replace(/'/g, "''") + '%').range(from, to);
-        allRows = r.data || [];
-        await renderResults();
-        renderPagination(Math.ceil((r.count || 0) / PER_PAGE));
+        var start = (currentPage - 1) * PER_PAGE;
+        var pageRows = allRows.slice(start, start + PER_PAGE);
+        await renderResults(pageRows);
+        renderPagination(Math.ceil(allRows.length / PER_PAGE));
     }
 
-    document.getElementById('status').textContent = 'Enter a room name and press Search.';
+    document.getElementById('status').textContent = 'Enter a room name or number and press Search.';
 </script>
 </body>
 </html>
