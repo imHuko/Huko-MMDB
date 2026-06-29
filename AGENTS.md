@@ -54,3 +54,13 @@ Plugin is **self-contained** — doesn't need modified async.lua. The local asyn
 ## Testing
 - `mcg debug` — toggle verbose logging
 - `mcg update` — check for plugin update
+
+## Database: items_db Deduplication (June 2026)
+
+`items_db` had thousands of duplicate entries — same item name, different hash `itemid`, each with its own location in `itemsloc_db`. Worst offenders:
+- "Cure disease Spell": 20+ copies
+- "Cure exotic disease Spell": 20+ copies  
+- "Enhanced strength Spell": 20+ copies
+- "a page of parchment": 114 copies
+
+**Fix**: `deduplicate-items_db.sql` consolidates each name group to one canonical `itemid` (prefers the itemid with the most location entries, then numeric EQDB ids). Re-points `itemsloc_db` references, deletes duplicates. 0 duplicate name groups remain after running in Supabase SQL Editor.
