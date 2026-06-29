@@ -227,8 +227,10 @@
             }
         }
 
-        var html = '<table style="width:100%;border-collapse:collapse;">' +
+        var html = '<div id="room-toolbar"' + (isEditor() ? '' : ' style="display:none;"') + '><button id="delete-selected-room-btn" style="background:#cc3333;color:white;margin-bottom:10px;">Delete Selected</button></div>';
+        html += '<table style="width:100%;border-collapse:collapse;">' +
             '<tr>' +
+            (isEditor() ? '<th style="width:30px;color:#888;text-align:left;padding:5px;border-bottom:1px solid #444;"><input type="checkbox" id="select-all-room"></th>' : '') +
             '<th style="color:#888;text-align:left;padding:5px;border-bottom:1px solid #444;">Zone</th>' +
             '<th style="color:#888;text-align:left;padding:5px;border-bottom:1px solid #444;">Room</th>' +
             '<th style="color:#888;text-align:left;padding:5px;border-bottom:1px solid #444;">Item</th>' +
@@ -243,7 +245,9 @@
             var mobName = resolvedMobs[String(row.mobid)] || '';
             var mobid = row.mobid ? String(row.mobid) : '';
             var rowData = encodeURIComponent(JSON.stringify({ area: row.area, room: row.room, mobid: row.mobid, itemid: row.itemid, hits: row.hits }));
+            var rowId = row.id || i;
             html += '<tr' + (isEditor() ? ' class="loc-row" data-row="' + rowData + '"' : '') + '>' +
+                (isEditor() ? '<td style="text-align:center;border-bottom:1px solid #333;"><input type="checkbox" class="room-check" value="' + rowId + '"></td>' : '') +
                 '<td style="padding:5px;border-bottom:1px solid #333;">' + escapeHtml(row.area || '') + '</td>' +
                 '<td style="padding:5px;border-bottom:1px solid #333;">' + escapeHtml(row.room || '') + '</td>' +
                 '<td style="padding:5px;border-bottom:1px solid #333;"><a href="item.html?name=' + encodeURIComponent(itemName) + '">' + escapeHtml(itemName) + '</a></td>' +
@@ -267,6 +271,27 @@
                     if (btn) { btn.textContent = 'Queued'; btn.disabled = true; }
                 }
             });
+            document.getElementById('select-all-room').addEventListener('change', function() {
+                document.querySelectorAll('.room-check').forEach(function(c) { c.checked = this.checked; }, this);
+            });
+            document.getElementById('delete-selected-room-btn').addEventListener('click', async function() {
+                var checked = document.querySelectorAll('.room-check:checked');
+                if (checked.length === 0) { alert('Select items to delete.'); return; }
+                if (!confirm('Queue ' + checked.length + ' selected location(s) for deletion?')) return;
+                for (var j = 0; j < checked.length; j++) {
+                    var idx = parseInt(checked[j].value);
+                    var row = pageRows[idx];
+                    if (!row) continue;
+                    var rd = { area: row.area, room: row.room, mobid: row.mobid, itemid: row.itemid, hits: row.hits };
+                    await supabase.from('deletion_queue').insert({
+                        table_name: 'itemsloc_db',
+                        row_data: rd,
+                        item_name: resolvedItems[String(row.itemid)] || 'unknown',
+                        created_by: localStorage.getItem('username') || 'unknown'
+                    });
+                }
+                loadWholePage();
+            });
             document.querySelectorAll('.btn-queue-delete:not([disabled])').forEach(function(btn) {
                 btn.addEventListener('click', async function() {
                     var tr = this.closest('tr');
@@ -283,6 +308,12 @@
                 });
             });
         }
+    }
+
+    async function loadWholePage() {
+        var start = (currentPage - 1) * PER_PAGE;
+        var pr = allRows.slice(start, start + PER_PAGE);
+        await renderResults(pr);
     }
 
     function renderPagination(total) {
