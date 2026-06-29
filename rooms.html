@@ -214,7 +214,18 @@
         div.innerHTML = html;
 
         if (isEditor()) {
-            document.querySelectorAll('.btn-queue-delete').forEach(function(btn) {
+            // Check which rows are already queued
+            var qr = await supabase.from('deletion_queue').select('row_data').eq('status', 'pending');
+            var queuedRows = qr.data || [];
+            document.querySelectorAll('.loc-row').forEach(function(tr) {
+                var rowData = tr.getAttribute('data-row');
+                if (rowData && queuedRows.some(function(q) { return q.row_data && encodeURIComponent(JSON.stringify(q.row_data)) === rowData; })) {
+                    tr.style.opacity = '0.3';
+                    var btn = tr.querySelector('.btn-queue-delete');
+                    if (btn) { btn.textContent = 'Queued'; btn.disabled = true; }
+                }
+            });
+            document.querySelectorAll('.btn-queue-delete:not([disabled])').forEach(function(btn) {
                 btn.addEventListener('click', async function() {
                     var tr = this.closest('tr');
                     var rowData = JSON.parse(decodeURIComponent(tr.getAttribute('data-row')));

@@ -287,10 +287,11 @@
         
         <div id="deletion-queue-section" class="section">
             <div class="toolbar">
+                <button id="delete-selected-queue-btn" style="background:#cc3333;color:white;">Delete Selected</button>
                 <span id="deletion-queue-status" style="font-size:13px;color:#888;"></span>
             </div>
             <table>
-                <thead><tr><th>Item</th><th>Zone</th><th>Room</th><th>Mob</th><th>Hits</th><th>Queued</th><th>By</th><th>Actions</th></tr></thead>
+                <thead><tr><th style="width:30px;"><input type="checkbox" id="select-all-queue"></th><th>Item</th><th>Zone</th><th>Room</th><th>Mob</th><th>Hits</th><th>Queued</th><th>By</th><th>Actions</th></tr></thead>
                 <tbody id="deletion-queue-table"></tbody>
             </table>
             <div class="pagination" id="deletion-queue-pagination"></div>
@@ -1225,8 +1226,8 @@
             var r = await supabase.from('deletion_queue').select('*', { count: 'exact' }).eq('status', 'pending').order('created_at', { ascending: false }).range(from, to);
             deletionQueueTotal = r.count || 0;
             var tbody = document.getElementById('deletion-queue-table');
-            if (r.error) { tbody.innerHTML = '<tr><td colspan="8">Error: ' + r.error.message + '</td></tr>'; status.textContent = ''; return; }
-            if (!r.data || r.data.length === 0) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#888;">No pending deletions.</td></tr>'; status.textContent = '0 pending'; return; }
+            if (r.error) { tbody.innerHTML = '<tr><td colspan="9">Error: ' + r.error.message + '</td></tr>'; status.textContent = ''; return; }
+            if (!r.data || r.data.length === 0) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#888;">No pending deletions.</td></tr>'; status.textContent = '0 pending'; return; }
             var rows = [];
             for (var i = 0; i < r.data.length; i++) {
                 var d = r.data[i];
@@ -1237,6 +1238,7 @@
                 var hits = rd.hits != null ? rd.hits : '-';
                 var itemLink = d.item_name ? '<a href="item.html?name=' + encodeURIComponent(d.item_name) + '" target="_blank">' + escapeHtml(d.item_name) + '</a>' : escapeHtml(d.item_name || '-');
                 rows.push('<tr>' +
+                    '<td style="text-align:center;"><input type="checkbox" class="queue-check" value="' + d.id + '"></td>' +
                     '<td>' + itemLink + '</td>' +
                     '<td>' + zone + '</td>' +
                     '<td>' + room + '</td>' +
@@ -1249,6 +1251,29 @@
             }
             tbody.innerHTML = rows.join('');
             status.textContent = deletionQueueTotal + ' pending';
+            document.getElementById('select-all-queue').addEventListener('change', function() {
+                document.querySelectorAll('.queue-check').forEach(function(c) { c.checked = this.checked; }, this);
+            });
+            document.getElementById('delete-selected-queue-btn').addEventListener('click', async function() {
+                var checked = document.querySelectorAll('.queue-check:checked');
+                if (checked.length === 0) { alert('Select items to delete.'); return; }
+                if (!confirm('Permanently delete ' + checked.length + ' selected location row(s)? This cannot be undone.')) return;
+                for (var j = 0; j < checked.length; j++) {
+                    var id = checked[j].value;
+                    var row = r.data.find(function(x) { return x.id === id; });
+                    if (!row) continue;
+                    var rd = row.row_data;
+                    var delQuery = supabase.from(row.table_name).delete();
+                    if (rd.area) delQuery = delQuery.eq('area', rd.area);
+                    if (rd.room) delQuery = delQuery.eq('room', rd.room);
+                    if (rd.mobid) delQuery = delQuery.eq('mobid', rd.mobid);
+                    if (rd.itemid) delQuery = delQuery.eq('itemid', String(rd.itemid));
+                    if (rd.hits != null) delQuery = delQuery.eq('hits', rd.hits);
+                    await delQuery;
+                    await supabase.from('deletion_queue').update({ status: 'deleted' }).eq('id', id);
+                }
+                loadDeletionQueue();
+            });
             document.querySelectorAll('#deletion-queue-table .btn-confirm-delete').forEach(function(b) {
                 b.addEventListener('click', async function() {
                     if (!confirm('Permanently delete this location row? This cannot be undone.')) return;
