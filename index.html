@@ -486,6 +486,25 @@ if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
                 return;
             }
             
+            // Deduplicate by item name (keep verified over personal, first seen otherwise)
+            var seen = {};
+            var deduped = [];
+            for (var i = 0; i < data.length; i++) {
+                var item = data[i];
+                var nameKey = item.name.toLowerCase().trim();
+                if (seen[nameKey]) {
+                    // Prefer verified over personal for the same name
+                    var existing = seen[nameKey];
+                    if (item.verified && !existing.verified) {
+                        existing.verified = true;
+                    }
+                    continue;
+                }
+                seen[nameKey] = item;
+                deduped.push(item);
+            }
+            data = deduped;
+
             var html = '';
             for (var i = 0; i < data.length; i++) {
                 var item = data[i];
