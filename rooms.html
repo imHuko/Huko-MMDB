@@ -245,9 +245,8 @@
             var mobName = resolvedMobs[String(row.mobid)] || '';
             var mobid = row.mobid ? String(row.mobid) : '';
             var rowData = encodeURIComponent(JSON.stringify({ area: row.area, room: row.room, mobid: row.mobid, itemid: row.itemid, hits: row.hits }));
-            var rowId = row.id || i;
             html += '<tr' + (isEditor() ? ' class="loc-row" data-row="' + rowData + '"' : '') + '>' +
-                (isEditor() ? '<td style="text-align:center;border-bottom:1px solid #333;"><input type="checkbox" class="room-check" value="' + rowId + '"></td>' : '') +
+                (isEditor() ? '<td style="text-align:center;border-bottom:1px solid #333;"><input type="checkbox" class="room-check" value="' + i + '"></td>' : '') +
                 '<td style="padding:5px;border-bottom:1px solid #333;">' + escapeHtml(row.area || '') + '</td>' +
                 '<td style="padding:5px;border-bottom:1px solid #333;">' + escapeHtml(row.room || '') + '</td>' +
                 '<td style="padding:5px;border-bottom:1px solid #333;"><a href="item.html?name=' + encodeURIComponent(itemName) + '">' + escapeHtml(itemName) + '</a></td>' +
