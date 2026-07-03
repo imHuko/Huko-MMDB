@@ -928,31 +928,40 @@ if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
             var el = document.getElementById('mini-lb-body');
             if (!el) return;
             try {
-                var { data, error } = await supabase.from('submission_history').select('submitter').limit(5000);
-                if (error) { console.error('MiniLB err:', error); el.textContent = 'Query error.'; return; }
-                if (!data || data.length === 0) { el.textContent = 'No submissions yet.'; return; }
-                var counts = {};
-                var allData = data;
-                var page = 1, pageSize = 1000, maxPages = 10;
-                while (data.length === pageSize && page < maxPages) {
-                    var r2 = await supabase.from('submission_history').select('submitter').range(page * pageSize, (page + 1) * pageSize - 1);
-                    if (r2.error || !r2.data || r2.data.length === 0) break;
-                    allData = allData.concat(r2.data);
-                    data = r2.data;
+                var allData = [];
+                var page = 0, pageSize = 1000;
+                while (true) {
+                    var r = await supabase.from('submission_history').select('submitter,is_eqdb,created_at').range(page * pageSize, (page + 1) * pageSize - 1);
+                    if (r.error) { console.error('MiniLB err:', r.error); el.textContent = 'Query error.'; return; }
+                    if (!r.data || r.data.length === 0) break;
+                    allData = allData.concat(r.data);
+                    if (r.data.length < pageSize) break;
                     page++;
                 }
+                if (allData.length === 0) { el.textContent = 'No submissions yet.'; return; }
+                var contributors = {};
                 for (var i = 0; i < allData.length; i++) {
-                    var n = allData[i].submitter || 'anonymous';
+                    var s = allData[i];
+                    var n = s.submitter || 'anonymous';
                     if (n.toLowerCase() === 'huko') continue;
-                    counts[n] = (counts[n] || 0) + 1;
+                    if (!contributors[n]) contributors[n] = { name: n, total: 0, eqdb: 0, personal: 0 };
+                    contributors[n].total++;
+                    if (s.is_eqdb) contributors[n].eqdb++; else contributors[n].personal++;
                 }
-                var sorted = Object.keys(counts).sort(function(a, b) { return counts[b] - counts[a]; });
-                var top = sorted.slice(0, 5);
-                if (top.length === 0) { el.textContent = 'Only Huko has submissions.'; return; }
+                var sorted = Object.values(contributors).sort(function(a, b) { return b.total - a.total; });
+                if (sorted.length === 0) { el.textContent = 'No other contributors yet.'; return; }
                 var html = '';
-                var medals = ['#1', '#2', '#3', '#4', '#5'];
-                for (var j = 0; j < top.length; j++) {
-                    html += '<div>' + medals[j] + ' <strong style="color:#aaa;">' + escapeHtml(top[j]) + '</strong> — ' + counts[top[j]] + ' items</div>';
+                var medals = ['🥇', '🥈', '🥉'];
+                for (var j = 0; j < sorted.length; j++) {
+                    var c = sorted[j];
+                    var rank = j < 3 ? medals[j] : (j + 1);
+                    html += '<div style="margin:2px 0;">'
+                        + '<span style="min-width:24px;display:inline-block;">' + rank + '</span> '
+                        + '<strong style="color:#aaa;">' + escapeHtml(c.name) + '</strong> — '
+                        + c.total + ' total'
+                        + ' <span style="color:#44aa44;">' + c.eqdb + ' EQDB</span>'
+                        + ' <span style="color:#ffaa00;">' + c.personal + ' personal</span>'
+                        + '</div>';
                 }
                 el.innerHTML = html;
             } catch(e) {
