@@ -442,7 +442,7 @@
 
         for (const { loc, roomNum, roomName, mobName } of resolved) {
             const mobCell = loc.mobid
-                ? '<a href="mob.html?mobid=' + escapeHtml(String(loc.mobid)) + '">' + escapeHtml(mobName) + '</a>'
+                ? '<a href="mob.html?mobid=' + escapeHtml(String(loc.mobid)) + '">' + escapeHtml(mobName || String(loc.mobid)) + '</a>'
                 : '-';
             const rowData = encodeURIComponent(JSON.stringify({ area: loc.area, room: loc.room, mobid: loc.mobid, itemid: loc.itemid, hits: loc.hits }));
             html += '<tr' + (isEditor() ? ' class="loc-row" data-row="' + rowData + '"' : '') + '>'
