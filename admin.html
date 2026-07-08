@@ -132,6 +132,7 @@
             <span class="tab" id="tab-market">Market Listings</span>
             <span class="tab" id="tab-bugs">Bug Reports</span>
             <span class="tab" id="tab-pastes">Pastes</span>
+            <span class="tab" id="tab-location-queue">Location Queue</span>
             <span class="tab" id="tab-deletion-queue">Deletion Queue</span>
         </div>
         
@@ -285,6 +286,18 @@
             <div class="pagination" id="pastes-pagination"></div>
         </div>
         
+        <div id="location-queue-section" class="section">
+            <div class="toolbar">
+                <button id="refresh-location-queue-btn" style="background:#4488ff;color:white;">Refresh</button>
+                <span id="location-queue-status" style="font-size:13px;color:#888;"></span>
+            </div>
+            <table>
+                <thead><tr><th>Item</th><th>Zone</th><th>Room</th><th>Mob</th><th>Submitted By</th><th>Date</th><th>Actions</th></tr></thead>
+                <tbody id="location-queue-table"></tbody>
+            </table>
+            <div class="pagination" id="location-queue-pagination"></div>
+        </div>
+
         <div id="deletion-queue-section" class="section">
             <div class="toolbar">
                 <button id="delete-selected-queue-btn" style="background:#cc3333;color:white;">Delete Selected</button>
@@ -349,6 +362,7 @@
         document.getElementById('tab-bugs').addEventListener('click', function() { switchTab('bugs'); });
         document.getElementById('tab-pastes').addEventListener('click', function() { switchTab('pastes'); });
         document.getElementById('tab-deletion-queue').addEventListener('click', function() { switchTab('deletion-queue'); });
+        document.getElementById('tab-location-queue').addEventListener('click', function() { switchTab('location-queue'); });
         
         document.getElementById('copy-eqdb-btn').addEventListener('click', function() {
             if (window.eqdbHashes && window.eqdbHashes.length > 0) {
@@ -401,6 +415,7 @@
             if (tab === 'bugs') loadBugReports();
             if (tab === 'pastes') loadPastes();
             if (tab === 'deletion-queue') loadDeletionQueue();
+            if (tab === 'location-queue') loadLocationQueue();
             if (tab === 'dashboard') loadDashboard();
         }
         
@@ -724,6 +739,7 @@
             else if (type === 'bugs') { bugsPage = page; loadBugReports(); }
             else if (type === 'pastes') { pastesPage = page; loadPastes(); }
             else if (type === 'deletion-queue') { deletionQueuePage = page; loadDeletionQueue(); }
+            else if (type === 'location-queue') { locationQueuePage = page; loadLocationQueue(); }
         }
         
         async function openEditModal(id) {
@@ -877,12 +893,13 @@
                 supabase.from('eqdb_queue').select('*', { count: 'exact', head: true }).eq('processed', false),
                 supabase.from('lfg_posts').select('*', { count: 'exact', head: true }).eq('is_deleted', false),
                 supabase.from('market_listings').select('*', { count: 'exact', head: true }).eq('is_deleted', false),
+                supabase.from('location_queue').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
                 supabase.from('lfg_posts').select('id,character_name,target,note,created_at').eq('is_deleted', false).order('created_at', { ascending: false }).limit(6),
                 supabase.from('market_listings').select('id,item_name,character_name,price,created_at').eq('is_deleted', false).order('created_at', { ascending: false }).limit(6)
             ]);
             var equipResult = results[0], bugResult = results[1], ideaResult = results[2], commentResult = results[3];
             var equipCount = results[4], bugCount = results[5], ideaCount = results[6], commentCount = results[7], eqdbCount = results[8];
-            var lfgCount = results[9], marketCount = results[10], lfgRecent = results[11], marketRecent = results[12];
+            var lfgCount = results[9], marketCount = results[10], lfgRecent = results[11], marketRecent = results[12], locationQueueCount = results[13];
 
             // Stats cards
             var stats = [
@@ -892,7 +909,8 @@
                 { label: 'Comments',   count: commentCount.count|| 0, tab: 'comments',  color: '#8787FF' },
                 { label: 'EQDB Queue', count: eqdbCount.count   || 0, tab: 'scrying',   color: (eqdbCount.count || 0) > 0 ? '#ffaa00' : '#44aa44' },
                 { label: 'LFG Posts',  count: lfgCount.count    || 0, tab: 'lfg',       color: (lfgCount.count  || 0) > 0 ? '#8787FF' : '#555' },
-                { label: 'Market',     count: marketCount.count  || 0, tab: 'market',    color: (marketCount.count|| 0) > 0 ? '#44aa44' : '#555' }
+                { label: 'Market',     count: marketCount.count  || 0, tab: 'market',    color: (marketCount.count|| 0) > 0 ? '#44aa44' : '#555' },
+                { label: 'Loc Queue',  count: locationQueueCount.count || 0, tab: 'location-queue', color: (locationQueueCount.count || 0) > 0 ? '#ffaa00' : '#555' }
             ];
             var statsEl = document.getElementById('dash-stats');
             statsEl.innerHTML = '';
@@ -1133,7 +1151,7 @@
         // ============================================
         // BUG REPORTS
         // ============================================
-        var bugsPage = 1, bugsTotal = 0, pastesPage = 1, pastesTotal = 0, deletionQueuePage = 1, deletionQueueTotal = 0;
+        var bugsPage = 1, bugsTotal = 0, pastesPage = 1, pastesTotal = 0, deletionQueuePage = 1, deletionQueueTotal = 0, locationQueuePage = 1, locationQueueTotal = 0;
 
         async function loadBugReports() {
             var status = document.getElementById('bugs-status');
@@ -1215,6 +1233,67 @@
             if (r.error) { document.getElementById('pastes-status').textContent = 'Error: ' + r.error.message; }
             else { loadPastes(); }
         });
+
+        // ============================================
+        // LOCATION QUEUE
+        // ============================================
+        async function loadLocationQueue() {
+            var status = document.getElementById('location-queue-status');
+            status.textContent = 'Loading...';
+            var from = (locationQueuePage - 1) * PER_PAGE, to = from + PER_PAGE - 1;
+            var r = await supabase.from('location_queue').select('*', { count: 'exact' }).eq('status', 'pending').order('created_at', { ascending: false }).range(from, to);
+            locationQueueTotal = r.count || 0;
+            var tbody = document.getElementById('location-queue-table');
+            if (r.error) { tbody.innerHTML = '<tr><td colspan="7">Error: ' + r.error.message + '</td></tr>'; status.textContent = ''; return; }
+            if (!r.data || r.data.length === 0) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#888;">No pending location submissions.</td></tr>'; status.textContent = '0 pending'; return; }
+            var rows = [];
+            for (var i = 0; i < r.data.length; i++) {
+                var s = r.data[i];
+                var itemLink = '<a href="item.html?name=' + encodeURIComponent(s.item_name || '') + '" target="_blank">' + escapeHtml(s.item_name || '') + '</a>';
+                rows.push('<tr>' +
+                    '<td>' + itemLink + '</td>' +
+                    '<td>' + escapeHtml(s.area || '') + '</td>' +
+                    '<td>' + escapeHtml(s.room || '-') + '</td>' +
+                    '<td>' + escapeHtml(s.mob || '-') + '</td>' +
+                    '<td>' + escapeHtml(s.submitted_by || 'anonymous') + '</td>' +
+                    '<td>' + new Date(s.created_at).toLocaleDateString() + '</td>' +
+                    '<td>' +
+                    '<button class="btn-loc-approve" data-id="' + s.id + '" style="background:#44aa44;color:white;padding:2px 8px;font-size:12px;">Approve</button> ' +
+                    '<button class="btn-loc-reject" data-id="' + s.id + '" style="background:#555;color:white;padding:2px 8px;font-size:12px;">Reject</button>' +
+                    '</td></tr>');
+            }
+            tbody.innerHTML = rows.join('');
+            status.textContent = locationQueueTotal + ' pending';
+            document.querySelectorAll('#location-queue-table .btn-loc-approve').forEach(function(b) {
+                b.addEventListener('click', async function() {
+                    var id = this.getAttribute('data-id');
+                    var row = r.data.find(function(x) { return x.id === id; });
+                    if (!row) return;
+                    var ins = await supabase.from('itemsloc_db').insert({
+                        itemid:     row.itemid,
+                        area:       row.area,
+                        room:       row.room || null,
+                        mobid:      row.mob  || null,
+                        hits:       1,
+                        date_added: new Date().toISOString()
+                    });
+                    if (ins.error) { alert('Approve failed: ' + ins.error.message); return; }
+                    await supabase.from('location_queue').update({ status: 'approved', reviewed_at: new Date().toISOString(), reviewed_by: 'admin' }).eq('id', id);
+                    loadLocationQueue();
+                });
+            });
+            document.querySelectorAll('#location-queue-table .btn-loc-reject').forEach(function(b) {
+                b.addEventListener('click', async function() {
+                    if (!confirm('Reject this location submission?')) return;
+                    var id = this.getAttribute('data-id');
+                    await supabase.from('location_queue').update({ status: 'rejected', reviewed_at: new Date().toISOString(), reviewed_by: 'admin' }).eq('id', id);
+                    loadLocationQueue();
+                });
+            });
+            renderPagination('location-queue', locationQueuePage, Math.ceil(locationQueueTotal / PER_PAGE));
+        }
+
+        document.getElementById('refresh-location-queue-btn').addEventListener('click', loadLocationQueue);
 
         // ============================================
         // DELETION QUEUE

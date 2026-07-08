@@ -294,10 +294,12 @@
         document.getElementById('item-details').innerHTML = html;
         document.getElementById('breadcrumb-item').textContent = escapeHtml(item.name);
 
-        // Show editor controls only after item is rendered (and pass name to avoid closure issues)
+        // Show location form for all users
+        document.getElementById('add-location-section').style.display = 'block';
+        setupLocationSubmit(item.name);
+
+        // Editor-only controls
         if (isEditor()) {
-            document.getElementById('add-location-section').style.display = 'block';
-            setupLocationSubmit(item.name);
             // Mark rows that are already in the deletion queue
             var qr = await supabase.from('deletion_queue').select('row_data').eq('item_name', item.name).eq('status', 'pending');
             var queuedRows = qr.data || [];
@@ -532,7 +534,7 @@
     }
 
     // ============================================
-    // ADD LOCATION (editors only)
+    // ADD LOCATION (submits to review queue)
     // ============================================
     function setupLocationSubmit(currentItemName) {
         document.getElementById('submit-location-btn').addEventListener('click', async function () {
@@ -549,20 +551,21 @@
                 return;
             }
 
-            const locItemId = found[0].itemid; // distinct name — does NOT shadow outer itemId
-            const { error } = await supabase.from('itemsloc_db').insert({
-                itemid:     String(locItemId),
-                area:       zone,
-                room:       room || null,
-                mobid:      mob  || null,
-                hits:       1,
-                date_added: new Date().toISOString()
+            const locItemId = found[0].itemid;
+            const submitter = localStorage.getItem('username') || 'anonymous';
+            const { error } = await supabase.from('location_queue').insert({
+                itemid:       String(locItemId),
+                item_name:    currentItemName,
+                area:         zone,
+                room:         room || null,
+                mob:          mob  || null,
+                submitted_by: submitter
             });
 
             if (error) {
                 msg.innerHTML = '<span style="color:#ff4444;">Error: ' + error.message + '</span>';
             } else {
-                msg.innerHTML = '<span style="color:#44aa44;">Location added! Refresh to see it.</span>';
+                msg.innerHTML = '<span style="color:#44aa44;">Location submitted for admin review!</span>';
                 document.getElementById('new-zone').value = '';
                 document.getElementById('new-room').value = '';
                 document.getElementById('new-mob').value  = '';
