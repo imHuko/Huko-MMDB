@@ -102,6 +102,7 @@
         <input type="text" id="new-zone" placeholder="Zone" style="width:200px;">
         <input type="text" id="new-room" placeholder="Room # (optional)" style="width:120px;">
         <input type="text" id="new-mob" placeholder="Mob name (optional)" style="width:200px;">
+        <input type="text" id="new-name" placeholder="Your name (optional)" style="width:150px;">
         <button id="submit-location-btn" style="background:#44aa44;color:white;">Add Location</button>
     </div>
     <p id="location-message" style="margin-top:8px;font-size:13px;"></p>
@@ -567,7 +568,8 @@
                 return;
             }
 
-            const submitter = localStorage.getItem('username') || 'anonymous';
+            const nameField = document.getElementById('new-name').value.trim();
+            const submitter = nameField || localStorage.getItem('username') || 'anonymous';
             const now = new Date().toISOString();
 
             // Insert directly so contributor sees it immediately
@@ -602,6 +604,7 @@
             document.getElementById('new-zone').value = '';
             document.getElementById('new-room').value = '';
             document.getElementById('new-mob').value  = '';
+            document.getElementById('new-name').value = '';
         });
     }
 
