@@ -1269,23 +1269,23 @@
                     var id = this.getAttribute('data-id');
                     var row = r.data.find(function(x) { return x.id === id; });
                     if (!row) return;
-                    var ins = await supabase.from('itemsloc_db').insert({
-                        itemid:     row.itemid,
-                        area:       row.area,
-                        room:       row.room || null,
-                        mobid:      row.mob  || null,
-                        hits:       1,
-                        date_added: new Date().toISOString()
-                    });
-                    if (ins.error) { alert('Approve failed: ' + ins.error.message); return; }
                     await supabase.from('location_queue').update({ status: 'approved', reviewed_at: new Date().toISOString(), reviewed_by: 'admin' }).eq('id', id);
                     loadLocationQueue();
                 });
             });
             document.querySelectorAll('#location-queue-table .btn-loc-reject').forEach(function(b) {
                 b.addEventListener('click', async function() {
-                    if (!confirm('Reject this location submission?')) return;
+                    if (!confirm('Reject this location? The itemsloc_db entry will be deleted.')) return;
                     var id = this.getAttribute('data-id');
+                    var row = r.data.find(function(x) { return x.id === id; });
+                    if (row) {
+                        var delQuery = supabase.from('itemsloc_db').delete();
+                        if (row.itemid) delQuery = delQuery.eq('itemid', String(row.itemid));
+                        if (row.area)   delQuery = delQuery.eq('area', row.area);
+                        if (row.room)   delQuery = delQuery.eq('room', row.room);
+                        if (row.mob)    delQuery = delQuery.eq('mobid', row.mob);
+                        await delQuery;
+                    }
                     await supabase.from('location_queue').update({ status: 'rejected', reviewed_at: new Date().toISOString(), reviewed_by: 'admin' }).eq('id', id);
                     loadLocationQueue();
                 });

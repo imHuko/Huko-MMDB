@@ -553,7 +553,24 @@
 
             const locItemId = found[0].itemid;
             const submitter = localStorage.getItem('username') || 'anonymous';
-            const { error } = await supabase.from('location_queue').insert({
+            const now = new Date().toISOString();
+
+            // Insert directly so contributor sees it immediately
+            var ins = await supabase.from('itemsloc_db').insert({
+                itemid:     String(locItemId),
+                area:       zone,
+                room:       room || null,
+                mobid:      mob  || null,
+                hits:       1,
+                date_added: now
+            });
+            if (ins.error) {
+                msg.innerHTML = '<span style="color:#ff4444;">Error: ' + ins.error.message + '</span>';
+                return;
+            }
+
+            // Also queue for admin review
+            var qErr = await supabase.from('location_queue').insert({
                 itemid:       String(locItemId),
                 item_name:    currentItemName,
                 area:         zone,
@@ -561,15 +578,14 @@
                 mob:          mob  || null,
                 submitted_by: submitter
             });
-
-            if (error) {
-                msg.innerHTML = '<span style="color:#ff4444;">Error: ' + error.message + '</span>';
+            if (qErr.error) {
+                msg.innerHTML = '<span style="color:#44aa44;">Location added! (Queue note failed: ' + qErr.error.message + ')</span>';
             } else {
-                msg.innerHTML = '<span style="color:#44aa44;">Location submitted for admin review!</span>';
-                document.getElementById('new-zone').value = '';
-                document.getElementById('new-room').value = '';
-                document.getElementById('new-mob').value  = '';
+                msg.innerHTML = '<span style="color:#44aa44;">Location added! Pending admin review.</span>';
             }
+            document.getElementById('new-zone').value = '';
+            document.getElementById('new-room').value = '';
+            document.getElementById('new-mob').value  = '';
         });
     }
 
