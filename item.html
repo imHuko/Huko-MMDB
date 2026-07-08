@@ -347,7 +347,7 @@
         const locArrays = await Promise.all(
             dbItems.map(dbItem =>
                 supabase.from('itemsloc_db')
-                    .select('area, room, mobid, hits')
+                    .select('area, room, mobid, hits, submitted_by')
                     .eq('itemid', String(dbItem.itemid))
                     .order('hits', { ascending: false, nullsLast: true })
                     .limit(100)
@@ -435,6 +435,7 @@
             + '<th style="color:#888;text-align:left;padding:5px;border-bottom:1px solid #444;">Room Name</th>'
             + '<th style="color:#888;text-align:left;padding:5px;border-bottom:1px solid #444;">Mob</th>'
             + '<th style="color:#888;text-align:left;padding:5px;border-bottom:1px solid #444;">Hits</th>'
+            + '<th style="color:#888;text-align:left;padding:5px;border-bottom:1px solid #444;">Submitted By</th>'
             + (isEditor() ? '<th style="color:#888;text-align:left;padding:5px;border-bottom:1px solid #444;">Actions</th>' : '')
             + '</tr>';
 
@@ -449,6 +450,7 @@
                 + '<td style="padding:5px;border-bottom:1px solid #333;">' + (roomName || '-') + '</td>'
                 + '<td style="padding:5px;border-bottom:1px solid #333;">' + mobCell           + '</td>'
                 + '<td style="padding:5px;border-bottom:1px solid #333;">' + hitBadge(loc.hits) + '</td>'
+                + '<td style="padding:5px;border-bottom:1px solid #333;font-size:12px;color:#888;">' + escapeHtml(loc.submitted_by || '') + '</td>'
                 + (isEditor() ? '<td style="padding:5px;border-bottom:1px solid #333;"><button class="btn-queue-delete" style="background:#cc3333;color:white;padding:2px 8px;font-size:12px;">Delete</button></td>' : '')
                 + '</tr>';
         }
@@ -536,6 +538,18 @@
     // ============================================
     // ADD LOCATION (submits to review queue)
     // ============================================
+    async function getOrCreateItemId(itemName) {
+        const { data: found } = await supabase.from('items_db').select('itemid').ilike('name', itemName).limit(1);
+        if (found && found.length > 0) return found[0].itemid;
+        const enc = new TextEncoder();
+        const hashBuf = await crypto.subtle.digest('SHA-1', enc.encode(itemName.toLowerCase()));
+        const hashArr = Array.from(new Uint8Array(hashBuf));
+        const itemid = hashArr.map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+        var insErr = await supabase.from('items_db').insert({ itemid: itemid, name: itemName });
+        if (insErr.error) throw new Error(insErr.error.message);
+        return itemid;
+    }
+
     function setupLocationSubmit(currentItemName) {
         document.getElementById('submit-location-btn').addEventListener('click', async function () {
             const zone = document.getElementById('new-zone').value.trim();
@@ -545,24 +559,26 @@
 
             if (!zone) { msg.innerHTML = '<span style="color:#ff4444;">Zone is required.</span>'; return; }
 
-            const { data: found } = await supabase.from('items_db').select('itemid').ilike('name', currentItemName).limit(1);
-            if (!found || found.length === 0) {
-                msg.innerHTML = '<span style="color:#ff4444;">Item not found in location database.</span>';
+            var locItemId;
+            try {
+                locItemId = await getOrCreateItemId(currentItemName);
+            } catch(e) {
+                msg.innerHTML = '<span style="color:#ff4444;">Database error: ' + e.message + '</span>';
                 return;
             }
 
-            const locItemId = found[0].itemid;
             const submitter = localStorage.getItem('username') || 'anonymous';
             const now = new Date().toISOString();
 
             // Insert directly so contributor sees it immediately
             var ins = await supabase.from('itemsloc_db').insert({
-                itemid:     String(locItemId),
-                area:       zone,
-                room:       room || null,
-                mobid:      mob  || null,
-                hits:       1,
-                date_added: now
+                itemid:       String(locItemId),
+                area:         zone,
+                room:         room || null,
+                mobid:        mob  || null,
+                hits:         1,
+                date_added:   now,
+                submitted_by: submitter
             });
             if (ins.error) {
                 msg.innerHTML = '<span style="color:#ff4444;">Error: ' + ins.error.message + '</span>';
