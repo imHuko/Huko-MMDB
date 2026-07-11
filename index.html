@@ -945,9 +945,19 @@ if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
                     var s = allData[i];
                     var n = s.submitter || 'anonymous';
                     if (n.toLowerCase() === 'huko') continue;
-                    if (!contributors[n]) contributors[n] = { name: n, total: 0, eqdb: 0, personal: 0 };
+                    if (!contributors[n]) contributors[n] = { name: n, total: 0, eqdb: 0, personal: 0, locs: 0 };
                     contributors[n].total++;
                     if (s.is_eqdb) contributors[n].eqdb++; else contributors[n].personal++;
+                }
+                // Fetch approved location counts per submitter
+                var { data: locData } = await supabase.from('location_queue').select('submitted_by').eq('status', 'approved');
+                if (locData) {
+                    for (var li = 0; li < locData.length; li++) {
+                        var ln = locData[li].submitted_by || 'anonymous';
+                        if (ln.toLowerCase() === 'huko') continue;
+                        if (!contributors[ln]) contributors[ln] = { name: ln, total: 0, eqdb: 0, personal: 0, locs: 0 };
+                        contributors[ln].locs = (contributors[ln].locs || 0) + 1;
+                    }
                 }
                 var sorted = Object.values(contributors).sort(function(a, b) { return b.total - a.total; });
                 if (sorted.length === 0) { el.textContent = 'No other contributors yet.'; return; }
@@ -962,6 +972,7 @@ if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
                         + c.total + ' total'
                         + ' <span style="color:#44aa44;">' + c.eqdb + ' EQDB</span>'
                         + ' <span style="color:#ffaa00;">' + c.personal + ' personal</span>'
+                        + (c.locs ? ' <span style="color:#8787FF;">' + c.locs + ' locs</span>' : '')
                         + '</div>';
                 }
                 el.innerHTML = html;
