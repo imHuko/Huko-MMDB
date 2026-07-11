@@ -959,7 +959,11 @@ if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
                         contributors[ln].locs = (contributors[ln].locs || 0) + 1;
                     }
                 }
-                var sorted = Object.values(contributors).sort(function(a, b) { return b.total - a.total; });
+                var sorted = Object.values(contributors).sort(function(a, b) {
+                    var aCombined = a.total + (a.locs || 0);
+                    var bCombined = b.total + (b.locs || 0);
+                    return bCombined - aCombined;
+                });
                 if (sorted.length === 0) { el.textContent = 'No other contributors yet.'; return; }
                 var html = '';
                 var medals = ['🥇', '🥈', '🥉'];
@@ -972,7 +976,7 @@ if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
                         + c.total + ' total'
                         + ' <span style="color:#44aa44;">' + c.eqdb + ' EQDB</span>'
                         + ' <span style="color:#ffaa00;">' + c.personal + ' personal</span>'
-                        + (c.locs ? ' <span style="color:#8787FF;">' + c.locs + ' locs</span>' : '')
+                        + (c.locs ? ' <span style="color:#8787FF;">+ ' + c.locs + ' locs</span>' : '')
                         + '</div>';
                 }
                 el.innerHTML = html;
