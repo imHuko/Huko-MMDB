@@ -973,10 +973,10 @@ if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
                     html += '<div style="margin:2px 0;">'
                         + '<span style="min-width:24px;display:inline-block;">' + rank + '</span> '
                         + '<strong style="color:#aaa;">' + escapeHtml(c.name) + '</strong> — '
-                        + c.total + ' total'
+                        + (c.total + (c.locs || 0)) + ' total'
                         + ' <span style="color:#44aa44;">' + c.eqdb + ' EQDB</span>'
                         + ' <span style="color:#ffaa00;">' + c.personal + ' personal</span>'
-                        + (c.locs ? ' <span style="color:#8787FF;">+ ' + c.locs + ' item locs</span>' : '')
+                        + (c.locs ? ' <span style="color:#8787FF;">' + c.locs + ' item locs</span>' : '')
                         + '</div>';
                 }
                 el.innerHTML = html;
