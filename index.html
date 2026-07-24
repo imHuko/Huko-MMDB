@@ -436,7 +436,11 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
                     query = query.ilike('name', '%' + searchTerm + '%');
                 }
             }
-            
+
+            // DEBUG: check the description format
+            var dbg = await supabase.from('equipment').select('name, description').ilike('name', '%throwing axe%').limit(3);
+            console.log('DESC FORMAT:', dbg.data);
+
             var itemType = document.getElementById('filter-type').value;
             var weaponType = document.getElementById('filter-weapon-type').value;
             var wearSlot = document.getElementById('filter-wear-slot').value;
