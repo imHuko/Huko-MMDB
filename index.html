@@ -463,8 +463,13 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
             
             if (error) { resultsDiv.innerHTML = '<p>Error: ' + error.message + '</p>'; return; }
 
+            console.log('RAW DATA:', data ? data.length : 0, 'items, first name:', data && data[0] ? data[0].name : 'N/A', 'has desc:', data && data[0] ? !!data[0].description : 'N/A');
+            if (data && data[0]) console.log('FIRST DESC (500 chars):', data[0].description ? data[0].description.substring(0, 500) : 'null description');
+            if (data && data[1]) console.log('SECOND DESC (500 chars):', data[1].description ? data[1].description.substring(0, 500) : 'null description');
+
             // Client-side AND filter for description patterns (Supabase can't AND multiple ilike on same column)
             if (descPatterns.length > 0 && data) {
+                data = data.filter(function(item) {
                 data = data.filter(function(item) {
                     if (!item.description) return false;
                     var desc = item.description.toLowerCase();
