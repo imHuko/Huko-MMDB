@@ -157,10 +157,10 @@
                 <option value="whip">Whip</option><option value="halberd">Halberd</option>
                 <option value="scythe">Scythe</option><option value="polearm">Polearm</option>
                 <option value="lance">Lance</option><option value="exotic">Exotic</option>
-                <option value="magical-wand">Magical Wand</option>
-                <option value="two-handed-axe">Two-Handed Axe</option>
-                <option value="two-handed-sword">Two-Handed Sword</option>
-                <option value="hand-cannon">Hand Cannon</option>
+                <option value="magical wand">Magical Wand</option>
+                <option value="two-handed axe">Two-Handed Axe</option>
+                <option value="two-handed sword">Two-Handed Sword</option>
+                <option value="hand cannon">Hand Cannon</option>
                 <option value="crossbow">Crossbow</option>
                 <option value="chakram">Chakram</option><option value="boomerang">Boomerang</option>
                 <option value="bola">Bola</option><option value="throwing axe">Throwing Axe</option>
@@ -170,7 +170,7 @@
                 <option value="maul">Maul</option><option value="nunchaku">Nunchaku</option>
                 <option value="yo-yo">Yo-Yo</option><option value="pike">Pike</option>
                 <option value="hook">Hook</option><option value="dart">Dart</option>
-                <option value="sling">Sling</option><option value="slug-thrower">Slug Thrower</option>
+                <option value="sling">Sling</option><option value="slug thrower">Slug Thrower</option>
             </select>
             
             <select id="filter-wear-slot">
@@ -437,10 +437,6 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
                 }
             }
 
-            // DEBUG: check the description format
-            var dbg = await supabase.from('equipment').select('name, description').ilike('name', '%throwing axe%').limit(3);
-            console.log('DESC FORMAT:', JSON.stringify(dbg.data.map(function(d){ return { name: d.name, desc: d.description ? d.description.substring(0, 500) : null }; })));
-
             var itemType = document.getElementById('filter-type').value;
             var weaponType = document.getElementById('filter-weapon-type').value;
             var wearSlot = document.getElementById('filter-wear-slot').value;
@@ -449,27 +445,27 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
             var maxLevel = document.getElementById('filter-max-level').value;
             var source = document.getElementById('filter-source').value;
             
-            if (itemType) query = query.ilike('description', '%is type ' + itemType + '%');
-            if (weaponType) query = query.ilike('description', '%type weapon ' + weaponType + '%');
-if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
-            if (material) query = query.ilike('description', '%made of ' + material + '%');
-			            if (activeAffects.length > 0) {
+            var descFilters = [];
+            if (itemType) descFilters.push('description.ilike.%is type ' + itemType + '%');
+            if (weaponType) descFilters.push('description.ilike.%Your ' + weaponType + '%');
+            if (wearSlot) descFilters.push('description.ilike.%on the ' + wearSlot + '%');
+            if (material) descFilters.push('description.ilike.%made of ' + material + '%');
+            if (activeAffects.length > 0) {
                 for (var af = 0; af < activeAffects.length; af++) {
-                    query = query.ilike('description', '%Affects ' + activeAffects[af] + '%');
+                    descFilters.push('description.ilike.%Affects ' + activeAffects[af] + '%');
                 }
             }
+            if (descFilters.length > 0) query = query.or(descFilters.join(','));
             if (minLevel) query = query.gte('level_req', minLevel);
             if (maxLevel) query = query.lte('level_req', maxLevel);
             if (source === 'eqdb') query = query.eq('verified', true);
             if (source === 'personal') query = query.eq('verified', false);
             if (skpChecked && !searchTerm) query = query.ilike('description', '%When %');
             
-            console.log('SEARCH DEBUG:', { searchTerm, itemType, weaponType, wearSlot, material, minLevel, maxLevel, source, skpChecked: skpChecked });
             var result = await query;
             var data = result.data;
             var error = result.error;
             var count = result.count;
-            console.log('SEARCH RESULT:', { count, dataLen: data ? data.length : 0, firstItem: data && data[0] ? data[0].name : null, error: error ? error.message : null });
             
             if (error) { resultsDiv.innerHTML = '<p>Error: ' + error.message + '</p>'; return; }
             
