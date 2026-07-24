@@ -460,10 +460,12 @@ if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
             if (source === 'personal') query = query.eq('verified', false);
             if (skpChecked && !searchTerm) query = query.ilike('description', '%When %');
             
+            console.log('SEARCH DEBUG:', { searchTerm, itemType, weaponType, wearSlot, material, minLevel, maxLevel, source, skpChecked: skpChecked });
             var result = await query;
             var data = result.data;
             var error = result.error;
             var count = result.count;
+            console.log('SEARCH RESULT:', { count, dataLen: data ? data.length : 0, firstItem: data && data[0] ? data[0].name : null, error: error ? error.message : null });
             
             if (error) { resultsDiv.innerHTML = '<p>Error: ' + error.message + '</p>'; return; }
             
