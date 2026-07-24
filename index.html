@@ -469,10 +469,12 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
                     if (!item.description) return false;
                     var desc = item.description.toLowerCase();
                     for (var dp = 0; dp < descPatterns.length; dp++) {
-                        if (desc.indexOf(descPatterns[dp].toLowerCase()) === -1) return false;
+                        var needle = descPatterns[dp].toLowerCase().replace(/%/g, '');
+                        if (desc.indexOf(needle) === -1) return false;
                     }
                     return true;
                 });
+                count = data.length;
             }
             console.log('AFTER DESC FILTER:', data ? data.length : 0, 'items');
             
