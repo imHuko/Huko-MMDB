@@ -445,42 +445,28 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
             var maxLevel = document.getElementById('filter-max-level').value;
             var source = document.getElementById('filter-source').value;
             
-            var descPatterns = [];
-            if (itemType) descPatterns.push('%is type ' + itemType + '%');
-            if (weaponType) descPatterns.push('%Your ' + weaponType + '%');
-            if (wearSlot) descPatterns.push('%on the ' + wearSlot + '%');
-            if (material) descPatterns.push('%made of ' + material + '%');
-            if (skpChecked && !searchTerm) descPatterns.push('%When %');
-            console.log('DESC PATTERNS:', descPatterns);
+            // Description filters - PostgREST ANDs multiple ilike on same column
+            if (itemType) query = query.ilike('description', '%is type ' + itemType + '%');
+            if (weaponType) query = query.ilike('description', '%Your ' + weaponType + '%');
+            if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
+            if (material) query = query.ilike('description', '%made of ' + material + '%');
+            if (activeAffects.length > 0) {
+                for (var af = 0; af < activeAffects.length; af++) {
+                    query = query.ilike('description', '%Affects ' + activeAffects[af] + '%');
+                }
+            }
+            if (skpChecked && !searchTerm) query = query.ilike('description', '%When %');
             if (minLevel) query = query.gte('level_req', minLevel);
             if (maxLevel) query = query.lte('level_req', maxLevel);
             if (source === 'eqdb') query = query.eq('verified', true);
             if (source === 'personal') query = query.eq('verified', false);
+            console.log('QUERY FILTERS:', { itemType, weaponType, wearSlot, material, skpChecked });
             var result = await query;
             var data = result.data;
             var error = result.error;
             var count = result.count;
             
             if (error) { resultsDiv.innerHTML = '<p>Error: ' + error.message + '</p>'; return; }
-
-            console.log('RAW DATA:', data ? data.length : 0, 'items, first name:', data && data[0] ? data[0].name : 'N/A', 'has desc:', data && data[0] ? !!data[0].description : 'N/A');
-            if (data && data[0]) console.log('FIRST DESC (500 chars):', data[0].description ? data[0].description.substring(0, 500) : 'null description');
-            if (data && data[1]) console.log('SECOND DESC (500 chars):', data[1].description ? data[1].description.substring(0, 500) : 'null description');
-
-            // Client-side AND filter for description patterns (Supabase can't AND multiple ilike on same column)
-            if (descPatterns.length > 0 && data) {
-                data = data.filter(function(item) {
-                    if (!item.description) return false;
-                    var desc = item.description.toLowerCase();
-                    for (var dp = 0; dp < descPatterns.length; dp++) {
-                        var needle = descPatterns[dp].toLowerCase().replace(/%/g, '');
-                        if (desc.indexOf(needle) === -1) return false;
-                    }
-                    return true;
-                });
-                count = data.length;
-            }
-            console.log('AFTER DESC FILTER:', data ? data.length : 0, 'items');
             
             if (!data || data.length === 0) {
                 if (searchTerm) {
