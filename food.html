@@ -56,7 +56,19 @@
         .cooked-badge { display: inline-block; color: #ffaa00; background: #3a2d12; border: 1px solid #775a20; border-radius: 3px; padding: 2px 6px; margin-left: 6px; font-size: 11px; font-weight: normal; }
         .status { color: #888; font-size: 13px; margin: 15px 0; }
         .empty { padding: 30px 0; text-align: center; color: #666; }
-        @media (max-width: 600px) { body { padding: 12px; } #food-search { width: 100%; } .race-lists { grid-template-columns: 1fr; } }
+        .results-section { margin: 20px 0 26px; }
+        .results-heading { color: #C0C0C0; font-size: 18px; border-bottom: 1px solid #333; padding-bottom: 6px; margin: 0 0 8px; }
+        .results-heading .count { color: #888; font-size: 12px; font-weight: normal; margin-left: 6px; }
+        .catalog-heading { color: #C0C0C0; font-size: 18px; border-bottom: 1px solid #333; padding-bottom: 6px; margin: 30px 0 8px; }
+        .catalog-note { color: #888; font-size: 12px; margin: 0 0 10px; }
+        .catalog-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; }
+        .catalog-item { border: 1px solid #333; background: #222; padding: 8px 10px; font-size: 12px; }
+        .catalog-item a { color: #C0C0C0; text-decoration: none; }
+        .catalog-item a:hover { color: #8787FF; text-decoration: underline; }
+        .catalog-item .mark-name { color: #888; display: block; margin-top: 3px; }
+        .catalog-item .catalog-status { color: #ffaa00; font-size: 11px; }
+        .catalog-item .catalog-status.edible { color: #44aa44; }
+        @media (max-width: 600px) { body { padding: 12px; } #food-search { width: 100%; } .race-lists, .catalog-grid { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
@@ -152,6 +164,11 @@
     </div>
     <p id="status" class="status">Loading food data...</p>
     <div id="food-results"></div>
+    <section aria-labelledby="catalog-heading">
+        <h2 id="catalog-heading" class="catalog-heading">Crafted food catalog</h2>
+        <p class="catalog-note">Names cross-referenced against the OOC Mark pages. Green entries are edible finished foods; amber entries are crafted ingredients or resources.</p>
+        <div id="craft-catalog" class="catalog-grid"></div>
+    </section>
 
     <script type="module">
         var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
@@ -168,11 +185,82 @@
         };
         var foods = [];
         var preferenceFilter = 'all';
+        var CRAFTED_FOODS = [
+            { mark: 'Bagel', name: 'a bagel', edible: true },
+            { mark: 'Bagel-Chips', name: 'bagel chips', edible: true },
+            { mark: 'Baking-Soda', name: 'a box of baking soda', edible: false },
+            { mark: 'Borracho', name: 'a pot of savo beans borracho', edible: true },
+            { mark: 'Breakfast-Bagel', name: 'an everything breakfast bagel', edible: true },
+            { mark: 'Breakfast-Omelette', name: 'a breakfast omelette', edible: true },
+            { mark: 'Breakfast-Taco', name: 'a breakfast taco', edible: true },
+            { mark: 'Brownies', name: 'a pan of brownies', edible: true },
+            { mark: 'Buche', name: 'a yule buche', edible: true },
+            { mark: 'Buche-Cream', name: 'some buche cream', edible: true },
+            { mark: 'Buche-Syrup', name: 'some buche syrup', edible: false },
+            { mark: 'Carrot-Cake', name: 'a carrot cake', edible: true },
+            { mark: 'Cheese-Souffle', name: 'a cheese souffle', edible: true },
+            { mark: 'Chile-Relleno', name: 'a chile relleno', edible: true },
+            { mark: 'Chile-Relleno-Burrito', name: 'a chile relleno burrito', edible: true },
+            { mark: 'Chocolate-Cake', name: 'an entire chocolate cake', edible: true },
+            { mark: 'Corn-Tortillas', name: 'a bag of corn tortillas', edible: true },
+            { mark: 'Cream-Cheese', name: 'a brick of cream cheese', edible: false },
+            { mark: 'Cream-Cheese-Frosting', name: 'a piping tube of cream cheese frosting', edible: true },
+            { mark: 'Enchilada-Sauce', name: 'a jar of enchilada sauce', edible: false },
+            { mark: 'Fudge-Sauce', name: 'a jar of hot fudge sauce', edible: false },
+            { mark: 'Garden-Salad', name: 'garden delight salad', edible: true },
+            { mark: 'Gingerbread', name: 'Heirloom Gingerbread', edible: true },
+            { mark: 'Hot-Fudge-Sundae', name: 'a hot fudge sundae', edible: true },
+            { mark: 'Huevos-Rancheros', name: 'a plate of huevos rancheros', edible: true },
+            { mark: 'Hummus', name: 'a bowl of hummus', edible: true },
+            { mark: 'Light-Breakfast', name: 'a light breakfast', edible: true },
+            { mark: 'Masa', name: 'a brick of masa', edible: false },
+            { mark: 'Mirepoix', name: 'a tub of mirepoix', edible: true },
+            { mark: 'Oatmeal-Chocolate-Chip-Cookies', name: 'oatmeal chocolate chip cookies', edible: true },
+            { mark: 'Peanut-Butter-Cookies', name: "Bernadette's peanut butter cookies", edible: true },
+            { mark: 'Pico-De-Gallo', name: 'a ramekin of pico-de-gallo', edible: true },
+            { mark: 'Plating', name: 'an arranged cheese plate', edible: true },
+            { mark: 'Popcorn', name: 'a bag of theater popcorn', edible: true },
+            { mark: 'Raised-Waffles', name: 'raised waffles', edible: true },
+            { mark: 'Salsa-Roja', name: 'a ramekin of salsa roja', edible: false },
+            { mark: 'Savory', name: 'a savory crimini pastry', edible: true },
+            { mark: 'Scorpion-Soup', name: 'scorpion soup', edible: true },
+            { mark: 'Sour-Cream', name: 'a dollop of sour cream', edible: false },
+            { mark: 'Sourdough-Pancakes', name: 'a stack of sourdough pancakes', edible: true },
+            { mark: 'Spaghetti-And-Pesto', name: 'spaghetti and pesto', edible: true },
+            { mark: 'Spinach-Enchiladas', name: 'spinach enchiladas', edible: true },
+            { mark: 'Sprutter-Spritz', name: 'sprutter spritz', edible: true },
+            { mark: 'Steak-And-Potatoes', name: 'steak and potatoes', edible: true },
+            { mark: 'Strawberry-Shortcake', name: 'a strawberry shortcake', edible: true },
+            { mark: 'Tapenade', name: 'olive tapenade', edible: true },
+            { mark: 'Tiramisu', name: 'a slice of tiramisu', edible: true },
+            { mark: 'Toffee', name: 'some soft toffee crunch', edible: true },
+            { mark: 'Tostada', name: 'a crunchy tostada', edible: true },
+            { mark: 'Whipped-Cream', name: 'a dollop of whipped cream', edible: false },
+            { mark: 'Winterroot-Soup', name: 'a pot of winterroot soup', edible: true },
+            { mark: 'Yeast-Starter', name: 'yeast starter', edible: false },
+            { mark: 'Yogurt', name: 'some yogurt', edible: true }
+        ];
 
         function escapeHtml(value) {
             var div = document.createElement('div');
             div.textContent = value == null ? '' : String(value);
             return div.innerHTML;
+        }
+
+        function renderCraftedCatalog() {
+            var search = document.getElementById('food-search').value.toLowerCase().trim();
+            var visible = CRAFTED_FOODS.filter(function(food) {
+                return !search || (food.name + ' ' + food.mark).toLowerCase().indexOf(search) >= 0;
+            });
+            document.getElementById('craft-catalog').innerHTML = visible.map(function(food) {
+                var markUrl = 'https://ooc.dune.net/Mark_Of_' + food.mark;
+                var status = food.edible ? 'Edible finished food' : 'Crafted ingredient/resource';
+                return '<div class="catalog-item">'
+                    + '<a href="item.html?name=' + encodeURIComponent(food.name) + '">' + escapeHtml(food.name) + '</a>'
+                    + '<span class="catalog-status ' + (food.edible ? 'edible' : '') + '">' + status + '</span>'
+                    + '<a class="mark-name" href="' + markUrl + '" target="_blank" rel="noopener">Mark of ' + escapeHtml(food.mark.replace(/-/g, ' ')) + ' ↗</a>'
+                    + '</div>';
+            }).join('') || '<div class="empty">No crafted foods match this search.</div>';
         }
 
         function plainText(value) {
@@ -267,31 +355,36 @@
             });
 
             var result = document.getElementById('food-results');
-            if (!filtered.length) {
-                result.innerHTML = '<div class="empty">No food matches this race, preference, or search.</div>';
-                document.getElementById('status').textContent = '0 foods';
-                return;
-            }
+            var playerMade = filtered.filter(function(food) { return food.playerCooked; });
+            var inGame = filtered.filter(function(food) { return !food.playerCooked; });
             document.getElementById('status').textContent = filtered.length + ' food' + (filtered.length === 1 ? '' : 's') + (race === 'all' ? '' : ' for ' + race);
-            result.innerHTML = filtered.map(function(food) {
-                var preference = getPreference(food, race);
-                var cardClass = race === 'all' ? 'neutral' : preference;
-                var preferenceText = race === 'all' ? 'Race preferences below' : preferenceLabel(preference, food.playerCooked);
-                var cookedBadge = food.playerCooked ? '<span class="cooked-badge">Player-cooked · multipliers apply</span>' : '';
-                var traits = food.traits.length ? food.traits.map(function(trait) { return '<span class="trait">' + escapeHtml(trait) + '</span>'; }).join('') : '<span style="color:#666;">Traits not recorded</span>';
-                var note = food.notes.length ? '<div class="condition-note">' + food.notes.map(escapeHtml).join('<br>') + '</div>' : '';
-                var lists = '<div class="race-lists">'
-                    + '<div class="favored"><strong>Favored by:</strong> ' + escapeHtml(food.favored.join(', ') || 'None recorded') + '</div>'
-                    + '<div class="disliked"><strong>Disliked by:</strong> ' + escapeHtml(food.disliked.join(', ') || 'None recorded') + '</div>'
-                    + '</div>';
-                return '<article class="food-card ' + cardClass + '">'
-                    + '<div class="food-heading"><h3><a href="item.html?name=' + encodeURIComponent(food.name) + '">' + escapeHtml(food.name) + '</a>' + cookedBadge + '</h3>'
-                    + '<span class="preference ' + cardClass + '">' + escapeHtml(preferenceText) + '</span></div>'
-                    + '<div class="food-meta"><strong>Traits:</strong> ' + traits + '</div>'
-                    + (food.effect ? '<div class="effect">' + escapeHtml(food.effect) + '</div>' : '')
-                    + lists + note
-                    + '</article>';
-            }).join('');
+
+            function renderSection(title, items) {
+                var cards = items.map(function(food) {
+                    var preference = getPreference(food, race);
+                    var cardClass = race === 'all' ? 'neutral' : preference;
+                    var preferenceText = race === 'all' ? 'Race preferences below' : preferenceLabel(preference, food.playerCooked);
+                    var cookedBadge = food.playerCooked ? '<span class="cooked-badge">Player-cooked · multipliers apply</span>' : '';
+                    var traits = food.traits.length ? food.traits.map(function(trait) { return '<span class="trait">' + escapeHtml(trait) + '</span>'; }).join('') : '<span style="color:#666;">Traits not recorded</span>';
+                    var note = food.notes.length ? '<div class="condition-note">' + food.notes.map(escapeHtml).join('<br>') + '</div>' : '';
+                    var lists = '<div class="race-lists">'
+                        + '<div class="favored"><strong>Favored by:</strong> ' + escapeHtml(food.favored.join(', ') || 'None recorded') + '</div>'
+                        + '<div class="disliked"><strong>Disliked by:</strong> ' + escapeHtml(food.disliked.join(', ') || 'None recorded') + '</div>'
+                        + '</div>';
+                    return '<article class="food-card ' + cardClass + '">'
+                        + '<div class="food-heading"><h3><a href="item.html?name=' + encodeURIComponent(food.name) + '">' + escapeHtml(food.name) + '</a>' + cookedBadge + '</h3>'
+                        + '<span class="preference ' + cardClass + '">' + escapeHtml(preferenceText) + '</span></div>'
+                        + '<div class="food-meta"><strong>Traits:</strong> ' + traits + '</div>'
+                        + (food.effect ? '<div class="effect">' + escapeHtml(food.effect) + '</div>' : '')
+                        + lists + note
+                        + '</article>';
+                }).join('');
+                return '<section class="results-section"><h2 class="results-heading">' + title + '<span class="count">(' + items.length + ')</span></h2>'
+                    + (cards || '<div class="empty">No food matches this race, preference, or search.</div>')
+                    + '</section>';
+            }
+
+            result.innerHTML = renderSection('Player-made food', playerMade) + renderSection('Food in the game', inGame);
         }
 
         async function loadFoods() {
@@ -317,7 +410,10 @@
         }
 
         document.getElementById('race-select').addEventListener('change', render);
-        document.getElementById('food-search').addEventListener('input', render);
+        document.getElementById('food-search').addEventListener('input', function() {
+            render();
+            renderCraftedCatalog();
+        });
         document.querySelectorAll('#preference-filters button').forEach(function(button) {
             button.addEventListener('click', function() {
                 preferenceFilter = this.getAttribute('data-filter');
@@ -326,6 +422,7 @@
                 render();
             });
         });
+        renderCraftedCatalog();
         loadFoods();
     </script>
 
