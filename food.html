@@ -53,6 +53,7 @@
         .favored { color: #44aa44; }
         .disliked { color: #ff6666; }
         .condition-note { color: #ffaa00; font-size: 12px; margin-top: 7px; }
+        .cooked-badge { display: inline-block; color: #ffaa00; background: #3a2d12; border: 1px solid #775a20; border-radius: 3px; padding: 2px 6px; margin-left: 6px; font-size: 11px; font-weight: normal; }
         .status { color: #888; font-size: 13px; margin: 15px 0; }
         .empty { padding: 30px 0; text-align: center; color: #666; }
         @media (max-width: 600px) { body { padding: 12px; } #food-search { width: 100%; } .race-lists { grid-template-columns: 1fr; } }
@@ -106,7 +107,7 @@
     </div>
 
     <h1>Food Guide</h1>
-    <p class="subtitle">Find foods by race preference. Favored food gives 4x its listed effect, disliked food gives 1/4, and neutral food gives the listed effect.</p>
+    <p class="subtitle">Find foods by race preference. Only player-cooked food gives favored 4x or disliked 1/4 effects; other food uses its listed effect.</p>
 
     <div class="guide-toolbar">
         <div class="field">
@@ -145,9 +146,9 @@
     </div>
 
     <div class="legend">
-        <span><strong class="favored">Favored</strong> = 4x effect</span>
+        <span><strong class="favored">Favored</strong> = 4x effect for player-cooked food</span>
         <span><strong>Neutral</strong> = listed effect</span>
-        <span><strong class="disliked">Disliked</strong> = 1/4 effect</span>
+        <span><strong class="disliked">Disliked</strong> = 1/4 effect for player-cooked food</span>
     </div>
     <p id="status" class="status">Loading food data...</p>
     <div id="food-results"></div>
@@ -202,6 +203,7 @@
             var dislikedText = dislikedLine ? dislikedLine.replace(/^Disliked by:\s*/i, '').replace(/[.]$/, '') : (dislikedMatch ? dislikedMatch[1].trim() : '');
             var notes = lines.filter(function(line) { return /typically\s+(like|dislike|love|hate)\s+this/i.test(line); });
             var effectLine = lines.find(function(line) { return /^When eaten,/i.test(line); }) || '';
+            var playerCooked = /_player-cooked_food/i.test(text);
             var explicitFavored = RACES.filter(function(race) { return favoredText && raceIsMentioned(favoredText, race); });
             var explicitDisliked = RACES.filter(function(race) { return dislikedText && raceIsMentioned(dislikedText, race); });
             var typical = {};
@@ -218,7 +220,7 @@
             return {
                 name: item.name || 'Unnamed food', nameKey: nameKey, description: text,
                 traits: traits, effect: effectLine, favored: explicitFavored, disliked: explicitDisliked,
-                notes: notes, typical: typical, verified: item.verified
+                notes: notes, typical: typical, playerCooked: playerCooked, verified: item.verified
             };
         }
 
@@ -241,9 +243,9 @@
             return food.favored.length === 0 && food.disliked.length === 0 && Object.keys(food.typical).length === 0;
         }
 
-        function preferenceLabel(preference) {
-            if (preference === 'liked') return 'Favored · 4x effect';
-            if (preference === 'disliked') return 'Disliked · 1/4 effect';
+        function preferenceLabel(preference, playerCooked) {
+            if (preference === 'liked') return playerCooked ? 'Favored · 4x effect' : 'Favored · listed effect';
+            if (preference === 'disliked') return playerCooked ? 'Disliked · 1/4 effect' : 'Disliked · listed effect';
             return 'Neutral · listed effect';
         }
 
@@ -274,7 +276,8 @@
             result.innerHTML = filtered.map(function(food) {
                 var preference = getPreference(food, race);
                 var cardClass = race === 'all' ? 'neutral' : preference;
-                var preferenceText = race === 'all' ? 'Race preferences below' : preferenceLabel(preference);
+                var preferenceText = race === 'all' ? 'Race preferences below' : preferenceLabel(preference, food.playerCooked);
+                var cookedBadge = food.playerCooked ? '<span class="cooked-badge">Player-cooked · multipliers apply</span>' : '';
                 var traits = food.traits.length ? food.traits.map(function(trait) { return '<span class="trait">' + escapeHtml(trait) + '</span>'; }).join('') : '<span style="color:#666;">Traits not recorded</span>';
                 var note = food.notes.length ? '<div class="condition-note">' + food.notes.map(escapeHtml).join('<br>') + '</div>' : '';
                 var lists = '<div class="race-lists">'
@@ -282,7 +285,7 @@
                     + '<div class="disliked"><strong>Disliked by:</strong> ' + escapeHtml(food.disliked.join(', ') || 'None recorded') + '</div>'
                     + '</div>';
                 return '<article class="food-card ' + cardClass + '">'
-                    + '<div class="food-heading"><h3><a href="item.html?name=' + encodeURIComponent(food.name) + '">' + escapeHtml(food.name) + '</a></h3>'
+                    + '<div class="food-heading"><h3><a href="item.html?name=' + encodeURIComponent(food.name) + '">' + escapeHtml(food.name) + '</a>' + cookedBadge + '</h3>'
                     + '<span class="preference ' + cardClass + '">' + escapeHtml(preferenceText) + '</span></div>'
                     + '<div class="food-meta"><strong>Traits:</strong> ' + traits + '</div>'
                     + (food.effect ? '<div class="effect">' + escapeHtml(food.effect) + '</div>' : '')
