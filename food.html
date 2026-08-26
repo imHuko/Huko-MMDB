@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Food Guide - MUD Equipment DB</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: "Inter", sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+        a { color: #8787FF; }
+        h1, h2 { color: #C0C0C0; }
+        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; }
+        nav a { margin-right: 15px; color: #8787FF; text-decoration: none; }
+        nav a:hover { color: #C0C0C0; }
+        nav .dropdown { position: relative; display: inline-block; margin-right: 15px; }
+        nav .dropbtn { cursor: pointer; color: #8787FF; }
+        nav .dropdown-content { display: none; position: absolute; top: 100%; left: 0; background: #333; min-width: 160px; border: 1px solid #444; border-radius: 3px; z-index: 1000; }
+        nav .dropdown-content a { display: block; padding: 8px 12px; margin: 0; white-space: nowrap; }
+        nav .dropdown-content a:hover { background: #444; color: #C0C0C0; }
+        nav .dropdown:hover .dropdown-content { display: block; }
+        #sticky-header { position: sticky; top: 0; z-index: 100; background: #1a1a1a; }
+        .subtitle { color: #888; font-size: 13px; margin: -8px 0 18px; }
+        .guide-toolbar { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; background: #222; border: 1px solid #333; border-radius: 5px; padding: 12px; margin: 15px 0; }
+        .field { display: flex; flex-direction: column; gap: 5px; }
+        .field label { color: #888; font-size: 12px; }
+        select, input { padding: 8px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; font: inherit; }
+        select { min-width: 150px; }
+        #food-search { width: 230px; }
+        .filters { display: flex; gap: 4px; flex-wrap: wrap; }
+        .filters button { padding: 8px 10px; background: #333; color: #aaa; border: 1px solid #555; border-radius: 3px; cursor: pointer; }
+        .filters button.active { background: #8787FF; border-color: #8787FF; color: #000; }
+        .legend { display: flex; gap: 14px; flex-wrap: wrap; color: #888; font-size: 12px; margin: 12px 0; }
+        .legend strong { color: #C0C0C0; }
+        .food-card { border: 1px solid #444; border-left-width: 4px; margin: 10px 0; padding: 13px 15px; background: #1a1a1a; }
+        .food-card.liked { border-left-color: #44aa44; }
+        .food-card.disliked { border-left-color: #ff4444; }
+        .food-card.neutral { border-left-color: #888; }
+        .food-heading { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+        .food-heading h3 { margin: 0; font-size: 16px; }
+        .food-heading h3 a { color: #C0C0C0; text-decoration: none; }
+        .food-heading h3 a:hover { color: #8787FF; text-decoration: underline; }
+        .preference { font-weight: bold; white-space: nowrap; }
+        .preference.liked { color: #44aa44; }
+        .preference.disliked { color: #ff6666; }
+        .preference.neutral { color: #aaa; }
+        .food-meta { color: #888; font-size: 13px; margin-top: 8px; line-height: 1.5; }
+        .food-meta strong { color: #aaa; }
+        .trait { display: inline-block; color: #00FFFF; background: #183333; border: 1px solid #285555; padding: 2px 6px; margin: 2px 4px 2px 0; border-radius: 3px; font-family: "Courier New", monospace; font-size: 12px; }
+        .effect { color: #C0C0C0; margin-top: 8px; font-family: "Courier New", monospace; font-size: 12px; white-space: pre-wrap; }
+        .race-lists { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 20px; margin-top: 8px; font-size: 12px; }
+        .favored { color: #44aa44; }
+        .disliked { color: #ff6666; }
+        .condition-note { color: #ffaa00; font-size: 12px; margin-top: 7px; }
+        .status { color: #888; font-size: 13px; margin: 15px 0; }
+        .empty { padding: 30px 0; text-align: center; color: #666; }
+        @media (max-width: 600px) { body { padding: 12px; } #food-search { width: 100%; } .race-lists { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div style="margin-bottom:6px;text-align:center;"><a href="index.html" style="text-decoration:none;"><img src="images/logo.png" alt="HukoDB" style="height:130px;cursor:pointer;"></a></div>
+    <div id="sticky-header">
+        <nav>
+            <a href="index.html">Search</a>
+            <a href="zones.html">Zones</a>
+            <a href="rooms.html">Rooms</a>
+            <a href="food.html">Food</a>
+            <a href="leaderboard.html">Leaderboard</a>
+            <div class="dropdown">
+                <span class="dropbtn">Games ▼</span>
+                <div class="dropdown-content">
+                    <a href="daily.html">Daily</a>
+                    <a href="zonequiz.html">Zone Quiz</a>
+                    <a href="mobguess.html">Mob Guess</a>
+                </div>
+            </div>
+            <div class="dropdown">
+                <span class="dropbtn">Community Tools ▼</span>
+                <div class="dropdown-content">
+                    <a href="market.html">Market</a>
+                    <a href="lfg.html">LFG</a>
+                </div>
+            </div>
+            <div class="dropdown">
+                <span class="dropbtn">More ▼</span>
+                <div class="dropdown-content">
+                    <a href="info.html">About</a>
+                    <a href="ideas.html">Ideas</a>
+                </div>
+            </div>
+            <div class="dropdown">
+                <span class="dropbtn">Sites ▼</span>
+                <div class="dropdown-content">
+                    <a href="https://annwn.info" target="_blank" rel="noopener">Annwn</a>
+                    <a href="https://ooc.dune.net" target="_blank" rel="noopener">OOC</a>
+                    <a href="https://alyria-online.com" target="_blank" rel="noopener">Alyria-Online</a>
+                </div>
+            </div>
+            <span id="login-link"><a href="login.html">Login</a></span>
+            <span id="signup-link"><a href="signup.html" style="color:#44aa44;">Sign Up</a></span>
+            <span id="logout-link" style="display:none;"><a href="#" onclick="logout();return false;">Logout</a></span>
+            <span id="admin-link" style="display:none;"><a href="admin.html" style="color:#FFD700;font-weight:bold;">Admin Panel</a></span>
+        </nav>
+        <script>document.querySelectorAll('nav a').forEach(function(a){if(a.href&&a.href.split('/').pop()===location.pathname.split('/').pop())a.style.color='#00FFFF';});</script>
+    </div>
+
+    <h1>Food Guide</h1>
+    <p class="subtitle">Find foods by race preference. Favored food gives 4x its listed effect, disliked food gives 1/4, and neutral food gives the listed effect.</p>
+
+    <div class="guide-toolbar">
+        <div class="field">
+            <label for="race-select">Race</label>
+            <select id="race-select">
+                <option value="all">All races</option>
+                <option>Human</option>
+                <option>Elf</option>
+                <option>Half-elf</option>
+                <option>Dwarf</option>
+                <option>Ogre</option>
+                <option>Fey</option>
+                <option>Sahuagin</option>
+                <option>Gnome</option>
+                <option>Halfling</option>
+                <option>Dracon</option>
+                <option>Minotaur</option>
+                <option>Drow</option>
+                <option>Sidhe</option>
+                <option>Sporefolk</option>
+            </select>
+        </div>
+        <div class="field">
+            <label for="food-search">Search food or trait</label>
+            <input type="search" id="food-search" placeholder="Search food or trait..." autocomplete="off">
+        </div>
+        <div class="field">
+            <label>Preference</label>
+            <div class="filters" id="preference-filters">
+                <button class="active" data-filter="all">All</button>
+                <button data-filter="liked">Favored</button>
+                <button data-filter="neutral">Neutral</button>
+                <button data-filter="disliked">Disliked</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="legend">
+        <span><strong class="favored">Favored</strong> = 4x effect</span>
+        <span><strong>Neutral</strong> = listed effect</span>
+        <span><strong class="disliked">Disliked</strong> = 1/4 effect</span>
+    </div>
+    <p id="status" class="status">Loading food data...</p>
+    <div id="food-results"></div>
+
+    <script type="module">
+        var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
+        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4IiwiaWF0IjoxNzc4Mjc5MjU5LCJleHAiOjIwOTM4NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+        var supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        var RACES = ['Human', 'Elf', 'Half-elf', 'Dwarf', 'Ogre', 'Fey', 'Sahuagin', 'Gnome', 'Halfling', 'Dracon', 'Minotaur', 'Drow', 'Sidhe', 'Sporefolk'];
+        var ALIASES = {
+            Human: ['human', 'humans'], Elf: ['elf', 'elves'], 'Half-elf': ['half-elf', 'half elf', 'half-elves'],
+            Dwarf: ['dwarf', 'dwarves'], Ogre: ['ogre', 'ogres'], Fey: ['fey'], Sahuagin: ['sahuagin', 'sahuagins'],
+            Gnome: ['gnome', 'gnomes'], Halfling: ['halfling', 'halflings'], Dracon: ['dracon', 'dracons'],
+            Minotaur: ['minotaur', 'minotaurs'], Drow: ['drow'], Sidhe: ['sidhe'], Sporefolk: ['sporefolk']
+        };
+        var foods = [];
+        var preferenceFilter = 'all';
+
+        function escapeHtml(value) {
+            var div = document.createElement('div');
+            div.textContent = value == null ? '' : String(value);
+            return div.innerHTML;
+        }
+
+        function plainText(value) {
+            if (!value) return '';
+            var div = document.createElement('div');
+            div.innerHTML = value;
+            return (div.textContent || div.innerText || '').replace(/\r/g, '').replace(/[ \t]+\n/g, '\n').trim();
+        }
+
+        function raceIsMentioned(listText, race) {
+            var lower = listText.toLowerCase();
+            return ALIASES[race].some(function(alias) {
+                var escaped = alias.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                return new RegExp('(^|\\s|,)'+ escaped +'(\\s|,|$)', 'i').test(lower);
+            });
+        }
+
+        function parseFood(item) {
+            var text = plainText(item.description);
+            var lines = text.split('\n').map(function(line) { return line.trim(); }).filter(Boolean);
+            var traitsMatch = text.match(/This food has the traits?\s+(.+?)(?:\.|\n|$)/i);
+            var traits = traitsMatch ? traitsMatch[1].split(/,\s*|\s+and\s+/).map(function(t) { return t.trim().replace(/[.]$/, ''); }).filter(Boolean) : [];
+            var favoredLine = lines.find(function(line) { return /^Favored by:/i.test(line); }) || '';
+            var dislikedLine = lines.find(function(line) { return /^Disliked by:/i.test(line); }) || '';
+            var favoredMatch = text.match(/Favored by:\s*(.*?)(?=\s+Disliked by:|\s+[A-Z][a-z]+ typically|$)/i);
+            var dislikedMatch = text.match(/Disliked by:\s*(.*?)(?=\s+[A-Z][a-z]+ typically|$)/i);
+            var favoredText = favoredLine ? favoredLine.replace(/^Favored by:\s*/i, '').replace(/[.]$/, '') : (favoredMatch ? favoredMatch[1].trim() : '');
+            var dislikedText = dislikedLine ? dislikedLine.replace(/^Disliked by:\s*/i, '').replace(/[.]$/, '') : (dislikedMatch ? dislikedMatch[1].trim() : '');
+            var notes = lines.filter(function(line) { return /typically\s+(like|dislike|love|hate)\s+this/i.test(line); });
+            var effectLine = lines.find(function(line) { return /^When eaten,/i.test(line); }) || '';
+            var explicitFavored = RACES.filter(function(race) { return favoredText && raceIsMentioned(favoredText, race); });
+            var explicitDisliked = RACES.filter(function(race) { return dislikedText && raceIsMentioned(dislikedText, race); });
+            var typical = {};
+            notes.forEach(function(note) {
+                RACES.forEach(function(race) {
+                    ALIASES[race].forEach(function(alias) {
+                        var re = new RegExp('\\b' + alias.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&') + '\\b\\s+typically\\s+(like|dislike|love|hate)\\s+this', 'i');
+                        var match = note.match(re);
+                        if (match) typical[race] = /dislike|hate/i.test(match[1]) ? 'disliked' : 'liked';
+                    });
+                });
+            });
+            var nameKey = (item.name || '').toLowerCase().trim();
+            return {
+                name: item.name || 'Unnamed food', nameKey: nameKey, description: text,
+                traits: traits, effect: effectLine, favored: explicitFavored, disliked: explicitDisliked,
+                notes: notes, typical: typical, verified: item.verified
+            };
+        }
+
+        function foodHasPreference(food) {
+            return food.favored.length > 0 || food.disliked.length > 0 || food.notes.length > 0;
+        }
+
+        function getPreference(food, race) {
+            if (race === 'all') return 'all';
+            if (food.favored.indexOf(race) >= 0) return 'liked';
+            if (food.disliked.indexOf(race) >= 0) return 'disliked';
+            return food.typical[race] || 'neutral';
+        }
+
+        function matchesFilter(food, race) {
+            if (preferenceFilter === 'all') return true;
+            if (race !== 'all') return getPreference(food, race) === preferenceFilter;
+            if (preferenceFilter === 'liked') return food.favored.length > 0 || Object.keys(food.typical).some(function(key) { return food.typical[key] === 'liked'; });
+            if (preferenceFilter === 'disliked') return food.disliked.length > 0 || Object.keys(food.typical).some(function(key) { return food.typical[key] === 'disliked'; });
+            return food.favored.length === 0 && food.disliked.length === 0 && Object.keys(food.typical).length === 0;
+        }
+
+        function preferenceLabel(preference) {
+            if (preference === 'liked') return 'Favored · 4x effect';
+            if (preference === 'disliked') return 'Disliked · 1/4 effect';
+            return 'Neutral · listed effect';
+        }
+
+        function render() {
+            var race = document.getElementById('race-select').value;
+            var search = document.getElementById('food-search').value.toLowerCase().trim();
+            var filtered = foods.filter(function(food) {
+                var haystack = (food.name + ' ' + food.traits.join(' ') + ' ' + food.description).toLowerCase();
+                if (search && haystack.indexOf(search) < 0) return false;
+                return matchesFilter(food, race);
+            });
+            filtered.sort(function(a, b) {
+                if (race !== 'all') {
+                    var order = { liked: 0, neutral: 1, disliked: 2 };
+                    var preferenceDiff = order[getPreference(a, race)] - order[getPreference(b, race)];
+                    if (preferenceDiff) return preferenceDiff;
+                }
+                return a.name.localeCompare(b.name);
+            });
+
+            var result = document.getElementById('food-results');
+            if (!filtered.length) {
+                result.innerHTML = '<div class="empty">No food matches this race, preference, or search.</div>';
+                document.getElementById('status').textContent = '0 foods';
+                return;
+            }
+            document.getElementById('status').textContent = filtered.length + ' food' + (filtered.length === 1 ? '' : 's') + (race === 'all' ? '' : ' for ' + race);
+            result.innerHTML = filtered.map(function(food) {
+                var preference = getPreference(food, race);
+                var cardClass = race === 'all' ? 'neutral' : preference;
+                var preferenceText = race === 'all' ? 'Race preferences below' : preferenceLabel(preference);
+                var traits = food.traits.length ? food.traits.map(function(trait) { return '<span class="trait">' + escapeHtml(trait) + '</span>'; }).join('') : '<span style="color:#666;">Traits not recorded</span>';
+                var note = food.notes.length ? '<div class="condition-note">' + food.notes.map(escapeHtml).join('<br>') + '</div>' : '';
+                var lists = '<div class="race-lists">'
+                    + '<div class="favored"><strong>Favored by:</strong> ' + escapeHtml(food.favored.join(', ') || 'None recorded') + '</div>'
+                    + '<div class="disliked"><strong>Disliked by:</strong> ' + escapeHtml(food.disliked.join(', ') || 'None recorded') + '</div>'
+                    + '</div>';
+                return '<article class="food-card ' + cardClass + '">'
+                    + '<div class="food-heading"><h3><a href="item.html?name=' + encodeURIComponent(food.name) + '">' + escapeHtml(food.name) + '</a></h3>'
+                    + '<span class="preference ' + cardClass + '">' + escapeHtml(preferenceText) + '</span></div>'
+                    + '<div class="food-meta"><strong>Traits:</strong> ' + traits + '</div>'
+                    + (food.effect ? '<div class="effect">' + escapeHtml(food.effect) + '</div>' : '')
+                    + lists + note
+                    + '</article>';
+            }).join('');
+        }
+
+        async function loadFoods() {
+            var pageSize = 1000;
+            var allItems = [];
+            for (var page = 0; page < 20; page++) {
+                var result = await supabase.from('equipment').select('name,type,description,verified').ilike('type', 'food').order('name', { ascending: true }).range(page * pageSize, (page + 1) * pageSize - 1);
+                if (result.error) {
+                    document.getElementById('status').textContent = 'Could not load food data: ' + result.error.message;
+                    return;
+                }
+                allItems = allItems.concat(result.data || []);
+                if (!result.data || result.data.length < pageSize) break;
+            }
+            var byName = {};
+            allItems.forEach(function(item) {
+                var parsed = parseFood(item);
+                if (!foodHasPreference(parsed)) return;
+                if (!byName[parsed.nameKey] || (item.verified && !byName[parsed.nameKey].verified)) byName[parsed.nameKey] = parsed;
+            });
+            foods = Object.keys(byName).map(function(key) { return byName[key]; });
+            render();
+        }
+
+        document.getElementById('race-select').addEventListener('change', render);
+        document.getElementById('food-search').addEventListener('input', render);
+        document.querySelectorAll('#preference-filters button').forEach(function(button) {
+            button.addEventListener('click', function() {
+                preferenceFilter = this.getAttribute('data-filter');
+                document.querySelectorAll('#preference-filters button').forEach(function(other) { other.classList.remove('active'); });
+                this.classList.add('active');
+                render();
+            });
+        });
+        loadFoods();
+    </script>
+
+    <script>
+        function hasSession() { return Object.keys(localStorage).some(function(k){return k.startsWith('sb-') && localStorage.getItem(k);}); }
+        if (localStorage.getItem('user_logged_in') === 'true' || hasSession()) {
+            document.getElementById('login-link').style.display = 'none';
+            document.getElementById('signup-link').style.display = 'none';
+            document.getElementById('admin-link').style.display = 'inline';
+            document.getElementById('logout-link').style.display = 'inline';
+        }
+        function logout() {
+            Object.keys(localStorage).filter(function(k){return k.startsWith('sb-');}).forEach(function(k){localStorage.removeItem(k);});
+            localStorage.removeItem('user_logged_in');
+            localStorage.removeItem('username');
+            location.reload();
+        }
+    </script>
+</body>
+</html>
