@@ -41,6 +41,7 @@
         .food-heading h3 { margin: 0; font-size: 16px; }
         .food-heading h3 a { color: #C0C0C0; text-decoration: none; }
         .food-heading h3 a:hover { color: #8787FF; text-decoration: underline; }
+        .ooc-link { color: #8787FF; font-size: 11px; font-weight: normal; margin-left: 7px; white-space: nowrap; }
         .preference { font-weight: bold; white-space: nowrap; }
         .preference.liked { color: #44aa44; }
         .preference.disliked { color: #ff6666; }
@@ -185,6 +186,40 @@
         };
         var foods = [];
         var preferenceFilter = 'all';
+        var CRAFTED_PREFERENCES = {
+            'Bagel': ['Human', 'Minotaur'],
+            'Bagel-Chips': ['Human', 'Minotaur'],
+            'Borracho': ['Human', 'Elf', 'Half-elf', 'Gnome'],
+            'Breakfast-Bagel': ['Human', 'Dwarf'],
+            'Breakfast-Omelette': ['Human', 'Half-elf', 'Dwarf', 'Halfling', 'Dracon'],
+            'Breakfast-Taco': ['Human', 'Dwarf', 'Minotaur'],
+            'Brownies': ['Human', 'Dwarf', 'Minotaur', 'Sidhe'],
+            'Buche': ['Human', 'Dwarf', 'Sidhe'],
+            'Buche-Cream': ['Human', 'Dwarf', 'Halfling', 'Dracon', 'Sidhe'],
+            'Carrot-Cake': ['Human', 'Elf', 'Dwarf', 'Sidhe'],
+            'Cheese-Souffle': ['Human', 'Dwarf'],
+            'Chile-Relleno-Burrito': ['Human', 'Elf', 'Dwarf', 'Ogre'],
+            'Cream-Cheese-Frosting': ['Human', 'Dwarf', 'Sidhe'],
+            'Garden-Salad': ['Human', 'Elf'],
+            'Mirepoix': ['Human', 'Dwarf', 'Minotaur'],
+            'Oatmeal-Chocolate-Chip-Cookies': ['Human', 'Dwarf', 'Sidhe'],
+            'Peanut-Butter-Cookies': ['Human', 'Dwarf', 'Halfling', 'Dracon', 'Sidhe'],
+            'Pico-De-Gallo': ['Human', 'Elf'],
+            'Plating': ['Human', 'Elf', 'Dwarf', 'Ogre'],
+            'Popcorn': ['Human', 'Elf', 'Half-elf', 'Dwarf', 'Halfling', 'Dracon'],
+            'Raised-Waffles': ['Human', 'Dwarf', 'Sidhe'],
+            'Savory': ['Human', 'Minotaur', 'Sidhe'],
+            'Spinach-Enchiladas': ['Human', 'Elf', 'Dwarf'],
+            'Sprutter-Spritz': ['Human', 'Dwarf', 'Halfling', 'Dracon', 'Sidhe'],
+            'Steak-And-Potatoes': ['Human', 'Dwarf', 'Fey', 'Dracon', 'Minotaur'],
+            'Strawberry-Shortcake': ['Sidhe', 'Human', 'Dwarf'],
+            'Tapenade': ['Human', 'Elf', 'Halfling'],
+            'Tiramisu': ['Human', 'Dwarf', 'Halfling', 'Dracon', 'Sidhe'],
+            'Toffee': ['Human', 'Dwarf', 'Halfling', 'Dracon', 'Sidhe'],
+            'Tostada': ['Human', 'Elf', 'Half-elf', 'Dwarf', 'Halfling', 'Dracon'],
+            'Winterroot-Soup': ['Human', 'Dwarf', 'Minotaur'],
+            'Yogurt': ['Half-elf', 'Dwarf', 'Halfling', 'Dracon']
+        };
         var CRAFTED_FOODS = [
             { mark: 'Bagel', name: 'a bagel', edible: true },
             { mark: 'Bagel-Chips', name: 'bagel chips', edible: true },
@@ -247,6 +282,20 @@
             return div.innerHTML;
         }
 
+        function normalizeFoodName(name) {
+            return String(name || '').toLowerCase()
+                .replace(/^(a|an|the|some)\\s+/, '')
+                .replace(/[^a-z0-9]+/g, ' ')
+                .trim();
+        }
+
+        function getCraftedFood(name) {
+            var normalized = normalizeFoodName(name);
+            return CRAFTED_FOODS.find(function(food) {
+                return normalizeFoodName(food.name) === normalized;
+            }) || null;
+        }
+
         function renderCraftedCatalog() {
             var search = document.getElementById('food-search').value.toLowerCase().trim();
             var visible = CRAFTED_FOODS.filter(function(food) {
@@ -305,10 +354,18 @@
                 });
             });
             var nameKey = (item.name || '').toLowerCase().trim();
+            var craftedFood = getCraftedFood(item.name);
+            var craftedFavored = craftedFood ? (CRAFTED_PREFERENCES[craftedFood.mark] || []) : [];
+            var favored = explicitFavored.slice();
+            craftedFavored.forEach(function(race) {
+                if (favored.indexOf(race) < 0) favored.push(race);
+            });
+            if (craftedFood && craftedFood.edible) playerCooked = true;
             return {
                 name: item.name || 'Unnamed food', nameKey: nameKey, description: text,
-                traits: traits, effect: effectLine, favored: explicitFavored, disliked: explicitDisliked,
-                notes: notes, typical: typical, playerCooked: playerCooked, verified: item.verified
+                traits: traits, effect: effectLine, favored: favored, disliked: explicitDisliked,
+                notes: notes, typical: typical, playerCooked: playerCooked, verified: item.verified,
+                oocUrl: craftedFood ? 'https://ooc.dune.net/Mark_Of_' + craftedFood.mark : ''
             };
         }
 
@@ -365,6 +422,7 @@
                     var cardClass = race === 'all' ? 'neutral' : preference;
                     var preferenceText = race === 'all' ? 'Race preferences below' : preferenceLabel(preference, food.playerCooked);
                     var cookedBadge = food.playerCooked ? '<span class="cooked-badge">Player-cooked · multipliers apply</span>' : '';
+                    var oocLink = food.oocUrl ? '<a class="ooc-link" href="' + food.oocUrl + '" target="_blank" rel="noopener">OOC details ↗</a>' : '';
                     var traits = food.traits.length ? food.traits.map(function(trait) { return '<span class="trait">' + escapeHtml(trait) + '</span>'; }).join('') : '<span style="color:#666;">Traits not recorded</span>';
                     var note = food.notes.length ? '<div class="condition-note">' + food.notes.map(escapeHtml).join('<br>') + '</div>' : '';
                     var lists = '<div class="race-lists">'
@@ -372,7 +430,7 @@
                         + '<div class="disliked"><strong>Disliked by:</strong> ' + escapeHtml(food.disliked.join(', ') || 'None recorded') + '</div>'
                         + '</div>';
                     return '<article class="food-card ' + cardClass + '">'
-                        + '<div class="food-heading"><h3><a href="item.html?name=' + encodeURIComponent(food.name) + '">' + escapeHtml(food.name) + '</a>' + cookedBadge + '</h3>'
+                        + '<div class="food-heading"><h3><a href="item.html?name=' + encodeURIComponent(food.name) + '">' + escapeHtml(food.name) + '</a>' + oocLink + cookedBadge + '</h3>'
                         + '<span class="preference ' + cardClass + '">' + escapeHtml(preferenceText) + '</span></div>'
                         + '<div class="food-meta"><strong>Traits:</strong> ' + traits + '</div>'
                         + (food.effect ? '<div class="effect">' + escapeHtml(food.effect) + '</div>' : '')
