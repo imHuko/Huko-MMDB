@@ -20,11 +20,6 @@
         nav .dropdown-content a { display: block; padding: 8px 12px; margin: 0; white-space: nowrap; }
         nav .dropdown-content a:hover { background: #444; color: #C0C0C0; }
         nav .dropdown:hover .dropdown-content { display: block; }
-        #nav-links { display: contents; }
-        nav.nav-collapsed #nav-links { display: none; }
-        #nav-toggle { padding: 7px 10px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; cursor: pointer; font: inherit; margin-right: 4px; }
-        #nav-toggle:hover { background: #444; }
-        #nav-toggle:focus-visible { outline: 2px solid #8787FF; outline-offset: 2px; }
         .item-card { border: 1px solid #444; margin: 10px 0; padding: 15px; border-radius: 5px; background: #1a1a1a; }
         .item-card h3 { margin: 0 0 5px 0; }
         .item-card h3 a { color: #C0C0C0; text-decoration: none; }
@@ -72,8 +67,6 @@
     <div style="margin-bottom:6px;text-align:center;"><a href="index.html" style="text-decoration:none;"><img src="images/logo.png" alt="HukoDB" style="height:130px;cursor:pointer;"></a></div>
     <div id="sticky-header">
     <nav aria-label="Main navigation">
-        <button type="button" id="nav-toggle" aria-controls="nav-links" aria-expanded="true">☰ Hide menu</button>
-        <div id="nav-links">
         <a href="index.html">Search</a>
         <a href="zones.html">Zones</a>
         <a href="rooms.html">Rooms</a>
@@ -122,10 +115,9 @@
         <span id="signup-link"><a href="signup.html" style="color:#44aa44;">Sign Up</a></span>
         <span id="logout-link" style="display:none;"><a href="#" onclick="logout()">Logout</a></span>
         <span id="admin-link" style="display:none;"><a href="admin.html" style="color:#FFD700;font-weight:bold;">Admin Panel</a></span>
-        </div>
     </nav>
     <script>document.querySelectorAll('nav a').forEach(function(a){if(a.href&&a.href.split('/').pop()===location.pathname.split('/').pop())a.style.color='#00FFFF';});
-    (function(){var nav=document.querySelector('#sticky-header nav');var toggle=document.getElementById('nav-toggle');function setCollapsed(collapsed){nav.classList.toggle('nav-collapsed',collapsed);toggle.setAttribute('aria-expanded',String(!collapsed));toggle.textContent=collapsed?'☰ Show menu':'☰ Hide menu';}setCollapsed(window.matchMedia('(max-width: 600px)').matches);toggle.addEventListener('click',function(){setCollapsed(!nav.classList.contains('nav-collapsed'));});})();</script>
+</script>
     <div id="sticky-filters">
     <div class="search-bar">
         <input type="text" id="search-input" placeholder="Search equipment..." style="width:250px;">
@@ -1739,5 +1731,6 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
         }
     </script>
 <div id="item-tooltip"></div>
+<script src="nav-collapse.js"></script>
 </body>
 </html>
