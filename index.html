@@ -1037,7 +1037,6 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
         }
 
         function renderDeepResults(page) {
-            deepSearchPage = Math.max(0, Math.min(page, Math.ceil(deepSearchResults.length / DEEP_PAGE_SIZE) - 1));
             var resultsDiv = document.getElementById('results');
             if (!deepSearchResults.length) {
                 resultsDiv.innerHTML = '<p>No items found. Try different filters.</p>';
