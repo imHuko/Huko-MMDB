@@ -2,3 +2,4 @@
 *.tmp
 schema-v6.sql
 room-data-export-merged(7).json
+schema-eqdb-lookup-backfill.sql
