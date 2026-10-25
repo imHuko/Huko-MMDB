@@ -269,6 +269,10 @@
             ? '<span style="color:#44aa44;">EQDB</span>'
             : '<span style="color:#ffaa00;">Personal</span>');
         html += '</div>';
+        const eqdbHash = item.properties && item.properties.eqdb_hash;
+        if (item.verified && typeof eqdbHash === 'string' && /^[a-f0-9]{64}$/i.test(eqdbHash)) {
+            html += '<p class="meta"><strong>EQDB lookup:</strong> <code>check eqlookup ' + escapeHtml(eqdbHash) + '</code></p>';
+        }
 
         if (item.mud_zone)   html += '<p><strong>Zone:</strong> '       + escapeHtml(item.mud_zone)   + '</p>';
         if (item.mob_source) html += '<p><strong>Dropped by:</strong> ' + escapeHtml(item.mob_source) + '</p>';

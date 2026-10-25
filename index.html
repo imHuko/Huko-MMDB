@@ -25,6 +25,8 @@
         .item-card h3 a { color: #C0C0C0; text-decoration: none; }
         .item-card h3 a:hover { text-decoration: underline; }
         .item-meta { color: #888; font-size: 14px; margin-bottom: 10px; }
+        .eqdb-lookup { margin-top: 5px; color: #888; font-size: 12px; overflow-wrap: anywhere; }
+        .eqdb-lookup code { color: #aaa; font-family: 'Courier New', monospace; }
         .search-bar { margin: 15px 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
         .search-bar input, .search-bar select, .search-bar button { padding: 8px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; }
         .search-bar button { cursor: pointer; background: #8787FF; color: #000; border: none; }
@@ -507,6 +509,7 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
                     var existing = seen[nameKey];
                     if (item.verified && !existing.verified) {
                         existing.verified = true;
+                        existing.properties = item.properties || existing.properties;
                     }
                     continue;
                 }
@@ -533,6 +536,7 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
                 }
                 html += item.verified ? '<span style="color:#44aa44;">EQDB</span>' : '<span style="color:#ffaa00;">Personal</span>';
                 html += '</div>';
+                html += renderEqdbLookup(item);
                 html += '</div>';
             }
             
@@ -1068,6 +1072,7 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
                 }
                 html += item.verified ? '<span style="color:#44aa44;">EQDB</span>' : '<span style="color:#ffaa00;">Personal</span>';
                 html += '</div>';
+                html += renderEqdbLookup(item);
                 html += '</div>';
             });
             var foundCount = deepSearchTotalCount === null ? deepSearchResults.length : deepSearchTotalCount;
@@ -1221,6 +1226,12 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
             var div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        function renderEqdbLookup(item) {
+            var hash = item && item.properties && item.properties.eqdb_hash;
+            if (!item || !item.verified || typeof hash !== 'string' || !/^[a-f0-9]{64}$/i.test(hash)) return '';
+            return '<div class="eqdb-lookup"><code>check eqlookup ' + escapeHtml(hash) + '</code></div>';
         }
 
         // ============================================

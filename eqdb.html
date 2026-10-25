@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EQDB Lookup - HukoDB</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: "Inter", sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+        a { color: #8787FF; }
+        h1, h2 { color: #C0C0C0; }
+        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; }
+        nav a { margin-right: 15px; color: #8787FF; text-decoration: none; }
+        nav a:hover { color: #C0C0C0; }
+        nav .dropdown { position: relative; display: inline-block; margin-right: 15px; }
+        nav .dropbtn { cursor: pointer; color: #8787FF; }
+        nav .dropdown-content { display: none; position: absolute; top: 100%; left: 0; background: #333; min-width: 160px; border: 1px solid #444; border-radius: 3px; z-index: 1000; }
+        nav .dropdown-content a { display: block; padding: 8px 12px; margin: 0; white-space: nowrap; }
+        nav .dropdown-content a:hover { background: #444; color: #C0C0C0; }
+        nav .dropdown:hover .dropdown-content { display: block; }
+        .search-row { display: flex; gap: 8px; margin: 16px 0; }
+        .search-row input { flex: 1; min-width: 0; padding: 9px 10px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; }
+        .search-row button { padding: 8px 18px; cursor: pointer; background: #8787FF; color: #000; border: none; border-radius: 3px; }
+        #command-syntax { margin: 12px 0 6px; color: #888; font: 12px/1.5 'Courier New', monospace; }
+        #command-input { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #555; border-radius: 3px; background: #111; color: #C0C0C0; font: 14px 'Courier New', monospace; }
+        .command-help { margin: 8px 0 14px; color: #888; font-size: 12px; line-height: 1.5; }
+        .command-help code { color: #aaa; }
+        #search-status { color: #888; font-size: 13px; margin: 8px 0; }
+        #results { font-family: 'Courier New', monospace; font-size: 14px; line-height: 1.4; overflow-x: hidden; }
+        .eqdb-row { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 2px 0; color: #C0C0C0; }
+        .eqdb-row .lookup-command { display: block; flex: 0 1 25ch; min-width: 0; overflow: hidden; color: #8787FF; text-overflow: ellipsis; white-space: nowrap; }
+        .eqdb-row .lookup-command:hover { overflow: visible; }
+        .eqdb-row .copy-lookup { flex: 0 0 auto; padding: 1px 5px; border: 1px solid #555; border-radius: 3px; background: #222; color: #aaa; font: 11px 'Courier New', monospace; cursor: pointer; }
+        .eqdb-row .copy-lookup:hover, .eqdb-row .copy-lookup:focus-visible { border-color: #8787FF; color: #fff; }
+        .eqdb-row .item-name { display: block; flex: 0 1 auto; min-width: 0; overflow: visible; color: #C0C0C0; text-decoration: none; white-space: nowrap; cursor: help; }
+        .eqdb-row .item-name:hover { color: #fff; }
+        #item-tooltip { position: fixed; z-index: 9999; background: #111; border: 1px solid #555; border-radius: 6px; padding: 12px 14px; max-width: 380px; min-width: 200px; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.5; pointer-events: none; display: none; box-shadow: 0 4px 20px rgba(0,0,0,0.8); white-space: pre-wrap; }
+        #item-tooltip .tt-loading { color: #555; font-style: italic; }
+        #item-tooltip font[color="#8787FF"] { color: #8787FF; }
+        #item-tooltip font[color="#C0C0C0"] { color: #C0C0C0; }
+        #item-tooltip font[color="#00FFFF"] { color: #00FFFF; }
+        #item-tooltip font[color="#FFFF00"] { color: #FFFF00; }
+        #item-tooltip font[color="#00FF00"] { color: #00FF00; }
+        #item-tooltip font[color="#D78787"] { color: #D78787; }
+        #item-tooltip font[color="#FF00FF"] { color: #FF00FF; }
+        #item-tooltip font[color="#808080"] { color: #808080; }
+        #item-tooltip font[color="#FF0000"] { color: #FF0000; }
+        @media (max-width: 600px) { body { padding: 12px; } .search-row { flex-direction: column; } .search-row button { align-self: flex-start; } }
+    </style>
+</head>
+<body>
+    <div style="margin-bottom:6px;text-align:center;"><a href="index.html" style="text-decoration:none;"><img src="images/logo.png" alt="HukoDB" style="height:130px;cursor:pointer;"></a></div>
+    <div id="sticky-header">
+        <nav aria-label="Main navigation">
+            <a href="index.html">Search</a>
+            <a href="zones.html">Zones</a>
+            <a href="rooms.html">Rooms</a>
+            <a href="food.html">Food</a>
+            <a href="leaderboard.html">Leaderboard</a>
+            <div class="dropdown"><span class="dropbtn">Games ▼</span><div class="dropdown-content"><a href="daily.html">Daily</a><a href="zonequiz.html">Zone Quiz</a><a href="mobguess.html">Mob Guess</a></div></div>
+            <div class="dropdown"><span class="dropbtn">Community Tools ▼</span><div class="dropdown-content"><a href="market.html">Market</a><a href="lfg.html">LFG</a></div></div>
+            <div class="dropdown"><span class="dropbtn">More ▼</span><div class="dropdown-content"><a href="info.html">About</a><a href="ideas.html">Ideas</a></div></div>
+            <div class="dropdown"><span class="dropbtn">Sites ▼</span><div class="dropdown-content"><a href="https://annwn.info" target="_blank" rel="noopener">Annwn</a><a href="https://ooc.dune.net" target="_blank" rel="noopener">OOC</a><a href="https://alyria-online.com" target="_blank" rel="noopener">Alyria-Online</a></div></div>
+            <span id="login-link"><a href="login.html">Login</a></span>
+            <span id="signup-link"><a href="signup.html" style="color:#44aa44;">Sign Up</a></span>
+            <span id="logout-link" style="display:none;"><a href="#" onclick="logout()">Logout</a></span>
+            <span id="admin-link" style="display:none;"><a href="admin.html" style="color:#FFD700;font-weight:bold;">Admin Panel</a></span>
+        </nav>
+    </div>
+    <h1 style="font-size:22px;margin-bottom:4px;">EQDB</h1>
+    <p style="color:#888;font-size:13px;margin-top:0;">Search equipment database entries. Hover over an item name to preview its stats.</p>
+    <form id="search-form">
+        <label id="command-syntax" for="command-input">Syntax: eqdb &lt;any set of options&gt; [&lt;keywords or short description&gt;]</label>
+        <input id="command-input" type="search" autocomplete="off" aria-label="EQDB command" placeholder="eqdb type weapon sword slash flaming levels 100 200 crimson blade">
+        <p class="command-help"><code>type weapon [weapon type] [damage type] [special weapon attribute]</code> · <code>type &lt;item type&gt;</code> · <code>material &lt;material&gt;</code> · <code>spell &lt;skill&gt;</code> · <code>affect &lt;stat&gt;</code> · <code>bindings &lt;minimum relic slots&gt;</code> · <code>levels &lt;min&gt; &lt;max&gt;</code> · <code>wear &lt;slot&gt;</code><br>Options can be combined in one command. Put multiword filter values in quotes; remaining words search item names and descriptions.</p>
+        <div class="search-row">
+            <button type="submit">Search</button>
+        </div>
+    </form>
+    <div id="search-status" aria-live="polite">Loading EQDB items...</div>
+    <div id="results" aria-live="polite"></div>
+    <div id="item-tooltip"></div>
+
+    <script>
+        function isEditor() { return sessionStorage.getItem('editor_logged_in') === 'true'; }
+        function hasSession() { return Object.keys(localStorage).some(function(k) { return k.startsWith('sb-') && localStorage.getItem(k); }); }
+        if (localStorage.getItem('user_logged_in') === 'true' || hasSession()) {
+            document.getElementById('login-link').style.display = 'none';
+            document.getElementById('signup-link').style.display = 'none';
+            document.getElementById('admin-link').style.display = 'inline';
+            document.getElementById('logout-link').style.display = 'inline';
+        }
+        function logout() {
+            Object.keys(localStorage).filter(function(k) { return k.startsWith('sb-'); }).forEach(function(k) { localStorage.removeItem(k); });
+            sessionStorage.removeItem('editor_logged_in'); sessionStorage.removeItem('editor_name');
+            localStorage.removeItem('user_logged_in'); localStorage.removeItem('username'); location.reload();
+        }
+        if (isEditor()) {
+            document.getElementById('admin-link').style.display = 'inline';
+            document.getElementById('logout-link').style.display = 'inline';
+            document.getElementById('login-link').style.display = 'none';
+        }
+        document.querySelectorAll('nav a').forEach(function(a) { if (a.href && a.href.split('/').pop() === location.pathname.split('/').pop()) a.style.color = '#00FFFF'; });
+    </script>
+
+    <script type="module">
+        const SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const resultsEl = document.getElementById('results');
+        const statusEl = document.getElementById('search-status');
+        const searchInput = document.getElementById('command-input');
+        const searchForm = document.getElementById('search-form');
+        const PAGE_SIZE = 1000;
+        let requestNumber = 0;
+        let tooltipCache = {};
+        let eqdbSearchDataPromise = null;
+        let tooltipTimer = null;
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session && session.user && session.user.email && session.user.email.indexOf('@hukodb.com') === -1) sessionStorage.setItem('editor_logged_in', 'true');
+
+        function escapeHtml(value) {
+            const node = document.createElement('div');
+            node.textContent = value == null ? '' : String(value);
+            return node.innerHTML;
+        }
+
+        const WEAPON_TYPES = ['archery','axe','bola','boomerang','chakram','dagger','dart','exotic','flail','halberd','hook','lance','mace','magical wand','marksmanship','maul','nunchaku','pike','polearm','scythe','spear','staff','sword','throwing axe','throwing knife','throwing spear','throwing star','two-handed axe','two-handed sword','whip','yo-yo','sling','slug thrower'];
+        const DAMAGE_TYPES = ['acid','air','bash','charm','corruption','disease','drowning','earth','emotional','energy','fear','flames','frost','harm','lightbeam','lightning','moonlight','necromancy','pain','pierce','poison','slash','soundwave','summon','sunlight','water'];
+        const WEAPON_SPECIALS = ['aqueous','battering','dispelling','echoing-strike','flaming','frost','grappling','overloading','parry-magic','poisoned','serrated','sharp','shocking','vampiric','vorpal'];
+        const COMMAND_OPTIONS = new Set(['type','material','spell','affect','bindings','levels','wear']);
+        const PARSED_EQDB_COLUMNS = 'name,verified,type,level_req,material,equipped,weapon_type,damage_type,special_weapon_attrs,weapon_special_attr,spell_name,casts_spell_name,fountain_spell,relic_slots,affects,_raw,keywords';
+
+        function parseEqdbCommand(input) {
+            const raw = String(input || '').trim().replace(/^eqdb\s*/i, '');
+            const tokens = (raw.match(/"[^"]*"|'[^']*'|\S+/g) || []).map(function(token) {
+                return token.replace(/^(["'])(.*)\1$/, '$2');
+            });
+            const filters = { type: '', weaponType: '', damageType: '', weaponSpecial: '', material: '', spell: '', affect: '', bindings: '', minLevel: '', maxLevel: '', wear: '', keywords: [] };
+            const errors = [];
+            let i = 0;
+            function takeValue(option) {
+                if (i >= tokens.length || COMMAND_OPTIONS.has(tokens[i].toLowerCase())) {
+                    errors.push('Missing value for ' + option + '.');
+                    return '';
+                }
+                return tokens[i++];
+            }
+            function takeChoice(choices) {
+                for (let length = Math.min(3, tokens.length - i); length > 0; length--) {
+                    const candidate = tokens.slice(i, i + length).join(' ').toLowerCase();
+                    const choice = choices.find(function(value) { return value.toLowerCase() === candidate; });
+                    if (choice) { i += length; return choice; }
+                }
+                return '';
+            }
+            function takeWeaponSpecial() {
+                const first = tokens[i] && tokens[i].toLowerCase();
+                if (!first || COMMAND_OPTIONS.has(first)) return '';
+                const found = [];
+                while (i < tokens.length && !COMMAND_OPTIONS.has(tokens[i].toLowerCase())) {
+                    const before = i;
+                    const special = takeChoice(WEAPON_SPECIALS);
+                    if (special) found.push(special);
+                    else if (before === i) break;
+                }
+                return found.join(' ');
+            }
+            while (i < tokens.length) {
+                const option = tokens[i].toLowerCase();
+                if (!COMMAND_OPTIONS.has(option)) { filters.keywords.push(tokens[i++]); continue; }
+                i++;
+                if (option === 'type') {
+                    filters.type = takeValue('type');
+                    if (filters.type.toLowerCase() === 'weapon') {
+                        filters.weaponType = takeChoice(WEAPON_TYPES);
+                        filters.damageType = takeChoice(DAMAGE_TYPES);
+                        filters.weaponSpecial = takeWeaponSpecial();
+                    }
+                } else if (option === 'levels') {
+                    const min = takeValue('levels'), max = takeValue('levels');
+                    if (!/^\d+$/.test(min) || !/^\d+$/.test(max)) errors.push('levels requires a minimum and maximum level.');
+                    else if (Number(min) > Number(max)) errors.push('levels minimum must not exceed maximum.');
+                    else { filters.minLevel = Number(min); filters.maxLevel = Number(max); }
+                } else if (option === 'bindings') {
+                    const value = takeValue('bindings');
+                    if (!/^\d+$/.test(value)) errors.push('bindings requires a minimum relic-slot count.');
+                    else filters.bindings = Number(value);
+                } else filters[option] = takeValue(option);
+            }
+            return { filters: filters, errors: errors };
+        }
+
+        function normalizeValue(value) {
+            return String(value == null ? '' : value).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
+        }
+        function containsNormalized(haystack, needle) {
+            const normalizedNeedle = normalizeValue(needle);
+            return Boolean(normalizedNeedle) && normalizeValue(haystack).includes(normalizedNeedle);
+        }
+        function escapeRegExp(value) { return String(value).replace(/[.*+?^${}()|[\\]\\]/g, '\\$&'); }
+        function rawHeaderValue(raw, pattern) {
+            const match = String(raw || '').match(pattern);
+            return match ? match[1] : '';
+        }
+        function matchesEqdbCommand(item, filters) {
+            const parsed = item._parsed || {};
+            const raw = [item.description, parsed._raw, parsed.flavor_text].filter(Boolean).join('\n');
+            const header = raw.split(/\r?\n/).slice(0, 4).join(' ');
+            const type = parsed.type || rawHeaderValue(header, /(?:Item|Level\s+\d+\s+item)\s+'[^']+'\s+is type\s+([\w-]+)/i) || item.type || '';
+            if (filters.type && normalizeValue(type) !== normalizeValue(filters.type)) return false;
+            const weaponType = parsed.weapon_type || rawHeaderValue(raw, /^Your\s+(.+?)\s+will deal\b/im) || rawHeaderValue(header, /with\s+([\w -]+?)\s+proficiency\b/i);
+            if (filters.weaponType && !containsNormalized(weaponType, filters.weaponType)) return false;
+            const damageType = parsed.damage_type || rawHeaderValue(raw, /\b(acid|air|bash|charm|corruption|disease|drowning|earth|emotional|energy|fear|flames|frost|harm|lightbeam|lightning|moonlight|necromancy|pain|pierce|poison|slash|soundwave|summon|sunlight|water)\s+damage\b/i);
+            if (filters.damageType && !containsNormalized(damageType, filters.damageType)) return false;
+            const special = Array.isArray(parsed.special_weapon_attrs) ? parsed.special_weapon_attrs.join(' ') : String(parsed.special_weapon_attrs || parsed.weapon_special_attr || '');
+            const rawSpecial = [rawHeaderValue(raw, /^Special weapon attributes:\s*(.+)$/im), rawHeaderValue(raw, /^Your weapon special attribute\s+(.+)$/im)].join(' ');
+            if (filters.weaponSpecial && !filters.weaponSpecial.split(' ').every(function(value) { return containsNormalized(special + ' ' + rawSpecial, value); })) return false;
+            const material = parsed.material || rawHeaderValue(header, /made of\s+([^,\s]+)/i) || '';
+            if (filters.material && !filters.material.trim().split(/\s+/).every(function(part) { return containsNormalized(material + ' ' + header, part); })) return false;
+            const spell = [parsed.spell_name, parsed.casts_spell_name, parsed.fountain_spell, parsed.keywords, raw].filter(Boolean).join(' ');
+            if (filters.spell && !filters.spell.trim().split(/\s+/).every(function(part) { return containsNormalized(spell, part); })) return false;
+            if (filters.affect) {
+                const affects = Array.isArray(parsed.affects) ? parsed.affects.map(function(effect) { return effect && (effect.stat || effect.name) || ''; }).join(' ') : '';
+                const rawAffects = Array.from(raw.matchAll(/^Affects\s+(.+?)\s+by\b/gim)).map(function(match) { return match[1]; }).join(' ');
+                const affectText = affects + ' ' + rawAffects;
+                const affectValue = filters.affect.toLowerCase();
+                if (!containsNormalized(affectText, filters.affect) && !new RegExp('^Affects\\s+' + escapeRegExp(affectValue) + '\\s+by', 'im').test(raw)) return false;
+            }
+            const bindings = Number(parsed.relic_slots || 0);
+            if (filters.bindings !== '' && bindings < Number(filters.bindings)) return false;
+            const level = Number(parsed.level_req || item.level_req || rawHeaderValue(header, /Level\s+(\d+)\s+item/i) || 0);
+            if (filters.minLevel !== '' && level < Number(filters.minLevel)) return false;
+            if (filters.maxLevel !== '' && level > Number(filters.maxLevel)) return false;
+            const wear = parsed.equipped || item.slot || rawHeaderValue(header, /equipped\s+(?:on|around|about|over|as|wielded)\s+([^,.]+)/i) || '';
+            const wearText = [wear, parsed.keywords, header].filter(Boolean).join(' ');
+            if (filters.wear && !filters.wear.trim().split(/\s+/).every(function(part) { return containsNormalized(wearText, part); })) return false;
+            if (filters.keywords.length) {
+                const haystack = normalizeValue([item.name, item.description, parsed.keywords, parsed._raw, parsed.flavor_text].filter(Boolean).join(' '));
+                if (!filters.keywords.every(function(word) { return haystack.includes(normalizeValue(word)); })) return false;
+            }
+            return true;
+        }
+
+        async function searchItems() {
+            const currentRequest = ++requestNumber;
+            const command = parseEqdbCommand(searchInput.value);
+            const filters = command.filters;
+            const hasFilters = Object.keys(filters).some(function(key) { return key === 'keywords' ? filters[key].length > 0 : filters[key] !== ''; });
+            if (command.errors.length) {
+                resultsEl.textContent = '';
+                statusEl.textContent = command.errors.join(' ');
+                return;
+            }
+            statusEl.textContent = hasFilters ? 'Searching EQDB...' : 'Loading EQDB items...';
+            resultsEl.textContent = '';
+            try {
+                if (!eqdbSearchDataPromise) {
+                    eqdbSearchDataPromise = (async function() {
+                        const rows = [];
+                        for (let offset = 0; ; offset += PAGE_SIZE) {
+                            const result = await supabase.from('equipment')
+                                .select('id,name,type,slot,level_req,description,properties,verified', { count: 'exact' })
+                                .eq('verified', true).not('properties->>eqdb_hash', 'is', null)
+                                .order('name', { ascending: true }).range(offset, offset + PAGE_SIZE - 1);
+                            if (result.error) throw new Error(result.error.message);
+                            const page = result.data || [];
+                            rows.push.apply(rows, page);
+                            if (page.length < PAGE_SIZE || Number.isFinite(result.count) && rows.length >= result.count) break;
+                        }
+                        const parsedRows = [];
+                        for (let offset = 0; ; offset += PAGE_SIZE) {
+                            const result = await supabase.from('equipment_parsed').select(PARSED_EQDB_COLUMNS, { count: 'exact' })
+                                .eq('verified', true).order('name', { ascending: true }).range(offset, offset + PAGE_SIZE - 1);
+                            if (result.error) throw new Error(result.error.message);
+                            const page = result.data || [];
+                            parsedRows.push.apply(parsedRows, page);
+                            if (page.length < PAGE_SIZE || Number.isFinite(result.count) && parsedRows.length >= result.count) break;
+                        }
+                        const parsedByName = new Map();
+                        parsedRows.forEach(function(item) {
+                            const key = normalizeValue(item.name);
+                            if (key && !parsedByName.has(key)) parsedByName.set(key, item);
+                        });
+                        rows.forEach(function(item) { item._parsed = parsedByName.get(normalizeValue(item.name)) || {}; });
+                        return rows;
+                    })().catch(function(error) {
+                        eqdbSearchDataPromise = null;
+                        throw error;
+                    });
+                }
+                const rows = await eqdbSearchDataPromise;
+                if (currentRequest !== requestNumber) return;
+                const validRows = rows.filter(function(item) {
+                    const hash = item.properties && item.properties.eqdb_hash;
+                    return item.verified && typeof hash === 'string' && /^[a-f0-9]{64}$/i.test(hash) && matchesEqdbCommand(item, filters);
+                });
+                if (currentRequest !== requestNumber) return;
+                renderRows(validRows);
+                statusEl.textContent = hasFilters ? 'Found ' + validRows.length + ' items.' : validRows.length + ' EQDB items';
+            } catch (error) {
+                if (currentRequest !== requestNumber) return;
+                statusEl.textContent = 'Could not load EQDB items: ' + error.message;
+            }
+        }
+
+        function renderRows(rows) {
+            if (!rows.length) {
+                resultsEl.innerHTML = '<div style="color:#888;padding:8px;">No matching EQDB items.</div>';
+                return;
+            }
+            resultsEl.innerHTML = rows.map(function(item) {
+                const hash = item.properties && item.properties.eqdb_hash;
+                if (!item.verified || typeof hash !== 'string' || !/^[a-f0-9]{64}$/i.test(hash)) return '';
+                const command = 'check eqlookup ' + hash;
+                return '<div class="eqdb-row" data-name="' + escapeHtml(item.name) + '">'
+                    + '<span class="lookup-command">[' + escapeHtml(command) + ']</span>'
+                    + '<button type="button" class="copy-lookup" data-command="' + escapeHtml(command) + '" aria-label="Copy EQDB lookup command" title="Copy EQDB lookup command">Copy</button>'
+                    + '<a class="item-name" aria-label="' + escapeHtml(item.name) + '" href="item.html?id=' + encodeURIComponent(item.id) + '">' + escapeHtml(item.name) + '</a></div>';
+            }).join('');
+        }
+
+        function getTooltip() { return document.getElementById('item-tooltip'); }
+        function hideTooltip() {
+            clearTimeout(tooltipTimer);
+            getTooltip().style.display = 'none';
+        }
+        function positionTooltip(tooltip, x, y) {
+            let left = x + 15, top = y + 15;
+            const rect = tooltip.getBoundingClientRect();
+            if (left + rect.width > window.innerWidth) left = Math.max(8, x - rect.width - 15);
+            if (top + rect.height > window.innerHeight) top = Math.max(8, y - rect.height - 15);
+            tooltip.style.left = left + 'px'; tooltip.style.top = top + 'px';
+        }
+        async function handleItemHover(event) {
+            const row = event.target.closest('.eqdb-row');
+            if (!row) return;
+            const name = row.getAttribute('data-name');
+            if (!name) return;
+            clearTimeout(tooltipTimer);
+            const x = event.clientX, y = event.clientY;
+            tooltipTimer = setTimeout(async function() {
+                const tooltip = getTooltip();
+                tooltip.innerHTML = '<span class="tt-loading">Loading...</span>';
+                tooltip.style.display = 'block';
+                positionTooltip(tooltip, x, y);
+                if (!Object.prototype.hasOwnProperty.call(tooltipCache, name)) {
+                    const result = await supabase.from('equipment').select('description').eq('name', name).eq('verified', true).limit(1);
+                    tooltipCache[name] = result.data && result.data.length ? result.data[0] : null;
+                }
+                if (!row.matches(':hover')) {
+                    tooltip.style.display = 'none';
+                    return;
+                }
+                const item = tooltipCache[name];
+                if (!item || !item.description) {
+                    tooltip.innerHTML = '<span style="color:#555;">No stat data available.</span>';
+                    positionTooltip(tooltip, x, y);
+                    return;
+                }
+                tooltip.innerHTML = colorize(item.description);
+                positionTooltip(tooltip, x, y);
+            }, 300);
+        }
+        function sanitizeHtml(html) {
+            const container = document.createElement('div');
+            container.innerHTML = html;
+            container.querySelectorAll('script,iframe,object,embed,form,input,a,link,meta,style').forEach(function(node) { node.remove(); });
+            container.querySelectorAll('*').forEach(function(node) {
+                Array.from(node.attributes).forEach(function(attribute) {
+                    if (attribute.name.startsWith('on') || attribute.name === 'href' || attribute.name === 'src') node.removeAttribute(attribute.name);
+                });
+            });
+            return container.innerHTML;
+        }
+        function colorize(html) {
+            if (!html) return '';
+            if (html.indexOf('<font') >= 0 || html.indexOf('<span') >= 0) {
+                return '<div style="white-space:pre-wrap;">' + sanitizeHtml(html) + '</div>';
+            }
+            return '<div style="white-space:pre-wrap;">' + colorizeMM(html) + '</div>';
+        }
+
+        const C = {
+            blue: '#8787FF', white: '#C0C0C0', cyan: '#00FFFF', yellow: '#FFFF00',
+            green: '#00FF00', pink: '#D78787', magenta: '#FF00FF', gray: '#808080',
+            olive: '#808000', red: '#FF0000', darkgreen: '#008000'
+        };
+        function tag(color, text) { return '<font color="' + color + '">' + text + '</font>'; }
+        function numbersWhite(str, baseColor) {
+            return str.replace(/(\d[\d,]*\.?\d*%?)/g,
+                '</font><font color="' + C.white + '">$1</font><font color="' + baseColor + '">');
+        }
+        function colorizeItemLine(line) {
+            let h = tag(C.blue, "Item '");
+            const nm = line.match(/^Item\s+'(.+?)'\s+is type/);        if (nm) h += tag(C.white, escapeHtml(nm[1])) + tag(C.blue, "' is type ");
+            const tm = line.match(/is type\s+(\S+)/);                  if (tm) h += tag(C.white, escapeHtml(tm[1].replace(',', ''))) + tag(C.blue, ',');
+            const am = line.match(/alignment\s+(-?\d+)/);              if (am) h += tag(C.blue, ' alignment ') + tag(C.white, am[1]) + tag(C.blue, ',');
+            const mm = line.match(/made of\s+(\S+)/);                  if (mm) h += tag(C.blue, ' made of ') + tag(C.white, escapeHtml(mm[1]));
+            const cm = line.match(/\(in\s+\((.+?)\)\s+condition\)/);   if (cm) h += tag(C.blue, ' (in ') + tag(C.white, '(' + escapeHtml(cm[1]) + ')') + tag(C.blue, ' condition)');
+            if (/\[EQDB\]/.test(line))  h += tag(C.white, '[EQDB]');
+            if (/\[Study\]/.test(line)) h += tag(C.white, '[Study]');
+            if (/\[LTB\]/.test(line))   h += tag(C.white, '[LTB]');
+            return h;
+        }
+        function colorizeKeywordLine(line) {
+            let h = tag(C.blue, "has keywords '");
+            const km = line.match(/has keywords\s+'([^']+)'/); if (km) h += tag(C.white, escapeHtml(km[1])) + tag(C.blue, "'");
+            const em = line.match(/, equipped\s+(.+?)\.?$/);   if (em) h += tag(C.blue, ', equipped ') + tag(C.white, escapeHtml(em[1])) + tag(C.blue, '.');
+            return h;
+        }
+        function colorizeAffectLine(line) {
+            const isSetBonus  = /\(Requires\s+\d+\s+items?\)/.test(line);
+            const labelColor  = isSetBonus ? C.magenta : C.cyan;
+            const match = line.match(/^Affects\s+(.+?)\s+by\s+(-?[\d.]+)\s*(\.?)\s*(\(Requires\s+\d+\s+items?\))?\.?\s*(\{[^}]+\})?/);
+            if (match) {
+                const [, stat, num, dot, req, freq] = match;
+                let h = tag(labelColor, 'Affects') + ' ' + tag(C.white, stat) + ' ' + tag(labelColor, 'by') + ' ' + tag(C.white, num);
+                if (dot) h += tag(labelColor, dot);
+                if (req) {
+                    const rm = req.match(/\(Requires\s+(\d+)\s+items?\)/);
+                    h += rm
+                        ? ' ' + tag(C.magenta, '(Requires ') + tag(C.white, rm[1]) + tag(C.magenta, ' items)')
+                        : ' ' + tag(C.magenta, req);
+                }
+                if (freq) h += ' ' + tag(C.pink, freq);
+                return h;
+            }
+            return tag(labelColor, escapeHtml(line));
+        }
+        function colorizeReqLine(content) {
+            let h = escapeHtml(content);
+            h = h.replace(/Your /,             'Your </font><font color="' + C.white + '">');
+            h = h.replace(/ must be /,         '</font><font color="' + C.cyan + '"> must be </font><font color="' + C.white + '">');
+            h = h.replace(/ must not be /,     '</font><font color="' + C.cyan + '"> must not be </font><font color="' + C.white + '">');
+            h = h.replace(/ to use this item/, '</font><font color="' + C.cyan + '"> to use this item');
+            return h;
+        }
+        function colorizeMM(text) {
+            if (!text) return '';
+            text = text.replace(/\n?.*\d+hp\s+\d+sp\s+\d+st[^\n]*\n?/g, '\n');
+            const lines  = text.split('\n');
+            const result = [];
+            let inRelic  = false;
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const t    = line.trim();
+                if (t === '') { result.push(''); continue; }
+                if (/^\+\+\+/.test(t)) {
+                    result.push(tag(C.green, escapeHtml(line)));
+                    i++;
+                    while (i < lines.length) {
+                        const nl = lines[i], nt = nl.trim();
+                        if (nt === '' || /^\+\+\+/.test(nt) || /^Item\s+'/.test(nt) || /^\*/.test(nt)) { i--; break; }
+                        result.push(tag(C.green, escapeHtml(nl)));
+                        i++;
+                    }
+                    continue;
+                }
+                if (/^Relics:/.test(t))                           { inRelic = true;  result.push(tag(C.green, escapeHtml(line))); continue; }
+                if (inRelic && /^(Small|Medium|Large)\s*\(/.test(t))               { result.push(tag(C.green, escapeHtml(line))); continue; }
+                if (inRelic && /^\s*\(\d+\/\d+/.test(t))          { inRelic = false; result.push(tag(C.green, escapeHtml(line))); continue; }
+                if (/^\*/.test(t)) {
+                    if (/^\*\s*Item\s+'/.test(t)) {
+                        const si = t.match(/\*\s*(Item\s+')(.+)(')$/);
+                        result.push(si
+                            ? tag(C.yellow, '* ') + tag(C.magenta, si[1]) + escapeHtml(si[2]) + tag(C.magenta, si[3])
+                            : tag(C.yellow, escapeHtml(line)));
+                        continue;
+                    }
+                    if (/^\*This/.test(t)) {
+                        result.push(tag(C.yellow, '*') + tag(C.blue, ' ' + numbersWhite(escapeHtml(t.substring(1).trim()), C.blue) + '</font>'));
+                        continue;
+                    }
+                    result.push(tag(C.yellow, '*') + tag(C.cyan, colorizeReqLine(t.substring(1).trim())));
+                    continue;
+                }
+                if (/^-\s*Item\s+'/.test(t)) {
+                    const di = t.match(/^(-\s*)(Item\s+')(.+)(')$/);
+                    if (di) result.push(tag(C.gray, di[1]) + tag(C.magenta, di[2]) + escapeHtml(di[3]) + tag(C.magenta, di[4]));
+                    continue;
+                }
+                if (/^Affects/.test(t)) { result.push(colorizeAffectLine(t)); continue; }
+                if (/^Special weapon attributes:/.test(t)) {
+                    const sw = line.match(/^(Special weapon attributes:)\s+(.+)$/);
+                    result.push(sw
+                        ? tag(C.blue, escapeHtml(sw[1])) + ' ' + tag(C.white, escapeHtml(sw[2]))
+                        : tag(C.blue, escapeHtml(line)));
+                    continue;
+                }
+                if (/^Your .+ will deal .+ damage with .+ accuracy, at .+ range, with a .+ chance to crit for .+ damage\.$/i.test(t)) {
+                    const ws = line.match(/^(Your )(.+?)( will deal )(.+?)( damage with )(.+?)( accuracy, at )(.+?)( range, with a )(.+?)( chance to crit for )(.+?)( damage\.)$/i);
+                    if (ws) {
+                        result.push(
+                            tag(C.cyan,  escapeHtml(ws[1]))  + tag(C.white, escapeHtml(ws[2]))  +
+                            tag(C.cyan,  escapeHtml(ws[3]))  + tag(C.white, escapeHtml(ws[4]))  +
+                            tag(C.cyan,  escapeHtml(ws[5]))  + tag(C.white, escapeHtml(ws[6]))  +
+                            tag(C.cyan,  escapeHtml(ws[7]))  + tag(C.white, escapeHtml(ws[8]))  +
+                            tag(C.cyan,  escapeHtml(ws[9]))  + tag(C.white, escapeHtml(ws[10])) +
+                            tag(C.cyan,  escapeHtml(ws[11])) + tag(C.white, escapeHtml(ws[12])) +
+                            tag(C.cyan,  escapeHtml(ws[13]))
+                        );
+                    } else {
+                        result.push(tag(C.cyan, escapeHtml(line)));
+                    }
+                    continue;
+                }
+                if (/^When/.test(t)) {
+                    const wm = line.match(/^(When\s+(casting|wielding|evoking|affected\s+by)\s+)(.+?)(,.+)$/i);
+                    if (wm) {
+                        const restColored = numbersWhite(escapeHtml(wm[4]), C.green);
+                        let h = tag(C.green, escapeHtml(wm[1])) + tag(C.white, escapeHtml(wm[3])) + '<font color="' + C.green + '">' + restColored + '</font>';
+                        h = h.replace(/<font color="#00FF00"><\/font>/g, '');
+                        result.push(h);
+                    } else {
+                        result.push('<font color="' + C.green + '">' + numbersWhite(escapeHtml(line), C.green) + '</font>');
+                    }
+                    continue;
+                }
+                if (/^(Adds resistance|Decreases|Grants|Casts|Improves|Your weapon special|Alters)/.test(t)) {
+                    const cls = (/^Adds resistance/.test(t) && /\(Requires/.test(t)) ? C.magenta : C.cyan;
+                    result.push(tag(cls, numbersWhite(escapeHtml(line), cls) + '</font>'));
+                    continue;
+                }
+                if (/^Increases/.test(t)) {
+                    const inc = line.match(/^(Increases )(.+?)( to )(.+?)(-based attacks\.)/i);
+                    if (inc) {
+                        result.push(
+                            tag(C.cyan, escapeHtml(inc[1])) + tag(C.white, escapeHtml(inc[2])) +
+                            tag(C.cyan, escapeHtml(inc[3])) + tag(C.white, escapeHtml(inc[4])) +
+                            tag(C.cyan, escapeHtml(inc[5]))
+                        );
+                    } else {
+                        result.push(tag(C.cyan, escapeHtml(line)));
+                    }
+                    continue;
+                }
+                if (/^Item\s+'/.test(t)) { result.push(colorizeItemLine(t)); continue; }
+                if (/^Level\s+\d+\s+item\s+'/.test(t)) {
+                    const lm = t.match(/^(Level\s+\d+\s+item\s+')(.+?)('\s+is type)/);
+                    result.push(lm
+                        ? tag(C.blue, lm[1]) + tag(C.white, escapeHtml(lm[2])) + tag(C.blue, lm[3])
+                        : tag(C.blue, escapeHtml(line)));
+                    continue;
+                }
+                if (/^has keywords/.test(t)) { result.push(colorizeKeywordLine(t)); continue; }
+                if (/^This item has a default lifespan/.test(t) || /^This item will lose its status/.test(t) || /^This item will vanish/.test(t)) {
+                    result.push(tag(C.blue, numbersWhite(escapeHtml(line), C.blue) + '</font>'));
+                    continue;
+                }
+                if (/^This level .+ item has the attributes:/.test(t)) {
+                    const am = line.match(/^(This level \d+ item has the attributes:)(.+)$/);
+                    result.push(am
+                        ? tag(C.blue, numbersWhite(escapeHtml(am[1]), C.blue) + '</font>') + tag(C.white, escapeHtml(am[2]))
+                        : tag(C.blue, escapeHtml(line)));
+                    continue;
+                }
+                if (/^(This item weighs|This level|This item has|This armor has|This item protects|This ward has|This relic|This item, when|This amulet|Your magical wand|This light source|Armor resistance|This item will have|This item is enchanted)/.test(t)) {
+                    const catMatch = line.match(/\{Cat\.\s*\d+\}/);
+                    const catText  = catMatch ? catMatch[0] : '';
+                    let working    = escapeHtml(line.replace(/\{Cat\.\s*\d+\}/g, '##CAT##'));
+                    let colored    = tag(C.blue, numbersWhite(working, C.blue) + '</font>');
+                    if (catText) colored = colored.replace(/##CAT##/g, '</font><font color="' + C.red + '">' + escapeHtml(catText) + '</font><font color="' + C.blue + '">');
+                    colored = colored.replace(/<font color="#8787FF"><\/font>/g, '');
+                    result.push(colored);
+                    continue;
+                }
+                if (/^(This is part of|You are currently)/.test(t)) {
+                    result.push(tag(C.magenta, numbersWhite(escapeHtml(line), C.magenta) + '</font>'));
+                    continue;
+                }
+                if (/This item is beyond your power/.test(t)) { result.push(tag(C.magenta, escapeHtml(line))); continue; }
+                if (/^(Capacity:|Upon|Small )/.test(t)) {
+                    result.push(tag(C.cyan, numbersWhite(escapeHtml(line), C.cyan) + '</font>'));
+                    continue;
+                }
+                result.push(tag(C.white, escapeHtml(line)));
+            }
+            return result.join('\n');
+        }
+
+        async function copyLookupCommand(button) {
+            const command = button.getAttribute('data-command');
+            if (!command) return;
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(command);
+                } else {
+                    const field = document.createElement('textarea');
+                    field.value = command;
+                    field.setAttribute('readonly', '');
+                    field.style.position = 'fixed';
+                    field.style.left = '-9999px';
+                    document.body.appendChild(field);
+                    field.select();
+                    const copied = document.execCommand('copy');
+                    field.remove();
+                    if (!copied) throw new Error('Clipboard copy failed');
+                }
+                const originalText = button.textContent;
+                button.textContent = 'Copied';
+                setTimeout(function() { button.textContent = originalText; }, 1200);
+            } catch (error) {
+                button.textContent = 'Copy failed';
+                setTimeout(function() { button.textContent = 'Copy'; }, 1500);
+            }
+        }
+
+        searchForm.addEventListener('submit', function(event) { event.preventDefault(); searchItems(); });
+        resultsEl.addEventListener('click', function(event) {
+            const button = event.target.closest('.copy-lookup');
+            if (button) copyLookupCommand(button);
+        });
+        resultsEl.addEventListener('pointerover', handleItemHover);
+        resultsEl.addEventListener('mouseover', handleItemHover);
+        resultsEl.addEventListener('mousemove', function(event) {
+            const tooltip = getTooltip();
+            if (tooltip.style.display !== 'none') positionTooltip(tooltip, event.clientX, event.clientY);
+        });
+        resultsEl.addEventListener('mouseout', function(event) {
+            if (event.target.closest('.eqdb-row') && !event.relatedTarget?.closest('.eqdb-row')) hideTooltip();
+        });
+        searchItems();
+    </script>
+    <script src="nav-collapse.js"></script>
+</body>
+</html>
