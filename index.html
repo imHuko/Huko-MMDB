@@ -53,7 +53,7 @@
         .badge-buy      { color: #8787FF; font-size: 10px; font-weight: bold; }
         .badge-trade    { color: #ffaa00; font-size: 10px; font-weight: bold; }
         .sidebar-empty  { padding: 10px; font-size: 12px; color: #444; text-align: center; font-style: italic; }
-        #item-tooltip { position: fixed; z-index: 9999; background: #111; border: 1px solid #555; border-radius: 6px; padding: 12px 14px; max-width: 380px; min-width: 200px; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.5; pointer-events: none; display: none; box-shadow: 0 4px 20px rgba(0,0,0,0.8); }
+        #item-tooltip { position: fixed; z-index: 9999; background: #111; border: 1px solid #555; border-radius: 6px; padding: 12px 14px; width: max-content; max-width: calc(100vw - 24px); min-width: 0; box-sizing: border-box; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.5; pointer-events: none; display: none; box-shadow: 0 4px 20px rgba(0,0,0,0.8); white-space: pre-wrap; overflow-wrap: anywhere; }
         #item-tooltip .mm-cyan   { color: #00FFFF; }
         #item-tooltip .mm-yellow { color: #FFFF00; }
         #item-tooltip .mm-red    { color: #FF0000; }
@@ -1239,20 +1239,35 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
         // ============================================
         var tooltipCache = {};
         var tooltipTimer = null;
+        var tooltipPointer = { x: 0, y: 0 };
 
         function getTooltip() {
             return document.getElementById('item-tooltip');
         }
 
+        function positionTooltip(x, y) {
+            var tt = getTooltip();
+            var rect = tt.getBoundingClientRect();
+            var margin = 8;
+            var gap = 15;
+            var left = x + gap;
+            var top = y + gap;
+
+            if (left + rect.width > window.innerWidth - margin) left = x - rect.width - gap;
+            if (top + rect.height > window.innerHeight - margin) top = y - rect.height - gap;
+
+            left = Math.max(margin, Math.min(left, window.innerWidth - rect.width - margin));
+            top = Math.max(margin, Math.min(top, window.innerHeight - rect.height - margin));
+            tt.style.left = left + 'px';
+            tt.style.top = top + 'px';
+        }
+
         function moveTooltip(e) {
+            tooltipPointer.x = e.clientX;
+            tooltipPointer.y = e.clientY;
             var tt = getTooltip();
             if (tt.style.display === 'none') return;
-            var x = e.clientX + 15;
-            var y = e.clientY + 15;
-            if (x + 400 > window.innerWidth)  x = e.clientX - 400;
-            if (y + 300 > window.innerHeight) y = e.clientY - 310;
-            tt.style.left = x + 'px';
-            tt.style.top  = y + 'px';
+            positionTooltip(tooltipPointer.x, tooltipPointer.y);
         }
 
         function hideTooltip() {
@@ -1267,14 +1282,14 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
             if (!name) return;
 
             clearTimeout(tooltipTimer);
-            var currentEvent = e;
+            tooltipPointer.x = e.clientX;
+            tooltipPointer.y = e.clientY;
 
             tooltipTimer = setTimeout(async function() {
                 var tt = getTooltip();
                 tt.innerHTML = '<span class="tt-loading">Loading...</span>';
                 tt.style.display = 'block';
-                tt.style.left = (currentEvent.clientX + 15) + 'px';
-                tt.style.top  = (currentEvent.clientY + 15) + 'px';
+                positionTooltip(tooltipPointer.x, tooltipPointer.y);
 
                 if (!tooltipCache[name]) {
                     var r = await supabase.from('equipment').select('description, type, slot, level_req, value, verified').eq('name', name).limit(1);
@@ -1284,10 +1299,12 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
                 var item = tooltipCache[name];
                 if (!item || !item.description) {
                     tt.innerHTML = '<span style="color:#555;">No stat data available.</span>';
+                    positionTooltip(tooltipPointer.x, tooltipPointer.y);
                     return;
                 }
 
                 tt.innerHTML = colorize(item.description);
+                positionTooltip(tooltipPointer.x, tooltipPointer.y);
             }, 300);
         }
 
