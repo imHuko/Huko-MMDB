@@ -36,7 +36,7 @@
         .eqdb-row .copy-lookup:hover, .eqdb-row .copy-lookup:focus-visible { border-color: #8787FF; color: #fff; }
         .eqdb-row .item-name { display: block; flex: 0 1 auto; min-width: 0; overflow: visible; color: #C0C0C0; text-decoration: none; white-space: nowrap; cursor: help; }
         .eqdb-row .item-name:hover { color: #fff; }
-        #item-tooltip { position: fixed; z-index: 9999; background: #111; border: 1px solid #555; border-radius: 6px; padding: 12px 14px; max-width: 380px; min-width: 200px; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.5; pointer-events: none; display: none; box-shadow: 0 4px 20px rgba(0,0,0,0.8); white-space: pre-wrap; }
+        #item-tooltip { position: fixed; z-index: 9999; background: #111; border: 1px solid #555; border-radius: 6px; padding: 12px 14px; width: max-content; max-width: calc(100vw - 24px); min-width: 0; box-sizing: border-box; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.5; pointer-events: none; display: none; box-shadow: 0 4px 20px rgba(0,0,0,0.8); white-space: pre-wrap; overflow-wrap: anywhere; }
         #item-tooltip .tt-loading { color: #555; font-style: italic; }
         #item-tooltip font[color="#8787FF"] { color: #8787FF; }
         #item-tooltip font[color="#C0C0C0"] { color: #C0C0C0; }
@@ -119,6 +119,7 @@
         let tooltipCache = {};
         let eqdbSearchDataPromise = null;
         let tooltipTimer = null;
+        const tooltipPointer = { x: 0, y: 0 };
 
         const { data: { session } } = await supabase.auth.getSession();
         if (session && session.user && session.user.email && session.user.email.indexOf('@hukodb.com') === -1) sessionStorage.setItem('editor_logged_in', 'true');
@@ -330,10 +331,13 @@
             getTooltip().style.display = 'none';
         }
         function positionTooltip(tooltip, x, y) {
-            let left = x + 15, top = y + 15;
             const rect = tooltip.getBoundingClientRect();
-            if (left + rect.width > window.innerWidth) left = Math.max(8, x - rect.width - 15);
-            if (top + rect.height > window.innerHeight) top = Math.max(8, y - rect.height - 15);
+            const margin = 8, gap = 15;
+            let left = x + gap, top = y + gap;
+            if (left + rect.width > window.innerWidth - margin) left = x - rect.width - gap;
+            if (top + rect.height > window.innerHeight - margin) top = y - rect.height - gap;
+            left = Math.max(margin, Math.min(left, window.innerWidth - rect.width - margin));
+            top = Math.max(margin, Math.min(top, window.innerHeight - rect.height - margin));
             tooltip.style.left = left + 'px'; tooltip.style.top = top + 'px';
         }
         async function handleItemHover(event) {
@@ -342,12 +346,13 @@
             const name = row.getAttribute('data-name');
             if (!name) return;
             clearTimeout(tooltipTimer);
-            const x = event.clientX, y = event.clientY;
+            tooltipPointer.x = event.clientX;
+            tooltipPointer.y = event.clientY;
             tooltipTimer = setTimeout(async function() {
                 const tooltip = getTooltip();
                 tooltip.innerHTML = '<span class="tt-loading">Loading...</span>';
                 tooltip.style.display = 'block';
-                positionTooltip(tooltip, x, y);
+                positionTooltip(tooltip, tooltipPointer.x, tooltipPointer.y);
                 if (!Object.prototype.hasOwnProperty.call(tooltipCache, name)) {
                     const result = await supabase.from('equipment').select('description').eq('name', name).eq('verified', true).limit(1);
                     tooltipCache[name] = result.data && result.data.length ? result.data[0] : null;
@@ -359,11 +364,11 @@
                 const item = tooltipCache[name];
                 if (!item || !item.description) {
                     tooltip.innerHTML = '<span style="color:#555;">No stat data available.</span>';
-                    positionTooltip(tooltip, x, y);
+                    positionTooltip(tooltip, tooltipPointer.x, tooltipPointer.y);
                     return;
                 }
                 tooltip.innerHTML = colorize(item.description);
-                positionTooltip(tooltip, x, y);
+                positionTooltip(tooltip, tooltipPointer.x, tooltipPointer.y);
             }, 300);
         }
         function sanitizeHtml(html) {
@@ -618,8 +623,10 @@
         resultsEl.addEventListener('pointerover', handleItemHover);
         resultsEl.addEventListener('mouseover', handleItemHover);
         resultsEl.addEventListener('mousemove', function(event) {
+            tooltipPointer.x = event.clientX;
+            tooltipPointer.y = event.clientY;
             const tooltip = getTooltip();
-            if (tooltip.style.display !== 'none') positionTooltip(tooltip, event.clientX, event.clientY);
+            if (tooltip.style.display !== 'none') positionTooltip(tooltip, tooltipPointer.x, tooltipPointer.y);
         });
         resultsEl.addEventListener('mouseout', function(event) {
             if (event.target.closest('.eqdb-row') && !event.relatedTarget?.closest('.eqdb-row')) hideTooltip();
