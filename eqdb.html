@@ -631,6 +631,8 @@
         resultsEl.addEventListener('mouseout', function(event) {
             if (event.target.closest('.eqdb-row') && !event.relatedTarget?.closest('.eqdb-row')) hideTooltip();
         });
+        window.addEventListener('pagehide', hideTooltip);
+        window.addEventListener('pageshow', hideTooltip);
         searchItems();
     </script>
     <script src="nav-collapse.js"></script>

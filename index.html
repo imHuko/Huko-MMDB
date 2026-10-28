@@ -1723,6 +1723,8 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
             if (e.target.closest('.item-card')) hideTooltip();
         }, true);
         resultsEl.addEventListener('mousemove', moveTooltip, true);
+        window.addEventListener('pagehide', hideTooltip);
+        window.addEventListener('pageshow', hideTooltip);
 
         if (restoreSearchState()) {
             var lastSearch = JSON.parse(sessionStorage.getItem('eqdb_search')).lastSearch;
