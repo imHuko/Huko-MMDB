@@ -218,6 +218,11 @@
             <datalist id="affect-list"></datalist>
             <label style="color:#aaa;font-size:13px;cursor:pointer;"><input type="checkbox" id="filter-search-desc"> Search descriptions</label>
             <label style="color:#FFD700;font-size:13px;cursor:pointer;" title="Items with 'When...' conditional effects (spell power / SKP procs)"><input type="checkbox" id="filter-when-proc"> Spell Power / SKP</label>
+            <div style="flex-basis:100%;margin-top:4px;">
+                <label for="filter-description-query" style="display:block;color:#aaa;font-size:13px;margin-bottom:4px;">Description query</label>
+                <input type="text" id="filter-description-query" placeholder='grant AND chakram' style="width:min(100%,520px);box-sizing:border-box;padding:7px;background:#333;color:#ccc;border:1px solid #555;border-radius:3px;">
+                <div style="color:#777;font-size:12px;margin-top:4px;">Space or AND requires every word; OR matches alternatives; use "quotes" for a phrase and -word to exclude it. Operators are case-insensitive. Example: <code>grant AND chakram</code></div>
+            </div>
             <button id="clear-filters-btn" style="background:#555;font-size:12px;padding:2px 8px;">Clear Filters</button>
         </div>
     </div>
@@ -322,6 +327,7 @@
         document.getElementById('clear-filters-btn').addEventListener('click', clearFilters);
 document.getElementById('mob-search-input').addEventListener('keyup', function(e) { if (e.key === 'Enter') searchMobs(); });
         document.getElementById('search-input').addEventListener('keyup', function(e) { if (e.key === 'Enter') searchEquipment(); });
+        document.getElementById('filter-description-query').addEventListener('keyup', function(e) { if (e.key === 'Enter') searchEquipment(); });
         
         function clearFilters() {
             document.getElementById('filter-type').value = '';
@@ -333,6 +339,7 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
             document.getElementById('filter-source').value = '';
             document.getElementById('filter-search-desc').checked = false;
             document.getElementById('filter-when-proc').checked = false;
+            document.getElementById('filter-description-query').value = '';
             activeAffects = [];
             renderAffectTags();
             searchEquipment();
@@ -351,6 +358,7 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
                 filterSource: document.getElementById('filter-source').value,
                 filterSearchDesc: document.getElementById('filter-search-desc').checked,
                 filterWhenProc: document.getElementById('filter-when-proc').checked,
+                descriptionQuery: document.getElementById('filter-description-query').value,
                 filterAffects: activeAffects.slice(),
                 filtersVisible: document.getElementById('advanced-filters').style.display !== 'none',
                 lastSearch: document.getElementById('results').querySelector('.item-card') ? 'equipment' : 'mobs'
@@ -373,6 +381,7 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
                 document.getElementById('filter-source').value = state.filterSource || '';
                 if (state.filterSearchDesc) document.getElementById('filter-search-desc').checked = true;
                 if (state.filterWhenProc) document.getElementById('filter-when-proc').checked = true;
+                document.getElementById('filter-description-query').value = state.descriptionQuery || '';
                 if (state.filterAffects && state.filterAffects.length) {
                     state.filterAffects.forEach(function(a) { addAffectTag(a); });
                 }
@@ -384,7 +393,7 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
                 if (state.filterType === 'weapon') {
                     document.getElementById('filter-weapon-type').style.display = 'inline';
                 }
-                return state.search || state.mobSearch || state.filterType || state.filterWearSlot || state.filterMaterial || state.filterMinLevel || state.filterMaxLevel || (state.filterAffects && state.filterAffects.length);
+                return state.search || state.mobSearch || state.descriptionQuery || state.filterType || state.filterWearSlot || state.filterMaterial || state.filterMinLevel || state.filterMaxLevel || (state.filterAffects && state.filterAffects.length);
             } catch(e) { return false; }
         }
         
@@ -399,6 +408,7 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
             document.getElementById('filter-source').value = '';
             document.getElementById('filter-search-desc').checked = false;
             document.getElementById('filter-when-proc').checked = false;
+            document.getElementById('filter-description-query').value = '';
             activeAffects = [];
             renderAffectTags();
             sessionStorage.removeItem('eqdb_search');
@@ -603,6 +613,54 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
             tokens = tokens.filter(function(token) { return !numericStatParts.has(token); });
             numeric.forEach(function(test) { tokens.push(test.stat); });
             return { tokens: Array.from(new Set(tokens)), numeric: numeric, phrase: normalizeSearchText(remainder), phrases: phrases };
+        }
+
+        function parseDescriptionQuery(raw) {
+            var groups = [{ include: [], exclude: [] }];
+            var terms = [];
+            var tokens = [];
+            var matcher = /(-?)"([^"]+)"|(-?\S+)/g;
+            var match;
+            while ((match = matcher.exec(raw)) !== null) {
+                if (match[2] !== undefined) tokens.push({ value: match[2], excluded: match[1] === '-', phrase: true });
+                else tokens.push({ value: match[3].replace(/^-/, ''), excluded: match[3].charAt(0) === '-', phrase: false });
+            }
+            if ((raw.match(/"/g) || []).length % 2 !== 0) return { error: 'Close the quote around your description phrase.' };
+
+            var expectingTerm = true;
+            for (var i = 0; i < tokens.length; i++) {
+                var token = tokens[i];
+                var operator = token.value.toLowerCase();
+                if (!token.phrase && !token.excluded && operator === 'or') {
+                    if (expectingTerm || !groups[groups.length - 1].include.length) return { error: 'Add a search term before and after OR.' };
+                    groups.push({ include: [], exclude: [] });
+                    expectingTerm = true;
+                    continue;
+                }
+                if (!token.phrase && !token.excluded && operator === 'and') {
+                    if (expectingTerm) return { error: 'Add a search term before AND.' };
+                    expectingTerm = true;
+                    continue;
+                }
+                var value = normalizeSearchText(token.value.replace(/^-/, ''));
+                if (!value) continue;
+                var group = groups[groups.length - 1];
+                (token.excluded ? group.exclude : group.include).push(value);
+                if (!token.excluded) terms.push(value);
+                expectingTerm = false;
+            }
+            if (expectingTerm) return { error: 'Add a search term after AND or OR.' };
+            if (!groups.some(function(group) { return group.include.length > 0; })) return { error: 'Include at least one word in the description query.' };
+            if (groups.some(function(group) { return group.include.length === 0; })) return { error: 'Each OR alternative needs at least one included word.' };
+            return { groups: groups, terms: Array.from(new Set(terms)) };
+        }
+
+        function matchesDescriptionQuery(item, query) {
+            var description = ' ' + normalizeSearchText(deepRawText(item)) + ' ';
+            return query.groups.some(function(group) {
+                return group.include.every(function(term) { return description.indexOf(' ' + term + ' ') >= 0; })
+                    && group.exclude.every(function(term) { return description.indexOf(' ' + term + ' ') < 0; });
+            });
         }
 
         function escapePostgrestToken(value) {
@@ -1081,9 +1139,17 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
         }
 
         async function searchEquipmentDeep() {
+            var requestId = ++deepSearchRequest;
             var resultsDiv = document.getElementById('results');
             var rawQuery = document.getElementById('search-input').value.trim();
             var parsedQuery = getDeepQuery(rawQuery);
+            var descriptionQueryText = document.getElementById('filter-description-query').value.trim();
+            var descriptionQuery = descriptionQueryText ? parseDescriptionQuery(descriptionQueryText) : null;
+            if (descriptionQuery && descriptionQuery.error) {
+                resultsDiv.innerHTML = '';
+                document.getElementById('search-status').textContent = descriptionQuery.error;
+                return;
+            }
             var filters = {
                 type: document.getElementById('filter-type').value,
                 weaponType: document.getElementById('filter-weapon-type').value,
@@ -1102,8 +1168,7 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
             var searchableQueryTokens = parsedQuery.tokens.filter(function(token) {
                 return !parsedQuery.numeric.some(function(test) { return normalizeSearchText(test.stat) === normalizeSearchText(token); });
             });
-            var hasSearchTokens = searchableQueryTokens.length > 0 || parsedQuery.phrases.length > 0;
-            var requestId = ++deepSearchRequest;
+            var hasSearchTokens = searchableQueryTokens.length > 0 || parsedQuery.phrases.length > 0 || Boolean(descriptionQuery);
             deepSearchTotalCount = null;
             resultsDiv.innerHTML = '<p>Searching...</p>';
             try {
@@ -1139,7 +1204,7 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
                 }
                 var parsedResult;
                 if (hasSearchTokens) {
-                    var searchableTokens = searchableQueryTokens;
+                    var searchableTokens = Array.from(new Set(searchableQueryTokens.concat(descriptionQuery ? descriptionQuery.terms : [])));
                     var tokenQueries = await Promise.all(searchableTokens.map(async function(token) {
                         return fetchPagedQuery(buildDeepTextQuery('equipment_parsed', token), requestId, 500);
                     }));
@@ -1159,6 +1224,7 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
                     if (requestId !== deepSearchRequest) return;
                     var merged = mergeDeepRows(parsedResult.concat(phraseParsedRows), rawOnlyRows.concat(phraseRows));
                     deepSearchResults = applyDeepSearch(merged, filters, parsedQuery);
+                    if (descriptionQuery) deepSearchResults = deepSearchResults.filter(function(item) { return matchesDescriptionQuery(item, descriptionQuery); });
                 } else {
                     var parsedQueryBuilder = buildParsedFacetQuery(filters).order('id', { ascending: true });
                     var filteredParsed = await fetchPagedQuery(parsedQueryBuilder, requestId, 500);
