@@ -65,7 +65,7 @@
             <span class="dropbtn">Games ▼</span>
             <div class="dropdown-content">
                 <a href="daily.html">Daily</a>
-                <a href="zonequiz.html">Zone Quiz</a>
+                <!-- <a href="zonequiz.html">Zone Quiz</a> (hidden for now) -->
                 <a href="mobguess.html">Mob Guess</a>
             </div>
         </div>
@@ -135,23 +135,77 @@
         var streak = 0;
         var best = parseInt(localStorage.getItem('mobguess_best') || '0');
         var hintsUsed = 0;
-        var currentHintIdx = 0;
         var currentName = '';
-        var revealedLetters = [];
+        var revealCounts = [];
+        var MOB_CACHE_KEY = 'mobguess_pool_v3';
+
+        function shuffle(a) {
+            for (var i = a.length - 1; i > 0; i--) {
+                var j = Math.floor(Math.random() * (i + 1));
+                var t = a[i]; a[i] = a[j]; a[j] = t;
+            }
+            return a;
+        }
+
+        function normGuess(s) {
+            return String(s || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+
+        function isGoodMobName(name) {
+            var n = String(name || '').trim();
+            if (n.length < 3 || n.length > 40) return false;
+            if (/[0-9]|__|corpse|^a\s|^an\s|^the\s/i.test(n)) return false;
+            var words = n.split(/\s+/);
+            if (words.length > 5) return false;
+            // A bare three-letter name is not guessable from its initials.
+            if (words.length === 1 && n.length < 6) return false;
+            return true;
+        }
+
+        // The old code asked for 5000 rows but Supabase caps a response at
+        // 1000, so it only ever saw ~229 usable mobs out of 20,000. Page
+        // through a server-side filtered list instead.
+        async function fetchMobPool() {
+            try {
+                var cached = JSON.parse(sessionStorage.getItem(MOB_CACHE_KEY) || 'null');
+                if (cached && cached.names && cached.names.length > 100) return cached.names;
+            } catch (e) {}
+
+            var raw = [];
+            for (var page = 0; page < 8; page++) {
+                var res = await supabase.from('mobs_db')
+                    .select('name')
+                    .not('name', 'ilike', 'a %')
+                    .not('name', 'ilike', 'an %')
+                    .not('name', 'ilike', 'the %')
+                    .not('name', 'ilike', '%corpse%')
+                    .order('name', { ascending: true })
+                    .range(page * 1000, page * 1000 + 999);
+                if (!res.data || res.data.length === 0) break;
+                res.data.forEach(function(r) { if (r.name) raw.push(r.name); });
+                if (res.data.length < 1000) break;
+            }
+
+            var seen = {}, names = [];
+            raw.forEach(function(n) {
+                if (!isGoodMobName(n) || seen[n]) return;
+                seen[n] = 1;
+                names.push(n);
+            });
+
+            try { sessionStorage.setItem(MOB_CACHE_KEY, JSON.stringify({ names: names })); } catch (e) {}
+            return names;
+        }
 
         async function loadData() {
             document.getElementById('game-area').innerHTML = '<p class="empty">Loading mob data...</p>';
 
-            var { data } = await supabase.from('mobs_db').select('name').limit(5000);
+            mobPool = await fetchMobPool();
 
-            mobPool = (data || []).filter(function(m) {
-                var name = m.name;
-                if (!name) return false;
-                if (name.includes('corpse') || name.includes('corpse of')) return false;
-                if (name.startsWith('a ') || name.startsWith('an ') || name.startsWith('the ')) return false;
-                var wc = name.split(/\s+/).length;
-                return wc >= 1 && wc <= 6;
-            });
+            if (mobPool.length < TOTAL_QUESTIONS) {
+                document.getElementById('game-area').innerHTML = '<p class="empty">Could not load mob data. Reload to try again.</p>';
+                return;
+            }
 
             document.getElementById('best-num').textContent = best;
             startRound();
@@ -168,11 +222,8 @@
         }
 
         function buildQuestions() {
-            var shuffled = mobPool.slice().sort(function() { return Math.random() - 0.5; });
-            return shuffled.slice(0, TOTAL_QUESTIONS).map(function(m, i) {
-                var words = m.name.split(/\s+/);
-                var firstLetters = words.map(function(w) { return w[0]; }).join('');
-                return { name: m.name, firstLetters: firstLetters, id: i };
+            return shuffle(mobPool.slice()).slice(0, TOTAL_QUESTIONS).map(function(name, i) {
+                return { name: name, id: i };
             });
         }
 
@@ -182,11 +233,10 @@
                 return;
             }
 
-            currentHintIdx = 0;
             currentName = questions[qIndex].name;
-            revealedLetters = [];
             hintsUsed = 0;
             updateHints();
+            updateStats();
 
             var area = document.getElementById('game-area');
             area.innerHTML = '';
@@ -210,8 +260,12 @@
             var prompt = document.createElement('div');
             prompt.className = 'question-item';
             prompt.id = 'mob-prompt';
-            prompt.textContent = questions[qIndex].firstLetters.split('').join(' ');
             card.appendChild(prompt);
+
+            var lenHint = document.createElement('div');
+            lenHint.className = 'question-hint';
+            lenHint.id = 'hint-len';
+            card.appendChild(lenHint);
 
             var hintBtnRow = document.createElement('div');
             hintBtnRow.style.marginTop = '12px';
@@ -227,6 +281,7 @@
             card.appendChild(hintBtnRow);
 
             area.appendChild(card);
+            initPrompt();
 
             var feedback = document.createElement('div');
             feedback.className = 'feedback';
@@ -260,33 +315,65 @@
             document.getElementById('guess-input').focus();
         }
 
+        // Start with the first letter of each word, then reveal letters
+        // instead of giving away whole words.
+        function initPrompt() {
+            var words = currentName.split(/\s+/);
+            revealCounts = words.map(function(w) { return 1; });
+            renderPrompt();
+
+            var lenEl = document.getElementById('hint-len');
+            if (lenEl) {
+                var letters = currentName.replace(/[^A-Za-z]/g, '').length;
+                lenEl.textContent = words.length + (words.length === 1 ? ' word' : ' words') + ' · ' + letters + ' letters';
+            }
+        }
+
+        function renderPrompt() {
+            var words = currentName.split(/\s+/);
+            var parts = words.map(function(w, i) {
+                var show = revealCounts[i] || 0;
+                var out = '';
+                for (var c = 0; c < w.length; c++) out += (c < show ? w[c] : '·');
+                return out;
+            });
+            var prompt = document.getElementById('mob-prompt');
+            if (prompt) prompt.textContent = parts.join('   ');
+        }
+
+        function allRevealed() {
+            var words = currentName.split(/\s+/);
+            for (var i = 0; i < words.length; i++) {
+                if ((revealCounts[i] || 0) < words[i].length) return false;
+            }
+            return true;
+        }
+
         function showHint() {
-            if (hintsUsed >= MAX_HINTS) return;
+            if (hintsUsed >= MAX_HINTS || allRevealed()) return;
 
             hintsUsed++;
-            currentHintIdx++;
-            updateHints();
-
-            var nameWords = currentName.split(/\s+/);
-            if (currentHintIdx > nameWords.length) return;
-
-            var revealedWord = nameWords.slice(0, currentHintIdx).join(' ');
-            var prompt = document.getElementById('mob-prompt');
-            if (prompt) {
-                var remaining = nameWords.slice(currentHintIdx);
-                var remainingLetters = remaining.map(function(w) {
-                    return w.split('').fill('_').join('');
-                }).join(' ');
-                prompt.innerHTML = revealedWord + ' ' + remainingLetters;
+            var words = currentName.split(/\s+/);
+            for (var letters = 0; letters < 2; letters++) {
+                for (var i = 0; i < words.length; i++) {
+                    if ((revealCounts[i] || 0) < words[i].length) {
+                        revealCounts[i]++;
+                        break;
+                    }
+                }
             }
+
+            renderPrompt();
+            updateHints();
         }
 
         function updateHints() {
             document.getElementById('hint-num').textContent = MAX_HINTS - hintsUsed;
             var hintBtn = document.getElementById('hint-btn');
             if (hintBtn) {
-                hintBtn.disabled = hintsUsed >= MAX_HINTS;
-                hintBtn.style.opacity = hintsUsed >= MAX_HINTS ? '0.4' : '1';
+                var done = hintsUsed >= MAX_HINTS || (revealCounts.length > 0 && allRevealed());
+                hintBtn.disabled = done;
+                hintBtn.style.opacity = done ? '0.4' : '1';
             }
         }
 
@@ -301,8 +388,7 @@
             submitBtns.forEach(function(b) { if (b.textContent === 'Guess') b.disabled = true; });
 
             var q = questions[qIndex];
-            var actual = q.name.toLowerCase();
-            var isCorrect = guess === actual;
+            var isCorrect = normGuess(guess) === normGuess(q.name);
             var feedback = document.getElementById('feedback');
 
             if (isCorrect) {
@@ -326,7 +412,7 @@
             var nextRow = document.createElement('div');
             nextRow.className = 'next-row';
             var nextBtn = document.createElement('button');
-            nextBtn.textContent = qIndex === TOTAL_QUESTIONS - 1 ? 'See Results' : 'Next &#8594;';
+            nextBtn.textContent = qIndex === TOTAL_QUESTIONS - 1 ? 'See Results' : 'Next →';
             nextBtn.addEventListener('click', function() {
                 qIndex++;
                 nextQuestion();

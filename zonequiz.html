@@ -68,7 +68,7 @@
             <span class="dropbtn">Games ▼</span>
             <div class="dropdown-content">
                 <a href="daily.html">Daily</a>
-                <a href="zonequiz.html">Zone Quiz</a>
+                <!-- <a href="zonequiz.html">Zone Quiz</a> (hidden for now) -->
                 <a href="mobguess.html">Mob Guess</a>
             </div>
         </div>
@@ -146,6 +146,132 @@
         var best = parseInt(localStorage.getItem('zonequiz_best') || '0');
         var answered = false;
 
+        // ---------- pool building ----------
+        // The old pool was mostly vouchers, coin piles and hostel passes, and it
+        // trusted whatever zone came back first. We now keep real gear with a
+        // single recorded zone.
+        var BAD_TYPES = {
+            'food': 1, 'drink-container': 1, 'trash': 1, 'parchment': 1, 'key': 1,
+            'potion': 1, 'pill': 1, 'manual': 1, 'book': 1, 'spellbook': 1,
+            'seed': 1, 'plant': 1, 'resource': 1, 'warp-stone': 1, 'furniture': 1,
+            'explosive': 1, 'small': 1, 'large': 1
+        };
+        var JUNK_NAME = /^(?:\d|.*\b(?:voucher|credit|access to|page of|booklet|sign|coins|ticket|corpse)\b)/i;
+
+        function normName(s) {
+            s = String(s || '').trim().toLowerCase();
+            if (s.indexOf('a ') === 0) s = s.slice(2);
+            else if (s.indexOf('an ') === 0) s = s.slice(3);
+            else if (s.indexOf('the ') === 0) s = s.slice(4);
+            return s.replace(/\s+/g, ' ');
+        }
+
+        function isGoodGear(name, gear) {
+            if (!gear || !gear.affects || gear.affects.length === 0) return false;
+            if (BAD_TYPES[String(gear.type || '').toLowerCase()]) return false;
+            if (!name || name.length > 50 || name.indexOf('__') >= 0) return false;
+            if (JUNK_NAME.test(name)) return false;
+            return true;
+        }
+
+        function shuffle(a) {
+            for (var i = a.length - 1; i > 0; i--) {
+                var j = Math.floor(Math.random() * (i + 1));
+                var t = a[i]; a[i] = a[j]; a[j] = t;
+            }
+            return a;
+        }
+
+        async function loadGearMap() {
+            var map = {};
+            for (var page = 0; page < 4; page++) {
+                var res = await supabase.from('equipment_parsed')
+                    .select('name, type, affects, when_procs, grants_knowledge')
+                    .neq('affects', '[]')
+                    .order('name', { ascending: true })
+                    .range(page * 1000, page * 1000 + 999);
+                if (!res.data || res.data.length === 0) break;
+                res.data.forEach(function(row) { map[normName(row.name)] = row; });
+            }
+            return map;
+        }
+
+        async function countCompleteLocations() {
+            var res = await supabase.from('itemsloc_db')
+                .select('itemid', { count: 'exact', head: true })
+                .not('area', 'is', null)
+                .neq('area', '')
+                .neq('area', '-')
+                .not('mobid', 'is', null)
+                .neq('mobid', '');
+            return res.count || 0;
+        }
+
+        async function fetchLocWindow(offset, limit) {
+            var res = await supabase.from('itemsloc_db')
+                .select('itemid, area, mobid')
+                .not('area', 'is', null)
+                .neq('area', '')
+                .neq('area', '-')
+                .not('mobid', 'is', null)
+                .neq('mobid', '')
+                .order('itemid', { ascending: true })
+                .range(offset, offset + limit - 1);
+            return res.data || [];
+        }
+
+        async function nameMapForIds(ids) {
+            var map = {};
+            for (var i = 0; i < ids.length; i += 100) {
+                var batch = ids.slice(i, i + 100);
+                var res = await supabase.from('items_db').select('itemid, name').in('itemid', batch);
+                (res.data || []).forEach(function(row) { map[String(row.itemid)] = row.name; });
+            }
+            return map;
+        }
+
+        async function buildCandidates(gearMap, offset, limit) {
+            var rows = await fetchLocWindow(offset, limit);
+            if (rows.length === 0) return [];
+
+            var ids = [];
+            rows.forEach(function(r) {
+                var id = String(r.itemid);
+                if (ids.indexOf(id) < 0) ids.push(id);
+            });
+            var nameMap = await nameMapForIds(ids);
+
+            var seen = {}, out = [];
+            rows.forEach(function(r) {
+                var id = String(r.itemid);
+                var name = nameMap[id];
+                if (!name || seen[name]) return;
+                var gear = gearMap[normName(name)];
+                if (!isGoodGear(name, gear)) return;
+                seen[name] = true;
+                out.push({ itemid: id, name: name, type: gear.type || 'unknown', zone: r.area });
+            });
+            return out;
+        }
+
+        async function zonesForIds(ids) {
+            var map = {};
+            for (var i = 0; i < ids.length; i += 100) {
+                var batch = ids.slice(i, i + 100);
+                var res = await supabase.from('itemsloc_db')
+                    .select('itemid, area')
+                    .not('area', 'is', null)
+                    .in('itemid', batch)
+                    .limit(1000);
+                (res.data || []).forEach(function(row) {
+                    var id = String(row.itemid);
+                    if (!map[id]) map[id] = new Set();
+                    map[id].add(row.area);
+                });
+            }
+            return map;
+        }
+
         window.setDiff = function(d) {
             diff = d;
             document.querySelectorAll('.diff-btn').forEach(function(b) { b.classList.remove('active'); });
@@ -154,48 +280,58 @@
         };
 
         async function loadData() {
-            document.getElementById('game-area').innerHTML = '<p class="empty">Loading...</p>';
+            var area = document.getElementById('game-area');
+            area.innerHTML = '<p class="empty">Loading quiz data...</p>';
 
-            var result = await supabase.rpc('get_quiz_items');
-
-            if (!result.data || result.data.length < 20) {
-                var r = await supabase.from('itemsloc_db')
-                    .select('itemid, area')
-                    .not('area', 'is', null)
-                    .neq('area', '')
-                    .neq('area', '-')
-                    .limit(5000);
-
-                var byItem = {};
-                (r.data || []).forEach(function(row) {
-                    if (!byItem[row.itemid]) byItem[row.itemid] = new Set();
-                    byItem[row.itemid].add(row.area);
-                });
-
-                var singleZoneIds = Object.keys(byItem).filter(function(id) { return byItem[id].size === 1; });
-                var nameMap = {};
-                for (var i = 0; i < singleZoneIds.length; i += 200) {
-                    var batch = singleZoneIds.slice(i, i + 200);
-                    var nr = await supabase.from('items_db').select('itemid, name').in('itemid', batch);
-                    (nr.data || []).forEach(function(row) { nameMap[String(row.itemid)] = row.name; });
-                }
-
-                pool = [];
-                singleZoneIds.forEach(function(id) {
-                    var name = nameMap[id];
-                    if (name && !name.includes('corpse') && !name.includes('gold coins') && name.length < 50) {
-                        pool.push({ name: name, zone: Array.from(byItem[id])[0] });
-                    }
-                });
-
-                zones = [...new Set(pool.map(function(p) { return p.zone; }))].sort();
-            } else {
-                pool = result.data.filter(function(r) {
-                    return r.name && !r.name.includes('corpse') && !r.name.includes('gold coins') && r.name.length < 50;
-                });
-                zones = [...new Set(pool.map(function(p) { return p.zone; }))].sort();
+            var gearMap = await loadGearMap();
+            var total = await countCompleteLocations();
+            if (total === 0) {
+                area.innerHTML = '<p class="empty">No item location data available.</p>';
+                return;
             }
 
+            // Sample a few windows of located items and keep the good gear.
+            var windowSize = 200;
+            var maxOffset = Math.max(0, total - windowSize);
+            var candidates = [];
+            var seen = {};
+
+            for (var w = 0; w < 3; w++) {
+                var offset = Math.floor(Math.random() * (maxOffset + 1));
+                offset = offset - (offset % 20);
+                var found = await buildCandidates(gearMap, offset, windowSize);
+                found.forEach(function(c) {
+                    var key = normName(c.name);
+                    if (seen[key]) return;
+                    seen[key] = true;
+                    candidates.push(c);
+                });
+            }
+
+            if (candidates.length === 0) {
+                area.innerHTML = '<p class="empty">Could not load quiz items. Reload to try again.</p>';
+                return;
+            }
+
+            shuffle(candidates);
+            var subset = candidates.slice(0, 60);
+            var zoneMap = await zonesForIds(subset.map(function(c) { return c.itemid; }));
+
+            // Only ask about items with exactly one recorded zone, so the
+            // correct answer is never one of several valid zones.
+            pool = [];
+            subset.forEach(function(c) {
+                var zs = zoneMap[c.itemid];
+                if (!zs || zs.size !== 1) return;
+                pool.push({ name: c.name, zone: Array.from(zs)[0], type: c.type });
+            });
+
+            if (pool.length < TOTAL_QUESTIONS) {
+                area.innerHTML = '<p class="empty">Not enough verified items to build a round. Reload to try again.</p>';
+                return;
+            }
+
+            zones = Array.from(new Set(pool.map(function(p) { return p.zone; }))).sort();
             document.getElementById('best-num').textContent = best;
             startRound();
         }
@@ -210,8 +346,7 @@
         }
 
         function buildQuestions() {
-            var shuffled = pool.slice().sort(function() { return Math.random() - 0.5; });
-            return shuffled.slice(0, TOTAL_QUESTIONS);
+            return shuffle(pool.slice()).slice(0, TOTAL_QUESTIONS);
         }
 
         function nextQuestion() {
@@ -221,13 +356,12 @@
             }
 
             answered = false;
+            updateStats();
             var q = questions[qIndex];
             var numChoices = DIFF_CHOICES[diff];
 
-            var wrongZones = zones.filter(function(z) { return z !== q.zone; });
-            wrongZones.sort(function() { return Math.random() - 0.5; });
-            var choices = [q.zone].concat(wrongZones.slice(0, numChoices - 1));
-            choices.sort(function() { return Math.random() - 0.5; });
+            var wrongZones = shuffle(zones.filter(function(z) { return z !== q.zone; }));
+            var choices = shuffle([q.zone].concat(wrongZones.slice(0, numChoices - 1)));
 
             renderQuestion(q, choices);
         }
@@ -248,7 +382,7 @@
             card.className = 'question-card';
             card.innerHTML = '<div class="question-label">Which zone does this item drop in?</div>'
                 + '<div class="question-item">' + escHtml(q.name) + '</div>'
-                + '<div class="question-hint"><a href="item.html?name=' + encodeURIComponent(q.name) + '" target="_blank" style="color:#555;font-size:11px;">View item &#8594;</a></div>';
+                + '<div class="question-hint" id="q-link"></div>';
             area.appendChild(card);
 
             var feedback = document.createElement('div');
@@ -262,7 +396,7 @@
                 var btn = document.createElement('button');
                 btn.className = 'choice-btn';
                 btn.textContent = zone;
-                btn.addEventListener('click', function() { handleChoice(zone, q.zone, choices); });
+                btn.addEventListener('click', function() { handleChoice(zone, q, choices); });
                 grid.appendChild(btn);
             });
             area.appendChild(grid);
@@ -272,7 +406,7 @@
             nextRow.id = 'next-row';
             nextRow.style.display = 'none';
             var nextBtn = document.createElement('button');
-            nextBtn.textContent = qIndex === TOTAL_QUESTIONS - 1 ? 'See Results' : 'Next &#8594;';
+            nextBtn.textContent = qIndex === TOTAL_QUESTIONS - 1 ? 'See Results' : 'Next →';
             nextBtn.addEventListener('click', function() {
                 qIndex++;
                 nextQuestion();
@@ -281,10 +415,11 @@
             area.appendChild(nextRow);
         }
 
-        function handleChoice(chosen, correct, choices) {
+        function handleChoice(chosen, q, choices) {
             if (answered) return;
             answered = true;
 
+            var correct = q.zone;
             var isCorrect = chosen === correct;
             var feedback = document.getElementById('feedback');
 
@@ -297,6 +432,14 @@
                 }
             });
 
+            // Only link the item page once the answer is locked in — it lists
+            // the known locations.
+            var linkEl = document.getElementById('q-link');
+            if (linkEl) {
+                linkEl.innerHTML = '<a href="item.html?name=' + encodeURIComponent(q.name)
+                    + '" target="_blank" style="color:#8787FF;font-size:11px;">View item &#8594;</a>';
+            }
+
             if (isCorrect) {
                 score++;
                 streak++;
@@ -305,7 +448,7 @@
             } else {
                 streak = 0;
                 feedback.className = 'feedback wrong';
-                feedback.textContent = '&#10007; It was ' + correct;
+                feedback.innerHTML = '&#10007; It was ' + escHtml(correct);
             }
 
             updateStats();

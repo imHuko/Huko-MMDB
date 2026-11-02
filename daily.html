@@ -70,7 +70,7 @@
             <span class="dropbtn">Games ▼</span>
             <div class="dropdown-content">
                 <a href="daily.html">Daily</a>
-                <a href="zonequiz.html">Zone Quiz</a>
+                <!-- <a href="zonequiz.html">Zone Quiz</a> (hidden for now) -->
                 <a href="mobguess.html">Mob Guess</a>
             </div>
         </div>
@@ -136,8 +136,14 @@
 
         function getStatHint(item) {
             if (item.affects && item.affects.length > 0) {
-                var a = item.affects[0];
-                return 'Affects ' + a.stat + ' by ' + a.value + '. {' + a.frequency + '}';
+                var parts = item.affects.slice(0, 2).map(function(a) {
+                    var v = a.value;
+                    var sign = (typeof v === 'number' && v > 0) ? '+' : '';
+                    return a.stat + ' ' + sign + v;
+                });
+                var more = item.affects.length > 2 ? ' (+' + (item.affects.length - 2) + ' more)' : '';
+                var freq = item.affects[0].frequency ? ' {' + item.affects[0].frequency + '}' : '';
+                return 'Affects ' + parts.join(', ') + more + freq;
             }
             if (item.when_procs && item.when_procs.length > 0) {
                 var w = item.when_procs[0];
@@ -149,10 +155,6 @@
             if (item.grants_knowledge && item.grants_knowledge.length > 0) {
                 var g = item.grants_knowledge[0];
                 return 'Grants knowledge of \'' + g.skill + '\' by ' + g.pct + '%. {' + g.frequency + '}';
-            }
-            if (item.procs && item.procs.length > 0) {
-                var raw = item.procs[0].replace(/^\++\s*/, '');
-                return raw.length > 150 ? raw.slice(0, 150) + '...' : raw;
             }
             return 'No stat data';
         }
@@ -166,6 +168,147 @@
             // Days since epoch, multiplied by golden-ratio prime to scatter
             // consecutive-day indices far apart.
             return (Math.floor(Date.now() / 86400000) * 2654435761) >>> 0;
+        }
+
+        // ---------- item quality ----------
+        // The database holds a lot of non-gear (food, vouchers, gold coins,
+        // parchments, keys). Only items with real stat bonuses are good
+        // puzzle material.
+        var BAD_TYPES = {
+            'food': 1, 'drink-container': 1, 'trash': 1, 'parchment': 1, 'key': 1,
+            'potion': 1, 'pill': 1, 'manual': 1, 'book': 1, 'spellbook': 1,
+            'seed': 1, 'plant': 1, 'resource': 1, 'warp-stone': 1, 'furniture': 1,
+            'explosive': 1, 'small': 1, 'large': 1
+        };
+        var JUNK_NAME = /^(?:\d|.*\b(?:voucher|credit|access to|page of|booklet|sign|coins|ticket|corpse)\b)/i;
+
+        function normName(s) {
+            s = String(s || '').trim().toLowerCase();
+            if (s.indexOf('a ') === 0) s = s.slice(2);
+            else if (s.indexOf('an ') === 0) s = s.slice(3);
+            else if (s.indexOf('the ') === 0) s = s.slice(4);
+            return s.replace(/\s+/g, ' ');
+        }
+
+        function isGoodGear(name, gear) {
+            if (!gear || !gear.affects || gear.affects.length === 0) return false;
+            if (BAD_TYPES[String(gear.type || '').toLowerCase()]) return false;
+            if (!name || name.length > 50 || name.indexOf('__') >= 0) return false;
+            if (JUNK_NAME.test(name)) return false;
+            return true;
+        }
+
+        async function loadGearMap() {
+            var map = {};
+            for (var page = 0; page < 4; page++) {
+                var res = await supabase.from('equipment_parsed')
+                    .select('name, type, affects, when_procs, grants_knowledge')
+                    .neq('affects', '[]')
+                    .order('name', { ascending: true })
+                    .range(page * 1000, page * 1000 + 999);
+                if (!res.data || res.data.length === 0) break;
+                res.data.forEach(function(row) { map[normName(row.name)] = row; });
+            }
+            return map;
+        }
+
+        async function countCompleteLocations() {
+            var res = await supabase.from('itemsloc_db')
+                .select('itemid', { count: 'exact', head: true })
+                .not('area', 'is', null)
+                .neq('area', '')
+                .neq('area', '-')
+                .not('mobid', 'is', null)
+                .neq('mobid', '');
+            return res.count || 0;
+        }
+
+        async function fetchLocWindow(offset, limit) {
+            var res = await supabase.from('itemsloc_db')
+                .select('itemid, area, mobid')
+                .not('area', 'is', null)
+                .neq('area', '')
+                .neq('area', '-')
+                .not('mobid', 'is', null)
+                .neq('mobid', '')
+                .order('itemid', { ascending: true })
+                .range(offset, offset + limit - 1);
+            return res.data || [];
+        }
+
+        async function nameMapForIds(ids) {
+            var map = {};
+            for (var i = 0; i < ids.length; i += 100) {
+                var batch = ids.slice(i, i + 100);
+                var res = await supabase.from('items_db').select('itemid, name').in('itemid', batch);
+                (res.data || []).forEach(function(row) { map[String(row.itemid)] = row.name; });
+            }
+            return map;
+        }
+
+        async function mobNameMapForIds(ids) {
+            var map = {};
+            for (var i = 0; i < ids.length; i += 100) {
+                var batch = ids.slice(i, i + 100);
+                var res = await supabase.from('mobs_db').select('mobid, name').in('mobid', batch);
+                (res.data || []).forEach(function(row) { map[String(row.mobid)] = row.name; });
+            }
+            return map;
+        }
+
+        async function buildCandidates(gearMap, offset, limit) {
+            var rows = await fetchLocWindow(offset, limit);
+            if (rows.length === 0) return [];
+
+            var ids = [];
+            rows.forEach(function(r) {
+                var id = String(r.itemid);
+                if (ids.indexOf(id) < 0) ids.push(id);
+            });
+            var nameMap = await nameMapForIds(ids);
+
+            var seen = {}, out = [];
+            rows.forEach(function(r) {
+                var id = String(r.itemid);
+                var name = nameMap[id];
+                if (!name || seen[name]) return;
+                var gear = gearMap[normName(name)];
+                if (!isGoodGear(name, gear)) return;
+                seen[name] = true;
+                out.push({ name: name, type: gear.type || 'unknown', zone: r.area, mobid: String(r.mobid), gear: gear });
+            });
+            if (out.length === 0) return [];
+
+            // Only keep drops whose mob is actually in mobs_db, so the
+            // "Dropped By" hint is always real.
+            var mobIds = [];
+            out.forEach(function(c) { if (mobIds.indexOf(c.mobid) < 0) mobIds.push(c.mobid); });
+            var mobNames = await mobNameMapForIds(mobIds);
+
+            out = out.filter(function(c) { return !!mobNames[c.mobid]; });
+            out.forEach(function(c) { c.mob = mobNames[c.mobid]; });
+
+            out.sort(function(a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
+            return out;
+        }
+
+        function readCachedItem() {
+            try {
+                var raw = localStorage.getItem('hukodb_daily_item');
+                if (!raw) return null;
+                var c = JSON.parse(raw);
+                if (!c || c.day !== todayKey || !c.item) return null;
+                return c.item;
+            } catch (e) { return null; }
+        }
+
+        function cacheItem(item) {
+            try { localStorage.setItem('hukodb_daily_item', JSON.stringify({ day: todayKey, item: item })); } catch (e) {}
+        }
+
+        function showLoadError(msg) {
+            document.getElementById('game-area').innerHTML =
+                '<p style="text-align:center;color:#ff4444;">' + escHtml(msg) + '</p>';
         }
 
         function loadState() {
@@ -190,99 +333,52 @@
         }
 
         async function loadGame() {
-            // Fetch all items in pages of 1000 (Supabase server caps at 1000 per request)
-            var allItems = [];
-            var pageSize = 1000;
-            for (var page = 0; page < 8; page++) {
-                var from = page * pageSize;
-                var to = from + pageSize - 1;
-                var res = await supabase.from('equipment_parsed')
-                    .select('name, type, level_req, affects, when_procs, grants_knowledge, procs')
-                    .order('name', { ascending: true })
-                    .range(from, to);
-                if (!res.data || res.data.length === 0) break;
-                allItems = allItems.concat(res.data);
-            }
-
-            // Only include items with actual stat hints (affects, procs, etc.)
-            var items = allItems.filter(function(item) {
-                return (item.affects && item.affects.length > 0)
-                    || (item.when_procs && item.when_procs.length > 0)
-                    || (item.grants_knowledge && item.grants_knowledge.length > 0)
-                    || (item.procs && item.procs.length > 0);
-            });
-            console.log('[daily] total:', allItems.length, 'with hints:', items.length);
-
-            if (items.length === 0) {
-                document.getElementById('game-area').innerHTML = '<p style="color:#ff4444;">No items with stats available.</p>';
+            var cached = readCachedItem();
+            if (cached) {
+                itemData = cached;
+                updateStats();
+                renderGame();
                 return;
             }
 
-            // Try items from the seed until we find one with all hints populated
-            var startIdx = dateSeed() % items.length;
-            itemData = null;
-            for (var offset = 0; offset < items.length; offset++) {
-                var idx = (startIdx + offset) % items.length;
-                var candidate = items[idx];
-
-                var itemType = candidate.type || 'unknown';
-                var statHint = getStatHint(candidate);
-
-                var zone = 'Unknown';
-                var mobName = 'Unknown';
-                var itemsDbRes = await supabase.from('items_db').select('itemid').ilike('name', candidate.name).limit(1);
-                var itemId = itemsDbRes.data && itemsDbRes.data.length > 0 ? itemsDbRes.data[0].itemid : null;
-                if (itemId) {
-                    var locRes = await supabase.from('itemsloc_db').select('area, mobid').eq('itemid', String(itemId)).limit(1);
-                    if (locRes.data && locRes.data.length > 0) {
-                        zone = locRes.data[0].area || 'Unknown';
-                        var mobId = locRes.data[0].mobid;
-                        if (mobId) {
-                            var mobRes = await supabase.from('mobs_db').select('name').eq('mobid', String(mobId)).limit(1);
-                            if (mobRes.data && mobRes.data.length > 0) mobName = mobRes.data[0].name;
-                        }
-                    }
-                }
-
-                if (zone !== 'Unknown' && mobName !== 'Unknown') {
-                    itemData = candidate;
-                    itemData._zone = zone;
-                    itemData._mob  = mobName;
-                    itemData._type = itemType;
-                    itemData._stat = statHint;
-                    console.log('[daily] picked idx:', idx, 'name:', itemData.name);
-                    break;
-                }
-                console.log('[daily] skip idx:', idx, 'name:', candidate.name, '(zone/mob unknown)');
+            var seed = dateSeed();
+            var gearMap = await loadGearMap();
+            var total = await countCompleteLocations();
+            if (total === 0) {
+                showLoadError('No item location data is available right now.');
+                return;
             }
 
-            // Fallback: use the seed item even if hints are incomplete
-            if (!itemData) {
-                var idx = startIdx % items.length;
-                itemData = items[idx];
-                var itemType = itemData.type || 'unknown';
-                var zone = 'Unknown';
-                var mobName = 'Unknown';
-                var itemsDbRes = await supabase.from('items_db').select('itemid').ilike('name', itemData.name).limit(1);
-                var itemId = itemsDbRes.data && itemsDbRes.data.length > 0 ? itemsDbRes.data[0].itemid : null;
-                if (itemId) {
-                    var locRes = await supabase.from('itemsloc_db').select('area, mobid').eq('itemid', String(itemId)).limit(1);
-                    if (locRes.data && locRes.data.length > 0) {
-                        zone = locRes.data[0].area || 'Unknown';
-                        var mobId = locRes.data[0].mobid;
-                        if (mobId) {
-                            var mobRes = await supabase.from('mobs_db').select('name').eq('mobid', String(mobId)).limit(1);
-                            if (mobRes.data && mobRes.data.length > 0) mobName = mobRes.data[0].name;
-                        }
-                    }
-                }
-                itemData._zone = zone;
-                itemData._mob  = mobName;
-                itemData._type = itemType;
-                itemData._stat = getStatHint(itemData);
-                console.log('[daily] fallback idx:', idx, 'name:', itemData.name);
+            // Walk a deterministic window of located items until we find
+            // something worth guessing: real stats, gear type, known zone+mob.
+            var windowSize = 200;
+            var maxOffset = Math.max(0, total - windowSize);
+            var chosen = null;
+
+            for (var attempt = 0; attempt < 5 && !chosen; attempt++) {
+                var offset = (seed + attempt * 9973) % (maxOffset + 1);
+                offset = offset - (offset % 20);
+
+                var candidates = await buildCandidates(gearMap, offset, windowSize);
+                if (candidates.length === 0) continue;
+
+                var pick = candidates[(seed >>> 3) % candidates.length];
+                chosen = {
+                    name: pick.name,
+                    _type: pick.type,
+                    _zone: pick.zone,
+                    _mob: pick.mob,
+                    _stat: getStatHint(pick.gear)
+                };
             }
 
+            if (!chosen) {
+                showLoadError('Could not load today\'s item. Reload the page to try again.');
+                return;
+            }
+
+            itemData = chosen;
+            cacheItem(chosen);
             updateStats();
             renderGame();
         }
