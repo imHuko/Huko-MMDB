@@ -182,16 +182,26 @@
             return a;
         }
 
-        async function loadGearMap() {
+        // Stat data lives in the item description, the same text the item pages
+        // read, so the quiz parses the lines it needs directly.
+        function parseGearText(description) {
+            var affects = [];
+            String(description || '').split(/[\r\n]+/).forEach(function(line) {
+                var text = line.trim();
+                var affect = text.match(/^Affects\s+([a-z][a-z0-9-]*)\s+by\s+(-?\d+(?:\.\d+)?)/i);
+                if (!affect || text.indexOf('(Requires ') >= 0) return; // skip set bonuses
+                affects.push({ stat: affect[1].toLowerCase(), value: Number(affect[2]) });
+            });
+            return affects;
+        }
+
+        async function gearForNames(names) {
             var map = {};
-            for (var page = 0; page < 4; page++) {
-                var res = await supabase.from('equipment_parsed')
-                    .select('name, type, affects, when_procs, grants_knowledge')
-                    .neq('affects', '[]')
-                    .order('name', { ascending: true })
-                    .range(page * 1000, page * 1000 + 999);
-                if (!res.data || res.data.length === 0) break;
-                res.data.forEach(function(row) { map[normName(row.name)] = row; });
+            for (var i = 0; i < names.length; i += 100) {
+                var res = await supabase.from('equipment')
+                    .select('name, type, description')
+                    .in('name', names.slice(i, i + 100));
+                (res.data || []).forEach(function(row) { map[normName(row.name)] = row; });
             }
             return map;
         }
@@ -230,7 +240,7 @@
             return map;
         }
 
-        async function buildCandidates(gearMap, offset, limit) {
+        async function buildCandidates(offset, limit) {
             var rows = await fetchLocWindow(offset, limit);
             if (rows.length === 0) return [];
 
@@ -241,13 +251,22 @@
             });
             var nameMap = await nameMapForIds(ids);
 
+            var wanted = [];
+            rows.forEach(function(r) {
+                var name = nameMap[String(r.itemid)];
+                if (name && wanted.indexOf(name) < 0) wanted.push(name);
+            });
+            var gearByName = await gearForNames(wanted);
+
             var seen = {}, out = [];
             rows.forEach(function(r) {
                 var id = String(r.itemid);
                 var name = nameMap[id];
                 if (!name || seen[name]) return;
-                var gear = gearMap[normName(name)];
-                if (!isGoodGear(name, gear)) return;
+                var gear = gearByName[normName(name)];
+                if (!gear) return;
+                var affects = parseGearText(gear.description);
+                if (!isGoodGear(name, { type: gear.type, affects: affects })) return;
                 seen[name] = true;
                 out.push({ itemid: id, name: name, type: gear.type || 'unknown', zone: r.area });
             });
@@ -283,7 +302,6 @@
             var area = document.getElementById('game-area');
             area.innerHTML = '<p class="empty">Loading quiz data...</p>';
 
-            var gearMap = await loadGearMap();
             var total = await countCompleteLocations();
             if (total === 0) {
                 area.innerHTML = '<p class="empty">No item location data available.</p>';
@@ -299,7 +317,7 @@
             for (var w = 0; w < 3; w++) {
                 var offset = Math.floor(Math.random() * (maxOffset + 1));
                 offset = offset - (offset % 20);
-                var found = await buildCandidates(gearMap, offset, windowSize);
+                var found = await buildCandidates(offset, windowSize);
                 found.forEach(function(c) {
                     var key = normName(c.name);
                     if (seen[key]) return;

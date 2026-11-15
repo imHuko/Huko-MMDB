@@ -149,6 +149,7 @@
                 <option value="treasure">Treasure</option>
                 <option value="key">Key</option>
                 <option value="book">Book</option>
+                <option value="light">Light</option>
                 <option value="other">Other</option>
             </select>
             
@@ -187,6 +188,7 @@
                 <option value="legs">Legs</option><option value="feet">Feet</option>
                 <option value="shield">Shield</option><option value="hold">Hold</option>
                 <option value="wield">Wield</option><option value="back">Back</option>
+                <option value="light">Light (light source)</option>
             </select>
             
             <select id="filter-material">
@@ -465,9 +467,11 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
             var source = document.getElementById('filter-source').value;
             
             // Description filters - PostgREST ANDs multiple ilike on same column
-            if (itemType) query = query.ilike('description', '%is type ' + itemType + '%');
+            if (itemType === 'light') query = query.ilike('type', 'light');
+            else if (itemType) query = query.ilike('description', '%is type ' + itemType + '%');
             if (weaponType) query = query.ilike('description', '%Your ' + weaponType + '%');
-            if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
+            if (wearSlot === 'light') query = query.ilike('type', 'light');
+            else if (wearSlot) query = query.ilike('description', '%on the ' + wearSlot + '%');
             if (material) query = query.ilike('description', '%made of ' + material + '%');
             if (activeAffects.length > 0) {
                 for (var af = 0; af < activeAffects.length; af++) {
@@ -558,32 +562,7 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
         var deepSearchTotalCount = null;
         var deepSearchRequest = 0;
 
-        var PARSED_SEARCH_COLUMNS = [
-            'id','name','type','level_req','slot','verified','alignment','material','condition','equipped',
-            'keywords','attributes','weapon_type','damage_tier','damage_type','accuracy_tier','range_tier',
-            'crit_tier','crit_multiplier','crit_penalty','special_weapon_attrs','armor_resistance',
-            'container_capacity','container_max_st','container_max_pb','container_flags','container_open',
-            'sustenance_minutes','drink_current','drink_max','drink_liquid','light_minutes','spell_level',
-            'spell_name','charges_current','charges_max','spellbook_count','spellbook_max','spellbook_base',
-            'spellbook_complexity','herb_group','herb_power','instrument_type','instrument_subtype',
-            'instrument_complexity','explosive_damage','seed_minutes','telescope_magnification','fountain_spell',
-            'warp_destination','warp_area','warp_charges','tool_type','tool_uses_current','tool_uses_max',
-            'tool_stamina','key_uses','key_unlimited','gold_attraction_pct','ink_ounces','gold_coins',
-            'resource_count','resource_name','ship_name','manual_skill','manual_points','quiver_ammo_type',
-            'quiver_sp','ammo_count','ammo_type','ammo_damage_modifier','ammo_sp','ammo_special_attrs',
-            'surge_charges','lifespan_days','expires_on','renewable','relic_slots','relic_properties','affects',
-            'casts_spell_level','casts_spell_name','requirements','weapon_special_attr','weapon_special_pct','weapon_special_per_attack','repair_count','repair_renewal',
-            'limit_per_char','vanish_date','nodecay_date','set_name','set_items','set_bonuses','set_min_level',
-            'set_level_range','artifice_result','artifice_ingredients','procs','when_procs','mount_weight',
-            'level_adjusted_pct','grants_knowledge','roadsign_directions','clock_time','clock_day',
-            'clock_month','clock_date','clock_year','npc_tell','flavor_text','_raw','has_random_relics'
-        ].join(',');
-        var DEEP_SEARCH_COLUMNS = [
-            'name','type','material','equipped','weapon_type','damage_type','spell_name','resource_name','ship_name',
-            'manual_skill','quiver_ammo_type','ammo_type','fountain_spell','warp_destination','warp_area',
-            'tool_type','set_name','artifice_result','flavor_text','_raw'
-        ];
-        var ORDINARY_ITEM_TYPES = ['weapon','armor','ring','jewelry','scroll','potion','wand','food','drink','herb','pill','clothing','treasure','key','book'];
+        var ORDINARY_ITEM_TYPES = ['weapon','armor','ring','jewelry','scroll','potion','wand','food','drink','herb','pill','clothing','treasure','key','book','light'];
         var SEARCH_STOP_WORDS = new Set(['a','an','the','and','or','of','to','for','with','from','in','on','by','is','it','this','that','as']);
 
         function normalizeSearchText(value) {
@@ -667,49 +646,19 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
             return value.replace(/[%_\\]/g, '\\$&').replace(/[(),]/g, ' ');
         }
 
-        function buildDeepTextQuery(table, token) {
-            var query = table === 'equipment_parsed'
-                ? supabase.from(table).select(PARSED_SEARCH_COLUMNS, { count: 'exact' })
-                : supabase.from(table).select('id,name,type,slot,level_req,weight,value,description,properties,verified');
-            var safe = escapePostgrestToken(token);
-            var columns = table === 'equipment_parsed' ? DEEP_SEARCH_COLUMNS : ['name','description'];
-            var filters = columns.map(function(column) { return column + '.ilike.%' + safe + '%'; });
-            return query.or(filters.join(','));
-        }
-
-        function buildParsedFacetQuery(filters) {
-            var query = supabase.from('equipment_parsed').select(PARSED_SEARCH_COLUMNS, { count: 'exact' });
-            if (filters.type && filters.type !== 'other') {
-                var types = filters.type === 'jewelry' ? ['ring','jewelry'] : filters.type === 'wand' ? ['wand','magical wand'] : [filters.type];
-                query = query.in('type', types);
-            } else if (filters.type === 'other') {
-                query = query.not('type', 'in', '({"' + ORDINARY_ITEM_TYPES.join('","') + '"})');
-            }
-            if (filters.weaponType) query = query.ilike('weapon_type', '%' + escapePostgrestToken(filters.weaponType) + '%');
-            if (filters.material) query = query.ilike('material', filters.material);
-            if (filters.minLevel) query = query.gte('level_req', Number(filters.minLevel));
-            if (filters.maxLevel) query = query.lte('level_req', Number(filters.maxLevel));
-            if (filters.source === 'eqdb') query = query.eq('verified', true);
-            if (filters.source === 'personal') query = query.eq('verified', false);
-            if (filters.affects.length) {
-                filters.affects.forEach(function(stat) {
-                    query = query.filter('affects', 'cs', JSON.stringify([{ stat: stat }]));
-                });
-            }
-            return query;
-        }
-
         function buildEquipmentFacetQuery(filters) {
             var query = supabase.from('equipment').select('id,name,type,slot,level_req,weight,value,description,properties,verified');
             if (filters.type && filters.type !== 'other') {
                 var typeText = filters.type === 'jewelry' ? 'jewelry' : filters.type;
-                query = query.ilike('type', '%' + typeText + '%');
+                // ilike with wildcards would let 'light' also match 'lightning'
+                query = filters.type === 'light' ? query.ilike('type', 'light') : query.ilike('type', '%' + escapePostgrestToken(typeText) + '%');
             }
             if (filters.type === 'other') {
                 query = query.not('type', 'in', '({"' + ORDINARY_ITEM_TYPES.join('","') + '"})');
             }
             if (filters.weaponType) query = query.ilike('description', '%Your ' + escapePostgrestToken(filters.weaponType) + '%');
-            if (filters.wearSlot) query = query.ilike('description', '%' + filters.wearSlot + '%');
+            if (filters.wearSlot === 'light') query = query.ilike('type', 'light');
+            else if (filters.wearSlot) query = query.ilike('description', '%' + escapePostgrestToken(filters.wearSlot) + '%');
             if (filters.material) query = query.ilike('description', '%made of ' + filters.material + '%');
             filters.affects.forEach(function(stat) { query = query.ilike('description', '%Affects ' + stat + '%'); });
             if (filters.whenProc) query = query.or('description.ilike.%When %,description.ilike.%+++%');
@@ -735,19 +684,6 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
         }
 
 
-        async function fetchExactDescriptionRows(names) {
-            var rows = [];
-            for (var from = 0; from < names.length; from += 50) {
-                var nameBatch = names.slice(from, from + 50);
-                var result = await supabase.from('equipment')
-                    .select('id,name,type,slot,level_req,weight,value,description,properties,verified')
-                    .in('name', nameBatch);
-                if (result.error) throw new Error('equipment descriptions: ' + result.error.message);
-                rows = rows.concat(result.data || []);
-            }
-            return rows;
-        }
-
         async function fetchRawDescriptionSearch(tokens, requestId) {
             if (!tokens.length) return [];
             var tokenRows = await Promise.all(tokens.map(async function(token) {
@@ -760,30 +696,6 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
             return Array.from(rowsById.values());
         }
 
-        function mergeDeepRows(parsedRows, equipmentRows) {
-            var merged = new Map();
-            parsedRows.forEach(function(row) {
-                var key = normalizeSearchText(row.name);
-                if (!key) return;
-                var existing = merged.get(key) || {};
-                merged.set(key, Object.assign(existing, { _parsed: row }, row, { description: row._raw || row.flavor_text || existing.description || '' }));
-            });
-            equipmentRows.forEach(function(row) {
-                var key = normalizeSearchText(row.name);
-                if (!key) return;
-                var existing = merged.get(key) || {};
-                var parsed = existing._parsed || null;
-                merged.set(key, Object.assign(existing, row, {
-                    _parsed: parsed,
-                    description: row.description || existing.description || '',
-                    type: row.type || existing.type,
-                    level_req: row.level_req || (parsed && parsed.level_req) || existing.level_req,
-                    verified: row.verified !== null && row.verified !== undefined ? row.verified : existing.verified
-                }));
-            });
-            return Array.from(merged.values());
-        }
-
         function applyDeepSearch(rows, filters, parsedQuery) {
             var deduplicated = new Map();
             rows.forEach(function(item) {
@@ -794,10 +706,8 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
             });
             return Array.from(deduplicated.values()).filter(function(item) {
                 if (!matchesDeepFilters(item, filters, parsedQuery)) return false;
-                var source = deepRawText(item) + ' ' + JSON.stringify(item._parsed || {});
-                var normalizedSource = normalizeSearchText(source);
+                var normalizedSearchSource = normalizeSearchText(deepRawText(item));
                 var normalizedName = normalizeSearchText(item.name);
-                var normalizedSearchSource = normalizedSource + ' ' + normalizeSearchText(JSON.stringify(item._parsed || {}));
                 var queryTokens = parsedQuery.tokens.filter(function(token) {
                     return !parsedQuery.numeric.some(function(test) { return normalizeSearchText(test.stat) === normalizeSearchText(token); });
                 });
@@ -813,12 +723,11 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
         }
 
         function deepRawText(item) {
-            var parsed = item._parsed || item;
-            return item.description || parsed._raw || parsed.flavor_text || '';
+            return item.description || '';
         }
 
         function getItemLevel(item) {
-            var parsed = item._parsed || item;
+            var parsed = item;
             var level = Number(parsed.level_req || item.level_req || 0);
             if (level > 0) return level;
             var match = deepRawText(item).match(/\b(?:This level|Level)\s+(\d+)\s+item\b/i);
@@ -826,14 +735,14 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
         }
 
         function getItemValue(item) {
-            var parsed = item._parsed || item;
+            var parsed = item;
             if (parsed.value !== null && parsed.value !== undefined && Number(parsed.value) > 0) return Number(parsed.value);
             var match = deepRawText(item).match(/\bvalued at\s+([\d,]+)\s+gold\b/i);
             return match ? Number(match[1].replace(/,/g, '')) : (parsed.value !== null && parsed.value !== undefined ? Number(parsed.value) : null);
         }
 
         function getItemWeight(item) {
-            var parsed = item._parsed || item;
+            var parsed = item;
             if (parsed.weight_stones !== null && parsed.weight_stones !== undefined) {
                 return { stones: Number(parsed.weight_stones), pebbles: Number(parsed.weight_pebbles || 0) };
             }
@@ -859,7 +768,7 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
         }
 
         function getItemAffects(item) {
-            var parsed = item._parsed || item;
+            var parsed = item;
             var affects = Array.isArray(parsed.affects) ? parsed.affects.filter(function(effect) { return effect && typeof effect === 'object'; }) : [];
             var raw = getRawAffects(item);
             var keys = new Set(affects.map(function(effect) { return normalizeSearchText(effect.stat || effect.name || ''); }));
@@ -887,14 +796,17 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
         }
 
         function matchesDeepFilters(item, filters, parsedQuery) {
-            var parsed = item._parsed || item;
+            var parsed = item;
             var raw = deepRawText(item);
             var type = String(item.type || parsed.type || '').toLowerCase();
             var typeAliases = { jewelry: ['jewelry','ring'], wand: ['wand','magical wand'] };
             if (filters.type === 'other') {
                 if (ORDINARY_ITEM_TYPES.indexOf(type) >= 0) return false;
             } else if (filters.type) {
-                if (!(typeAliases[filters.type] || [filters.type]).includes(type)) return false;
+                if (!(typeAliases[filters.type] || [filters.type]).includes(type)) {
+                    // Light sources are identified by header text when the parsed type is missing.
+                    if (!(filters.type === 'light' && /is type light(?=[,\s.])/i.test(raw))) return false;
+                }
             }
             if (filters.weaponType) {
                 var weaponType = String(parsed.weapon_type || '').toLowerCase();
@@ -908,7 +820,10 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
                 }
                 if (!weaponType.includes(filters.weaponType.toLowerCase())) return false;
             }
-            if (filters.wearSlot) {
+            if (filters.wearSlot === 'light') {
+                // Light sources are not worn in a slot: the game reports them as "is type light".
+                if (type !== 'light' && !/is type light(?=[,\s.])/i.test(raw)) return false;
+            } else if (filters.wearSlot) {
                 var slotText = String(parsed.equipped || parsed.slot || item.slot || '').toLowerCase();
                 var header = raw.split('\n').slice(0, 3).join(' ').toLowerCase();
                 if (!slotText) {
@@ -950,7 +865,7 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
         }
 
         function scoreDeepResult(item, parsedQuery) {
-            var parsed = item._parsed || item;
+            var parsed = item;
             var name = normalizeSearchText(item.name);
             var phrase = parsedQuery.phrase;
             var raw = deepRawText(item);
@@ -964,13 +879,12 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
                 JSON.stringify(parsed.procs || []), JSON.stringify(parsed.requirements || [])
             ].filter(Boolean).join(' '));
             var normalizedRaw = normalizeSearchText(raw);
-            var searchableParsed = item._parsed || {};
             var normalizedParsed = normalizeSearchText([
-                JSON.stringify(searchableParsed.affects || []), JSON.stringify(searchableParsed.when_procs || []),
-                JSON.stringify(searchableParsed.procs || []), JSON.stringify(searchableParsed.requirements || []),
-                JSON.stringify(searchableParsed.relic_properties || []), JSON.stringify(searchableParsed.set_bonuses || []),
-                JSON.stringify(searchableParsed.grants_knowledge || []), JSON.stringify(searchableParsed.artifice_ingredients || []),
-                JSON.stringify(searchableParsed.special_weapon_attrs || []), searchableParsed._raw
+                JSON.stringify(item.affects || []), JSON.stringify(item.when_procs || []),
+                JSON.stringify(item.procs || []), JSON.stringify(item.requirements || []),
+                JSON.stringify(item.relic_properties || []), JSON.stringify(item.set_bonuses || []),
+                JSON.stringify(item.grants_knowledge || []), JSON.stringify(item.artifice_ingredients || []),
+                JSON.stringify(item.special_weapon_attrs || [])
             ].filter(Boolean).join(' '));
             var score = 0;
             if (phrase && name === phrase) score += 10000;
@@ -993,7 +907,7 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
         }
 
         function deepResultHighlights(item) {
-            var parsed = item._parsed || item;
+            var parsed = item;
             var raw = deepRawText(item);
             var rawLines = raw.split(/\r?\n|\r/);
             var lines = [];
@@ -1047,7 +961,7 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
                 var text = stat === 'silver-vuln' && (amount === null || amount === undefined)
                     ? 'Increases vulnerability to silver-based attacks'
                     : 'Affects ' + stat + (amount !== null && amount !== undefined ? ' by ' + amount : '');
-                add('Effect', text + (effect.frequency ? ' {' + effect.frequency + '}' : ''), effect._source || 'parsed');
+                add('Effect', text + (effect.frequency ? ' {' + effect.frequency + '}' : ''), 'raw');
             });
             if (parsed.damage_tier) {
                 add('Weapon profile', (parsed.weapon_type || 'Weapon') + ': ' + parsed.damage_tier + ' ' + (parsed.damage_type || 'damage') + ' damage; ' + (parsed.accuracy_tier || 'unknown') + ' accuracy; ' + (parsed.range_tier || 'unknown') + ' range; ' + (parsed.crit_tier || 'unknown') + ' critical chance' + (parsed.crit_multiplier ? ' (' + parsed.crit_multiplier + 'x on a critical hit)' : ''), 'parsed');
@@ -1075,7 +989,7 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
         }
 
         function mechanicsGlossary(item) {
-            var parsed = item._parsed || item;
+            var parsed = item;
             var raw = deepRawText(item);
             var lines = raw.split(/\r?\n|\r/);
             var normalizedRaw = raw.replace(/\s+/g, ' ');
@@ -1107,7 +1021,7 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
             var visible = deepSearchResults.slice(0, 200);
             var html = '';
             visible.forEach(function(item) {
-                var parsed = item._parsed || item;
+                var parsed = item;
                 html += '<div class="item-card" data-name="' + escapeHtml(item.name) + '">';
                 html += '<h3><a href="item.html?name=' + encodeURIComponent(item.name) + '">' + escapeHtml(item.name) + '</a></h3>';
                 html += '<div class="item-meta">';
@@ -1179,60 +1093,37 @@ document.getElementById('mob-search-input').addEventListener('keyup', function(e
                     if (browseResult.error) throw new Error(browseResult.error.message);
                     if (requestId !== deepSearchRequest) return;
                     deepSearchTotalCount = browseResult.count;
-                    deepSearchResults = applyDeepSearch(mergeDeepRows([], browseResult.data || []), filters, parsedQuery);
+                    deepSearchResults = applyDeepSearch(browseResult.data || [], filters, parsedQuery);
                     renderDeepResults(0);
                     saveSearchState();
                     return;
                 }
                 if (!hasSearchTokens) {
-                    var matchingParsed = await fetchPagedQuery(buildParsedFacetQuery(filters).order('id', { ascending: true }), requestId, 500);
                     var matchingRaw = await fetchPagedQuery(buildEquipmentFacetQuery(filters).order('name', { ascending: true }), requestId, 500);
                     if (requestId !== deepSearchRequest) return;
-                    var matchingNames = new Set(matchingParsed.map(function(row) { return normalizeSearchText(row.name); }));
-                    var fallbackCandidates = matchingRaw.filter(function(row) { return !matchingNames.has(normalizeSearchText(row.name)); });
-                    var fallbackParsed = [];
-                    for (var batchStart = 0; batchStart < fallbackCandidates.length; batchStart += 50) {
-                        var batchNames = fallbackCandidates.slice(batchStart, batchStart + 50).map(function(row) { return row.name; });
-                        var parsedLookup = await supabase.from('equipment_parsed').select(PARSED_SEARCH_COLUMNS).in('name', batchNames);
-                        if (parsedLookup.error) throw new Error('equipment_parsed fallback: ' + parsedLookup.error.message);
-                        fallbackParsed = fallbackParsed.concat(parsedLookup.data || []);
-                    }
-                    deepSearchResults = applyDeepSearch(mergeDeepRows(matchingParsed.concat(fallbackParsed), matchingRaw), filters, parsedQuery);
+                    deepSearchResults = applyDeepSearch(matchingRaw, filters, parsedQuery);
                     renderDeepResults(0);
                     saveSearchState();
                     return;
                 }
-                var parsedResult;
                 if (hasSearchTokens) {
                     var searchableTokens = Array.from(new Set(searchableQueryTokens.concat(descriptionQuery ? descriptionQuery.terms : [])));
-                    var tokenQueries = await Promise.all(searchableTokens.map(async function(token) {
-                        return fetchPagedQuery(buildDeepTextQuery('equipment_parsed', token), requestId, 500);
-                    }));
-                    var parsedUnique = new Map();
-                    tokenQueries.forEach(function(rows) { rows.forEach(function(row) { parsedUnique.set(String(row.id), row); }); });
-                    parsedResult = Array.from(parsedUnique.values());
-                    if (requestId !== deepSearchRequest) return;
                     var rawOnlyRows = await fetchRawDescriptionSearch(searchableTokens, requestId);
                     var phraseRows = [];
-                    var phraseParsedRows = [];
                     for (var phraseIndex = 0; phraseIndex < parsedQuery.phrases.length; phraseIndex++) {
                         var phrase = parsedQuery.phrases[phraseIndex];
-                        phraseParsedRows = phraseParsedRows.concat(await fetchPagedQuery(buildDeepTextQuery('equipment_parsed', phrase), requestId, 500));
                         var phraseQuery = supabase.from('equipment').select('id,name,type,slot,level_req,weight,value,description,properties,verified').or('name.ilike.%' + escapePostgrestToken(phrase) + '%,description.ilike.%' + escapePostgrestToken(phrase) + '%');
                         phraseRows = phraseRows.concat(await fetchPagedQuery(phraseQuery, requestId, 250));
                     }
                     if (requestId !== deepSearchRequest) return;
-                    var merged = mergeDeepRows(parsedResult.concat(phraseParsedRows), rawOnlyRows.concat(phraseRows));
+                    var merged = rawOnlyRows.concat(phraseRows);
                     deepSearchResults = applyDeepSearch(merged, filters, parsedQuery);
                     if (descriptionQuery) deepSearchResults = deepSearchResults.filter(function(item) { return matchesDescriptionQuery(item, descriptionQuery); });
                 } else {
-                    var parsedQueryBuilder = buildParsedFacetQuery(filters).order('id', { ascending: true });
-                    var filteredParsed = await fetchPagedQuery(parsedQueryBuilder, requestId, 500);
-                    if (requestId !== deepSearchRequest) return;
                     var fallbackBuilder = buildEquipmentFacetQuery(filters).order('name', { ascending: true });
                     var fallbackRows = await fetchPagedQuery(fallbackBuilder, requestId, 500);
                     if (requestId !== deepSearchRequest) return;
-                    deepSearchResults = applyDeepSearch(mergeDeepRows(filteredParsed, fallbackRows), filters, parsedQuery);
+                    deepSearchResults = applyDeepSearch(fallbackRows, filters, parsedQuery);
                 }
                 if (requestId !== deepSearchRequest) return;
                 renderDeepResults(0);

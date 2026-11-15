@@ -134,7 +134,6 @@
         const DAMAGE_TYPES = ['acid','air','bash','charm','corruption','disease','drowning','earth','emotional','energy','fear','flames','frost','harm','lightbeam','lightning','moonlight','necromancy','pain','pierce','poison','slash','soundwave','summon','sunlight','water'];
         const WEAPON_SPECIALS = ['aqueous','battering','dispelling','echoing-strike','flaming','frost','grappling','overloading','parry-magic','poisoned','serrated','sharp','shocking','vampiric','vorpal'];
         const COMMAND_OPTIONS = new Set(['type','material','spell','affect','bindings','levels','wear']);
-        const PARSED_EQDB_COLUMNS = 'name,verified,type,level_req,material,equipped,weapon_type,damage_type,special_weapon_attrs,weapon_special_attr,spell_name,casts_spell_name,fountain_spell,relic_slots,affects,_raw,keywords';
 
         function parseEqdbCommand(input) {
             const raw = String(input || '').trim().replace(/^eqdb\s*/i, '');
@@ -232,7 +231,7 @@
                 const affectValue = filters.affect.toLowerCase();
                 if (!containsNormalized(affectText, filters.affect) && !new RegExp('^Affects\\s+' + escapeRegExp(affectValue) + '\\s+by', 'im').test(raw)) return false;
             }
-            const bindings = Number(parsed.relic_slots || 0);
+            const bindings = Number(parsed.relic_slots || rawHeaderValue(raw, /occupies\s+(\d+)\s+binding slot/i) || rawHeaderValue(raw, /has\s+(\d+)\s+relic slots?/i) || 0);
             if (filters.bindings !== '' && bindings < Number(filters.bindings)) return false;
             const level = Number(parsed.level_req || item.level_req || rawHeaderValue(header, /Level\s+(\d+)\s+item/i) || 0);
             if (filters.minLevel !== '' && level < Number(filters.minLevel)) return false;
@@ -273,21 +272,6 @@
                             rows.push.apply(rows, page);
                             if (page.length < PAGE_SIZE || Number.isFinite(result.count) && rows.length >= result.count) break;
                         }
-                        const parsedRows = [];
-                        for (let offset = 0; ; offset += PAGE_SIZE) {
-                            const result = await supabase.from('equipment_parsed').select(PARSED_EQDB_COLUMNS, { count: 'exact' })
-                                .eq('verified', true).order('name', { ascending: true }).range(offset, offset + PAGE_SIZE - 1);
-                            if (result.error) throw new Error(result.error.message);
-                            const page = result.data || [];
-                            parsedRows.push.apply(parsedRows, page);
-                            if (page.length < PAGE_SIZE || Number.isFinite(result.count) && parsedRows.length >= result.count) break;
-                        }
-                        const parsedByName = new Map();
-                        parsedRows.forEach(function(item) {
-                            const key = normalizeValue(item.name);
-                            if (key && !parsedByName.has(key)) parsedByName.set(key, item);
-                        });
-                        rows.forEach(function(item) { item._parsed = parsedByName.get(normalizeValue(item.name)) || {}; });
                         return rows;
                     })().catch(function(error) {
                         eqdbSearchDataPromise = null;
