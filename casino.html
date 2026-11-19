@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Casino - MUD Equipment DB</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: "Inter", sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+        a { color: #8787FF; }
+        h1, h2, h3 { color: #C0C0C0; }
+        nav { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; }
+        nav a { margin-right: 15px; color: #8787FF; text-decoration: none; }
+        nav a:hover { color: #C0C0C0; }
+        nav .dropdown { position: relative; display: inline-block; margin-right: 15px; }
+        nav .dropbtn { cursor: pointer; color: #8787FF; }
+        nav .dropdown-content { display: none; position: absolute; top: 100%; left: 0; background: #333; min-width: 160px; border: 1px solid #444; border-radius: 3px; z-index: 1000; }
+        nav .dropdown-content a { display: block; padding: 8px 12px; margin: 0; white-space: nowrap; }
+        nav .dropdown-content a:hover { background: #444; color: #C0C0C0; }
+        nav .dropdown:hover .dropdown-content { display: block; }
+        #sticky-header { position: sticky; top: 0; z-index: 100; background: #1a1a1a; }
+        button, select { padding: 8px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; font-family: "Inter", sans-serif; }
+        button { cursor: pointer; }
+        button:disabled { opacity: 0.4; cursor: not-allowed; }
+        .layout { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
+        .machine { flex: 1 1 460px; background: #222; border: 1px solid #333; border-radius: 8px; padding: 18px; }
+        .paytable { flex: 1 1 260px; background: #222; border: 1px solid #333; border-radius: 8px; padding: 18px; }
+        .jackpot { text-align: center; border: 1px solid #FFD700; border-radius: 6px; padding: 10px 12px; background: #201a00; }
+        .jackpot .label { color: #FFD700; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; }
+        .jackpot .amount { color: #FFD700; font-size: 34px; font-weight: bold; line-height: 1.2; }
+        .jackpot .sub { color: #8a7a3a; font-size: 11px; }
+        .reels { display: flex; gap: 10px; justify-content: center; margin: 18px 0 12px; }
+        .reel { background: #111; border: 1px solid #555; border-radius: 6px; padding: 6px; width: 92px; }
+        .cell { font-size: 38px; text-align: center; height: 54px; line-height: 54px; user-select: none; }
+        .cell.payline { background: #2a2410; outline: 1px solid #FFD700; border-radius: 4px; }
+        .reels.spinning .cell { filter: blur(1.2px); opacity: 0.8; }
+        .controls { display: flex; gap: 8px; align-items: center; justify-content: center; flex-wrap: wrap; margin-top: 6px; }
+        #spin-btn { background: #FFD700; color: #000; border: none; font-weight: bold; font-size: 16px; padding: 12px 34px; letter-spacing: 1px; }
+        #spin-btn:hover:not(:disabled) { background: #ffe14d; }
+        .balances { display: flex; gap: 10px; justify-content: space-between; margin-top: 14px; padding-top: 12px; border-top: 1px solid #333; font-size: 13px; flex-wrap: wrap; }
+        .balances strong { color: #C0C0C0; }
+        .gold { color: #FFD700; }
+        #result-msg { text-align: center; font-size: 15px; min-height: 22px; margin-top: 10px; }
+        .win { color: #44dd44; font-weight: bold; }
+        .lose { color: #777; }
+        .jackpot-hit { color: #FFD700; font-weight: bold; font-size: 17px; }
+        .warn { color: #ffaa00; font-size: 13px; }
+        table.pt { width: 100%; border-collapse: collapse; font-size: 13px; }
+        table.pt td { padding: 5px 4px; border-bottom: 1px solid #2a2a2a; }
+        table.pt td:last-child { text-align: right; color: #FFD700; }
+        table.pt tr.jackpot-row td { color: #C0C0C0; }
+        .note { font-size: 12px; color: #777; line-height: 1.6; margin-top: 10px; }
+        .panel { background: #222; border: 1px solid #333; border-radius: 8px; padding: 16px; margin-top: 18px; }
+        .panel h2 { font-size: 15px; margin: 0 0 10px; }
+        .kv { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-size: 13px; }
+        .kv div:nth-child(even) { text-align: right; color: #C0C0C0; }
+        .legal { border-left: 3px solid #ffaa00; background: #1f1a10; padding: 10px 12px; font-size: 12px; color: #b9a066; line-height: 1.6; margin-top: 18px; border-radius: 0 4px 4px 0; }
+        .tiny { font-size: 11px; color: #555; }
+        .field { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 8px 0; font-size: 13px; }
+        .field label { color: #888; }
+        input[type="text"], input[type="number"], input[type="password"] { padding: 8px; background: #111; color: #eee; border: 1px solid #555; border-radius: 3px; font-family: "Inter", sans-serif; font-size: 13px; }
+        input[type="text"]:focus, input[type="number"]:focus, input[type="password"]:focus { outline: 1px solid #FFD700; }
+        .cmd { display: block; background: #000; border: 1px solid #333; border-radius: 3px; padding: 8px 10px; margin: 6px 0; font-family: monospace; font-size: 13px; color: #7CFC9E; user-select: all; }
+        #acct-msg { min-height: 20px; font-size: 13px; margin-top: 10px; }
+        table.wd { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+        table.wd th { text-align: left; color: #888; font-weight: normal; border-bottom: 1px solid #333; padding: 6px 4px; }
+        table.wd td { padding: 6px 4px; border-bottom: 1px solid #262626; }
+    </style>
+</head>
+<body>
+    <div style="margin-bottom:6px;text-align:center;"><a href="index.html" style="text-decoration:none;"><img src="images/logo.png" alt="HukoDB" style="height:130px;cursor:pointer;"></a></div>
+    <div id="sticky-header">
+    <nav>
+        <a href="index.html">Search</a>
+        <a href="zones.html">Zones</a>
+        <a href="rooms.html">Rooms</a>
+        <a href="leaderboard.html">Leaderboard</a>
+
+        <div class="dropdown">
+            <span class="dropbtn">Games ▼</span>
+            <div class="dropdown-content">
+                <a href="daily.html">Daily</a>
+                <!-- <a href="zonequiz.html">Zone Quiz</a> (hidden for now) -->
+                <a href="mobguess.html">Mob Guess</a>
+                <a href="casino.html">Casino</a>
+            </div>
+        </div>
+
+        <div class="dropdown">
+            <span class="dropbtn">Community Tools ▼</span>
+            <div class="dropdown-content">
+                <a href="market.html">Market</a>
+                <a href="lfg.html">LFG</a>
+            </div>
+        </div>
+        <div class="dropdown">
+            <span class="dropbtn">More ▼</span>
+            <div class="dropdown-content">
+                <a href="info.html">About</a>
+                <a href="ideas.html">Ideas</a>
+            </div>
+        </div>
+        <div class="dropdown">
+            <span class="dropbtn">Sites ▼</span>
+            <div class="dropdown-content">
+                <a href="https://annwn.info" target="_blank" rel="noopener">Annwn</a>
+                <a href="https://ooc.dune.net" target="_blank" rel="noopener">OOC</a>
+                <a href="https://alyria-online.com" target="_blank" rel="noopener">Alyria-Online</a>
+            </div>
+        </div>
+        <div class="dropdown" id="editor-dropdown" style="display:none;">
+            <span class="dropbtn">Editor ▼</span>
+            <div class="dropdown-content">
+                <a href="import.html">Add Equipment</a>
+                <a href="batch.html">Batch Import</a>
+            </div>
+        </div>
+        <span id="login-link"><a href="login.html">Login</a></span>
+        <span id="signup-link"><a href="#account" style="color:#44aa44;">Get an account</a></span>
+        <span id="logout-link" style="display:none;"><a href="#" onclick="logout()">Logout</a></span>
+        <span id="admin-link" style="display:none;"><a href="admin.html" style="color:#FFD700;font-weight:bold;">Admin Panel</a></span>
+    </nav>
+    <script>document.querySelectorAll('nav a').forEach(function(a){if(a.href&&a.href.split('/').pop()===location.pathname.split('/').pop())a.style.color='#00FFFF';});</script>
+    </div>
+
+    <h1 style="margin-bottom:4px;">The Gold Vault</h1>
+    <p style="color:#888;font-size:13px;margin-top:0;">Three-reel slots, one payline, one progressive jackpot. Played with gold only.</p>
+
+    <div class="layout">
+        <section class="machine">
+            <div class="jackpot">
+                <div class="label">Progressive Jackpot</div>
+                <div class="amount" id="jackpot-value">0</div>
+                <div class="sub" id="jackpot-sub">gold &middot; max bet only</div>
+            </div>
+
+            <div class="reels" id="reels">
+                <div class="reel" data-reel="0"><div class="cell">🍒</div><div class="cell payline">🍒</div><div class="cell">🍒</div></div>
+                <div class="reel" data-reel="1"><div class="cell">🍒</div><div class="cell payline">🍒</div><div class="cell">🍒</div></div>
+                <div class="reel" data-reel="2"><div class="cell">🍒</div><div class="cell payline">🍒</div><div class="cell">🍒</div></div>
+            </div>
+
+            <div class="controls">
+                <label for="bet-select" style="font-size:13px;color:#888;">Bet</label>
+                <select id="bet-select">
+                    <option value="10">10 gold</option>
+                    <option value="25">25 gold</option>
+                    <option value="50">50 gold</option>
+                    <option value="100">100 gold</option>
+                    <option value="250">250 gold</option>
+                    <option value="500">500 gold (jackpot eligible)</option>
+                </select>
+                <button id="spin-btn">SPIN</button>
+            </div>
+
+            <div id="result-msg" class="lose">Log in below to play.</div>
+
+            <div class="balances">
+                <span>Account: <strong class="gold" id="balance-value">0</strong> gold</span>
+                <span>Session: <strong id="session-value">0 spins</strong></span>
+                <span class="tiny" style="flex-basis:100%;">Gold sits in your vault account. Everything you win stays there until you withdraw it in game.</span>
+            </div>
+        </section>
+
+        <aside class="paytable">
+            <h2 style="margin-top:0;">Paytable</h2>
+            <table class="pt" id="paytable-body">
+                <tr><td>🍒 🍒 🍒</td><td>6&times;</td></tr>
+                <tr><td>🍋 🍋 🍋</td><td>10&times;</td></tr>
+                <tr><td>🔔 🔔 🔔</td><td>20&times;</td></tr>
+                <tr><td>💎 💎 💎</td><td>50&times;</td></tr>
+                <tr><td>7️⃣ 7️⃣ 7️⃣</td><td>110&times;</td></tr>
+                <tr><td>⭐ ⭐ ⭐</td><td>100&times;</td></tr>
+                <tr class="jackpot-row"><td>⭐ ⭐ ⭐ at max bet</td><td>JACKPOT</td></tr>
+                <tr><td>🍒 🍒 <span style="color:#777;">(any third)</span></td><td>1&times;</td></tr>
+            </table>
+            <p class="note">Prizes are multiples of the total bet, paid on the centre payline. The star triple is the progressive when you are on the maximum bet; below max bet it pays 100&times; instead.</p>
+            <h2>Machine numbers</h2>
+            <div class="kv" id="math-body"></div>
+            <p class="note">Base return is fixed by the paytable and reel weights. The jackpot adds value on top at max bet, so max-bet RTP rises as the pool grows.</p>
+        </aside>
+    </div>
+
+    <section class="panel">
+        <h2>Session</h2>
+        <div class="kv" id="stats-body"></div>
+    </section>
+
+    <section class="panel" id="account">
+        <h2>Your vault account</h2>
+        <p class="note" style="margin-top:0;">
+            Accounts are made in game, by the character <strong>HukoDB</strong>, so nobody can claim your name.
+            Message HukoDB and it replies with a password:
+        </p>
+        <code class="cmd">tell HukoDB login</code>
+
+        <div id="acct-out">
+            <div class="field">
+                <label for="acct-char">Character</label>
+                <input type="text" id="acct-char" placeholder="e.g. Huko" maxlength="20" size="14" autocomplete="off">
+                <label for="acct-pass">Password</label>
+                <input type="password" id="acct-pass" size="14" autocomplete="current-password">
+                <button id="acct-login">Log in</button>
+            </div>
+            <p class="tiny">Lost the password? <code>tell HukoDB reset</code> gives you a new one.</p>
+        </div>
+
+        <div id="acct-in" style="display:none;">
+            <div class="kv" style="max-width:340px;">
+                <div>Character</div><div id="acct-name"></div>
+                <div>Gold in account</div><div class="gold" id="acct-gold">0</div>
+            </div>
+
+            <h3 style="margin:16px 0 4px;">Deposit</h3>
+            <p class="note" style="margin:0 0 4px;">In the same room as HukoDB, exact and free:</p>
+            <code class="cmd">give 10000 gold to HukoDB</code>
+            <p class="note" style="margin:8px 0 4px;">Or from any bank, while HukoDB is online:</p>
+            <code class="cmd">bank transfer 10000 HukoDB</code>
+
+            <h3 style="margin:16px 0 4px;">Withdraw</h3>
+            <p class="note" style="margin:0 0 4px;">
+                Start it here or in game with <code>tell HukoDB withdraw 5000</code>. Either way the request and the
+                payout are recorded together, and HukoDB only settles the exact net the site recorded. Gold still
+                moves in game, so you must be online when it is sent. The bank fee is deducted.
+            </p>
+            <div class="field">
+                <label for="wd-amount">Gold</label>
+                <input type="number" id="wd-amount" min="1000" step="1000" value="5000" size="10">
+                <button id="acct-withdraw">Request payout</button>
+                <span class="tiny">then <code>tell HukoDB pay</code> to collect</span>
+            </div>
+
+            <table class="wd">
+                <thead><tr><th>Date</th><th>Ref</th><th>Asked</th><th>You get</th><th>Status</th><th></th></tr></thead>
+                <tbody id="wd-list"></tbody>
+            </table>
+
+            <h3 style="margin:16px 0 4px;">Lifetime summary</h3>
+            <div class="kv" id="sum-body"></div>
+            <div class="field" style="margin-top:8px;">
+                <button id="hist-refresh">Refresh summary</button>
+                <button id="hist-csv">Download statement (CSV)</button>
+            </div>
+            <table class="wd">
+                <thead><tr><th>When</th><th>Action</th><th>Gold</th><th>Balance</th><th>Ref</th></tr></thead>
+                <tbody id="hist-body"></tbody>
+            </table>
+
+            <div class="field" style="margin-top:12px;">
+                <button id="acct-refresh">Refresh balance</button>
+                <button id="acct-logout">Log out</button>
+            </div>
+        </div>
+
+        <div id="acct-msg"></div>
+    </section>
+
+    <div class="legal">
+        <strong>Play money only.</strong> Gold on this page is virtual, has no cash value, cannot be bought with real money and cannot be sold, converted or cashed out &mdash; "withdrawing" only returns your own gold to your character inside the game. No purchase is necessary and there is no mechanism to convert winnings into money or goods. 18+. If you gamble elsewhere and it stops being fun, stop.
+    </div>
+
+    <p class="tiny" style="margin-top:18px;">1% of every wager feeds the progressive. Accounts, balances and the jackpot are held by the vault, not by this browser. Deposits and payouts are gold-only and always go through the character HukoDB.</p>
+
+    <script src="nav-collapse.js"></script>
+    <script>
+    (function () {
+        'use strict';
+
+        // ---- Machine definition -------------------------------------------------
+        // Each reel is a 128-stop virtual strip with the same weighting.
+        var SYMBOLS = [
+            { id: 'cherry',  glyph: '🍒', weight: 40, pay3: 6 },
+            { id: 'lemon',   glyph: '🍋', weight: 28, pay3: 10 },
+            { id: 'bell',    glyph: '🔔', weight: 22, pay3: 20 },
+            { id: 'diamond', glyph: '💎', weight: 18, pay3: 50 },
+            { id: 'seven',   glyph: '7️⃣', weight: 16, pay3: 110 },
+            { id: 'star',    glyph: '⭐', weight: 4,  pay3: 100 }
+        ];
+        var PAY_TWO_CHERRIES = 1;
+
+        var CFG = {
+            bets: [10, 25, 50, 100, 250, 500],
+            jackpotSeed: 250000,
+            jackpotContribution: 0.01
+        };
+        var MAX_BET = CFG.bets[CFG.bets.length - 1];
+        var STOP_MS = [700, 950, 1200];
+        var FRAME_MS = 70;
+
+        var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
+        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
+        var TOKEN_KEY = 'mudcasino_token';
+        var CHAR_KEY = 'mudcasino_char';
+
+        // ---- Exact math ---------------------------------------------------------
+        var TOTAL_WEIGHT = SYMBOLS.reduce(function (sum, s) { return sum + s.weight; }, 0);
+        var byId = {};
+        SYMBOLS.forEach(function (s) { byId[s.id] = s; });
+
+        function machineMath() {
+            var baseRtp = 0, hitFreq = 0;
+            for (var i = 0; i < SYMBOLS.length; i++) {
+                for (var j = 0; j < SYMBOLS.length; j++) {
+                    for (var k = 0; k < SYMBOLS.length; k++) {
+                        var a = SYMBOLS[i], b = SYMBOLS[j], c = SYMBOLS[k];
+                        var p = (a.weight / TOTAL_WEIGHT) * (b.weight / TOTAL_WEIGHT) * (c.weight / TOTAL_WEIGHT);
+                        var win = 0;
+                        if (a === b && b === c) win = a.pay3;
+                        else if (countCherries(a, b, c) === 2) win = PAY_TWO_CHERRIES;
+                        baseRtp += p * win;
+                        if (win > 0) hitFreq += p;
+                    }
+                }
+            }
+            var starProb = byId.star.weight / TOTAL_WEIGHT;
+            var jackpotProb = starProb * starProb * starProb;
+            return {
+                baseRtp: baseRtp,
+                hitFreq: hitFreq,
+                jackpotProb: jackpotProb,
+                jackpotOdds: Math.round(1 / jackpotProb)
+            };
+        }
+        var MATH = machineMath();
+
+        function maxBetRtp(pool) {
+            return MATH.baseRtp - MATH.jackpotProb * byId.star.pay3 + (pool * MATH.jackpotProb / MAX_BET);
+        }
+
+        function countCherries(a, b, c) {
+            return (a.id === 'cherry' ? 1 : 0) + (b.id === 'cherry' ? 1 : 0) + (c.id === 'cherry' ? 1 : 0);
+        }
+
+        // ---- Account state ------------------------------------------------------
+        var acct = {
+            token: null,
+            character: '',
+            gold: 0,
+            jackpot: CFG.jackpotSeed,
+            lifetime: { spins: 0, wagered: 0, won: 0, biggest: 0, jackpots: 0 }
+        };
+        var session = { spins: 0, wagered: 0, won: 0 };
+        var spinning = false;
+
+        // ---- DOM ----------------------------------------------------------------
+        var reelsEl = document.getElementById('reels');
+        var reelEls = [0, 1, 2].map(function (i) { return reelsEl.querySelector('[data-reel="' + i + '"]'); });
+        var balanceEl = document.getElementById('balance-value');
+        var jackpotEl = document.getElementById('jackpot-value');
+        var sessionEl = document.getElementById('session-value');
+        var msgEl = document.getElementById('result-msg');
+        var spinBtn = document.getElementById('spin-btn');
+        var betSelect = document.getElementById('bet-select');
+        var acctMsgEl = document.getElementById('acct-msg');
+
+        function fmt(n) { return Math.floor(n).toLocaleString('en-US'); }
+
+        function renderReel(reelIndex, strip) {
+            var cells = reelEls[reelIndex].children;
+            for (var i = 0; i < 3; i++) cells[i].textContent = strip[i].glyph;
+        }
+        function render() {
+            balanceEl.textContent = fmt(acct.gold);
+            jackpotEl.textContent = fmt(acct.jackpot);
+            sessionEl.textContent = session.spins + (session.spins === 1 ? ' spin' : ' spins');
+            document.getElementById('acct-gold').textContent = fmt(acct.gold);
+            renderStats();
+        }
+        function renderStats() {
+            var s = session, l = acct.lifetime;
+            var rtp = s.wagered > 0 ? (s.won / s.wagered * 100).toFixed(1) + '%' : '—';
+            document.getElementById('stats-body').innerHTML =
+                row('Spins this session', s.spins) +
+                row('Wagered this session', fmt(s.wagered) + ' gold') +
+                row('Won this session', fmt(s.won) + ' gold') +
+                row('Actual return this session', rtp) +
+                row('Lifetime spins', fmt(l.spins)) +
+                row('Biggest single win', fmt(l.biggest) + ' gold') +
+                row('Jackpots won', fmt(l.jackpots));
+        }
+        function row(k, v) { return '<div>' + k + '</div><div>' + v + '</div>'; }
+
+        function renderMath() {
+            document.getElementById('math-body').innerHTML =
+                row('Base RTP (bets below max)', (MATH.baseRtp * 100).toFixed(2) + '%') +
+                row('Hit frequency', (MATH.hitFreq * 100).toFixed(1) + '%') +
+                row('Jackpot odds (all three stars)', '1 in ' + fmt(MATH.jackpotOdds)) +
+                row('Jackpot contribution', (CFG.jackpotContribution * 100).toFixed(0) + '% of every bet') +
+                row('Jackpot seed', fmt(CFG.jackpotSeed) + ' gold') +
+                row('Max-bet RTP at current pool', (maxBetRtp(acct.jackpot) * 100).toFixed(2) + '%');
+            document.getElementById('jackpot-sub').textContent =
+                'gold · ' + (CFG.jackpotContribution * 100).toFixed(0) + '% of every wager feeds it · max bet only';
+        }
+
+        function setBusy(busy) {
+            spinning = busy;
+            spinBtn.disabled = busy || !acct.token || acct.gold < currentBet();
+            betSelect.disabled = busy;
+        }
+        function currentBet() {
+            var v = Number(betSelect.value);
+            return CFG.bets.indexOf(v) >= 0 ? v : CFG.bets[0];
+        }
+
+        // ---- Website ------------------------------------------------------------
+        function rpc(fn, args) {
+            return fetch(SUPABASE_URL + '/rest/v1/rpc/' + fn, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+                },
+                body: JSON.stringify(args)
+            }).then(function (res) {
+                return res.text().then(function (text) {
+                    var data = null;
+                    try { data = text ? JSON.parse(text) : null; } catch (e) { /* not json */ }
+                    if (!res.ok) {
+                        throw new Error((data && (data.message || data.error)) || ('HTTP ' + res.status));
+                    }
+                    return data;
+                });
+            });
+        }
+
+        function applyAccount(r) {
+            acct.token = r.token || acct.token;
+            acct.character = r.character || acct.character;
+            acct.gold = Number(r.gold) || 0;
+            if (r.jackpot !== undefined && r.jackpot !== null) acct.jackpot = Number(r.jackpot);
+            if (r.lifetime) {
+                acct.lifetime = {
+                    spins: Number(r.lifetime.spins) || 0,
+                    wagered: Number(r.lifetime.wagered) || 0,
+                    won: Number(r.lifetime.won) || 0,
+                    biggest: Number(r.lifetime.biggest) || 0,
+                    jackpots: Number(r.lifetime.jackpots) || 0
+                };
+            }
+            document.getElementById('acct-name').textContent = acct.character;
+            render();
+        }
+
+        function acctMsg(text, bad) {
+            acctMsgEl.className = bad ? 'warn' : 'win';
+            acctMsgEl.textContent = text;
+        }
+
+        function showAccount(loggedIn) {
+            document.getElementById('acct-out').style.display = loggedIn ? 'none' : 'block';
+            document.getElementById('acct-in').style.display = loggedIn ? 'block' : 'none';
+            if (!loggedIn) {
+                acct.token = null;
+                acct.character = '';
+                acct.gold = 0;
+                document.getElementById('acct-name').textContent = '';
+                renderPayouts([]);
+                render();
+            }
+            setBusy(false);
+        }
+
+        function login() {
+            var char = String(document.getElementById('acct-char').value || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 20);
+            var pass = document.getElementById('acct-pass').value;
+            if (!char || !pass) {
+                acctMsg('Enter your character and the password HukoDB gave you.', true);
+                return;
+            }
+            acctMsg('Logging in…');
+
+            rpc('casino_login', { p_character: char, p_password: pass }).then(function (r) {
+                if (!r || !r.ok) {
+                    if (r && r.error === 'no_account') acctMsg('No account for that character. Tell HukoDB: login', true);
+                    else if (r && r.error === 'bad_password') acctMsg('Wrong password. Tell HukoDB: reset', true);
+                    else acctMsg('Login failed. Try again.', true);
+                    return;
+                }
+                applyAccount(r);
+                sessionStorage.setItem(TOKEN_KEY, r.token);
+                localStorage.setItem(CHAR_KEY, r.character);
+                document.getElementById('acct-pass').value = '';
+                acctMsg('Logged in as ' + r.character + '.');
+                showAccount(true);
+                loadPayouts();
+                loadSummary(true);
+                msgEl.className = 'lose';
+                msgEl.textContent = 'Logged in. Press SPIN to play.';
+            }).catch(function () {
+                acctMsg('The vault did not answer. Try again.', true);
+            });
+        }
+
+        function restore() {
+            var savedChar = localStorage.getItem(CHAR_KEY);
+            if (savedChar) document.getElementById('acct-char').value = savedChar;
+
+            var token = sessionStorage.getItem(TOKEN_KEY);
+            if (!token) { showAccount(false); return; }
+
+            rpc('casino_balance', { p_token: token }).then(function (r) {
+                if (r && r.ok) {
+                    acct.token = token;
+                    applyAccount(r);
+                    showAccount(true);
+                    loadPayouts();
+                    loadSummary(true);
+                    msgEl.className = 'lose';
+                    msgEl.textContent = 'Press SPIN to play.';
+                } else {
+                    sessionStorage.removeItem(TOKEN_KEY);
+                    showAccount(false);
+                }
+            }).catch(function () {
+                showAccount(false);
+            });
+        }
+
+        function logout() {
+            sessionStorage.removeItem(TOKEN_KEY);
+            showAccount(false);
+            acctMsg('Logged out.');
+            msgEl.className = 'lose';
+            msgEl.textContent = 'Log in below to play.';
+        }
+
+        function refresh() {
+            if (!acct.token) return;
+            acctMsg('Checking…');
+            rpc('casino_balance', { p_token: acct.token }).then(function (r) {
+                if (r && r.ok) {
+                    applyAccount(r);
+                    acctMsg('Balance updated.');
+                    loadPayouts();
+                    loadSummary(true);
+                } else {
+                    acctMsg('Your login expired. Log in again.', true);
+                    logout();
+                }
+            }).catch(function () {
+                acctMsg('The vault did not answer. Try again.', true);
+            });
+        }
+
+        function renderPayouts(rows) {
+            var body = document.getElementById('wd-list');
+            if (!rows.length) {
+                body.innerHTML = '<tr><td colspan="6" class="tiny">No withdrawals yet.</td></tr>';
+                return;
+            }
+            body.innerHTML = rows.map(function (p) {
+                var when = new Date(p.requested_at).toLocaleDateString();
+                var label = p.status === 'paid' ? 'Paid'
+                    : p.status === 'requested' ? 'Waiting for HukoDB'
+                    : p.status === 'cancelled' ? 'Cancelled'
+                    : 'Failed';
+                var act = p.status === 'requested'
+                    ? '<button data-cancel="' + p.id + '" style="font-size:11px;padding:2px 6px;">Cancel</button>'
+                    : '';
+                return '<tr><td class="tiny">' + when + '</td><td class="tiny">' + p.ref +
+                    '</td><td class="gold">' + fmt(p.amount) + '</td><td class="gold">' + fmt(p.net) +
+                    '</td><td>' + label + '</td><td>' + act + '</td></tr>';
+            }).join('');
+            body.querySelectorAll('[data-cancel]').forEach(function (btn) {
+                btn.addEventListener('click', function () { cancelPayout(btn.getAttribute('data-cancel')); });
+            });
+        }
+
+        function loadPayouts() {
+            if (!acct.token) return;
+            rpc('casino_payout_my', { p_token: acct.token }).then(function (r) {
+                if (!r || !r.ok) return;
+                if (r.gold !== undefined) {
+                    acct.gold = Number(r.gold) || 0;
+                    render();
+                }
+                renderPayouts(r.payouts || []);
+            }).catch(function () { /* leave the last list up */ });
+        }
+
+        function requestPayout() {
+            if (!acct.token) return;
+            var amount = Math.floor(Number(document.getElementById('wd-amount').value));
+            if (!isFinite(amount) || amount < 1000) {
+                acctMsg('The smallest payout is 1,000 gold.', true);
+                return;
+            }
+            if (amount > acct.gold) {
+                acctMsg('You only have ' + fmt(acct.gold) + ' gold in your account.', true);
+                return;
+            }
+
+            rpc('casino_request_payout', { p_token: acct.token, p_amount: amount }).then(function (r) {
+                if (!r || !r.ok) {
+                    if (r && r.error === 'funds') acctMsg('You only have ' + fmt(r.gold) + ' gold in your account.', true);
+                    else if (r && r.error === 'session') { acctMsg('Your login expired. Log in again.', true); logout(); }
+                    else acctMsg('Could not request that payout.', true);
+                    return;
+                }
+                acct.gold = Number(r.gold) || 0;
+                render();
+                acctMsg(r.ref + ': ' + fmt(r.net) + ' gold after the ' + fmt(r.fee) +
+                    ' bank fee. Tell HukoDB pay while you are online.');
+                loadPayouts();
+                loadSummary(true);
+            }).catch(function () {
+                acctMsg('The vault did not answer. Try again.', true);
+            });
+        }
+
+        function cancelPayout(id) {
+            if (!acct.token) return;
+            rpc('casino_payout_cancel', { p_token: acct.token, p_id: Number(id) }).then(function (r) {
+                if (r && r.ok) {
+                    acct.gold = Number(r.gold) || 0;
+                    render();
+                    acctMsg('Cancelled ' + r.ref + '. ' + fmt(r.amount) + ' gold is back in your account.');
+                    loadPayouts();
+                    loadSummary(true);
+                } else {
+                    acctMsg('That payout can no longer be cancelled.', true);
+                }
+            }).catch(function () {
+                acctMsg('The vault did not answer. Try again.', true);
+            });
+        }
+
+        var lastSummary = 0;
+        var ACTION_LABELS = {
+            account_created: 'Account created',
+            password_reset: 'Password reset',
+            login: 'Login',
+            login_failed: 'Login failed',
+            balance_check: 'Balance check',
+            deposit: 'Deposit',
+            deposit_held: 'Deposit held (no account)',
+            refund_taken: 'Refund issued',
+            refund_returned: 'Refund returned',
+            withdraw: 'Withdrawal requested',
+            withdraw_cancelled: 'Withdrawal cancelled',
+            payout_paid: 'Payout sent',
+            payout_failed: 'Payout refunded',
+            spin: 'Spin',
+            jackpot: 'Jackpot'
+        };
+
+        function renderHistory(rows) {
+            var body = document.getElementById('hist-body');
+            if (!rows.length) {
+                body.innerHTML = '<tr><td colspan="5" class="tiny">Nothing recorded yet.</td></tr>';
+                return;
+            }
+            body.innerHTML = rows.map(function (e) {
+                var cls = e.delta > 0 ? 'win' : '';
+                return '<tr><td class="tiny">' + new Date(e.at).toLocaleString() +
+                    '</td><td>' + (ACTION_LABELS[e.action] || e.action) +
+                    '</td><td class="' + cls + '">' + (e.delta > 0 ? '+' : '') + fmt(e.delta) +
+                    '</td><td>' + fmt(e.balance) +
+                    '</td><td class="tiny">' + (e.ref || '') + '</td></tr>';
+            }).join('');
+        }
+
+        function loadSummary(force) {
+            if (!acct.token) return;
+            var now = Date.now();
+            if (!force && now - lastSummary < 15000) return;
+            lastSummary = now;
+
+            rpc('casino_summary', { p_token: acct.token }).then(function (r) {
+                if (!r || !r.ok) return;
+                acct.gold = Number(r.gold) || 0;
+                render();
+
+                var L = r.lifetime || {};
+                document.getElementById('sum-body').innerHTML =
+                    row('Deposited', fmt(L.deposited || 0) + ' gold') +
+                    row('Withdrawn', fmt(L.withdrawn || 0) + ' gold') +
+                    row('Wagered', fmt(L.wagered || 0) + ' gold') +
+                    row('Won', fmt(L.won || 0) + ' gold') +
+                    row('Net (deposits − withdrawals + wins − wagers)', fmt(r.net || 0) + ' gold') +
+                    row('Balance check', r.balanced
+                        ? '<span class="win">matches the ledger</span>'
+                        : '<span class="warn">MISMATCH — ask Huko to run vault audit</span>') +
+                    row('Biggest win', fmt(L.biggest || 0) + ' gold') +
+                    row('Jackpots', fmt(L.jackpots || 0)) +
+                    row('Spins', fmt(L.spins || 0)) +
+                    row('Account since', L.first_seen ? new Date(L.first_seen).toLocaleDateString() : '—') +
+                    row('Last action', L.last_seen ? new Date(L.last_seen).toLocaleString() : '—');
+
+                renderHistory(r.events || []);
+            }).catch(function () { /* keep the last statement on screen */ });
+        }
+
+        function downloadHistory() {
+            if (!acct.token) return;
+            rpc('casino_history', { p_token: acct.token, p_limit: 500, p_offset: 0 }).then(function (r) {
+                if (!r || !r.ok) {
+                    acctMsg('Could not build the statement.', true);
+                    return;
+                }
+                var rows = [['id', 'utc', 'action', 'actor', 'gold_change', 'balance', 'ref', 'detail']];
+                (r.events || []).forEach(function (e) {
+                    rows.push([e.id, new Date(e.at).toISOString(), e.action, e.actor,
+                        e.delta, e.balance, e.ref || '', JSON.stringify(e.meta || '')]);
+                });
+                var csv = rows.map(function (cols) {
+                    return cols.map(function (v) {
+                        return '"' + String(v).replace(/"/g, '""') + '"';
+                    }).join(',');
+                }).join('\r\n');
+
+                var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'hukodb-' + acct.character + '-statement.csv';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+            }).catch(function () {
+                acctMsg('The vault did not answer. Try again.', true);
+            });
+        }
+
+        // ---- Spin ---------------------------------------------------------------
+        function finalStrip(symbol) {
+            return [randomSymbol(), symbol, randomSymbol()];
+        }
+        function randomSymbol() {
+            return SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+        }
+        function randomStrip() {
+            return [randomSymbol(), randomSymbol(), randomSymbol()];
+        }
+
+        function spin() {
+            if (spinning) return;
+            if (!acct.token) {
+                msgEl.className = 'warn';
+                msgEl.textContent = 'Log in below to play with the gold in your account.';
+                return;
+            }
+            var bet = currentBet();
+            if (acct.gold < bet) {
+                msgEl.className = 'warn';
+                msgEl.textContent = 'Not enough gold. Deposit with HukoDB in game.';
+                return;
+            }
+
+            msgEl.className = 'lose';
+            msgEl.textContent = 'Spinning…';
+            reelsEl.classList.add('spinning');
+            setBusy(true);
+
+            rpc('casino_spin', { p_token: acct.token, p_bet: bet }).then(function (r) {
+                if (!r || !r.ok) {
+                    reelsEl.classList.remove('spinning');
+                    setBusy(false);
+                    if (r && r.error === 'session') {
+                        msgEl.className = 'warn';
+                        msgEl.textContent = 'Your login expired. Log in again.';
+                        logout();
+                    } else {
+                        msgEl.className = 'warn';
+                        msgEl.textContent = 'The vault refused the spin. Refresh your balance and try again.';
+                    }
+                    return;
+                }
+                var line = r.reels.map(function (id) { return byId[id] || SYMBOLS[0]; });
+                animate(line, r);
+            }).catch(function () {
+                reelsEl.classList.remove('spinning');
+                setBusy(false);
+                msgEl.className = 'warn';
+                msgEl.textContent = 'The vault did not answer. Refresh your balance before spinning again.';
+            });
+        }
+
+        function animate(line, result) {
+            var strips = [null, null, null];
+            var started = Date.now();
+
+            var timer = setInterval(function () {
+                var elapsed = Date.now() - started;
+                var stillSpinning = false;
+                for (var i = 0; i < 3; i++) {
+                    if (strips[i]) continue;
+                    if (elapsed >= STOP_MS[i]) {
+                        strips[i] = finalStrip(line[i]);
+                        renderReel(i, strips[i]);
+                    } else {
+                        renderReel(i, randomStrip());
+                        stillSpinning = true;
+                    }
+                }
+                if (!stillSpinning) {
+                    clearInterval(timer);
+                    reelsEl.classList.remove('spinning');
+                    settle(line, result);
+                }
+            }, FRAME_MS);
+        }
+
+        function settle(line, r) {
+            var win = Number(r.win) || 0;
+            var bet = Number(r.bet) || currentBet();
+            var isTriple = line[0] === line[1] && line[1] === line[2];
+            var label = '';
+
+            acct.gold = Number(r.gold) || 0;
+            acct.jackpot = Number(r.jackpot);
+
+            session.spins++;
+            session.wagered += bet;
+            session.won += win;
+            acct.lifetime.spins++;
+            acct.lifetime.wagered += bet;
+            acct.lifetime.won += win;
+            if (win > acct.lifetime.biggest) acct.lifetime.biggest = win;
+            if (r.jackpot_hit) acct.lifetime.jackpots++;
+
+            if (r.jackpot_hit) {
+                label = 'JACKPOT! ' + fmt(win) + ' gold';
+                msgEl.className = 'jackpot-hit';
+                msgEl.textContent = label;
+            } else if (win > 0 && isTriple) {
+                if (line[0].id === 'star') {
+                    label = 'Star triple pays ' + line[0].pay3 + '× below max bet — ' + fmt(win) + ' gold';
+                } else {
+                    label = 'Three ' + line[0].glyph + ' — ' + line[0].pay3 + '× — ' + fmt(win) + ' gold';
+                }
+                msgEl.className = 'win';
+                msgEl.textContent = label;
+            } else if (win > 0) {
+                msgEl.className = 'win';
+                msgEl.textContent = 'Two cherries — ' + fmt(win) + ' gold';
+            } else {
+                msgEl.className = 'lose';
+                msgEl.textContent = 'No win on the payline.';
+            }
+
+            render();
+            renderMath();
+            loadSummary(false);
+            setBusy(false);
+        }
+
+        // ---- Controls -----------------------------------------------------------
+        spinBtn.addEventListener('click', spin);
+        betSelect.addEventListener('change', function () {
+            spinBtn.disabled = spinning || !acct.token || acct.gold < currentBet();
+            renderMath();
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.code === 'Space' && !/^(INPUT|SELECT|TEXTAREA|BUTTON)$/.test(document.activeElement.tagName)) {
+                e.preventDefault();
+                spin();
+            }
+        });
+        document.getElementById('acct-login').addEventListener('click', login);
+        document.getElementById('acct-pass').addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') login();
+        });
+        document.getElementById('acct-logout').addEventListener('click', logout);
+        document.getElementById('acct-refresh').addEventListener('click', refresh);
+        document.getElementById('acct-withdraw').addEventListener('click', requestPayout);
+        document.getElementById('hist-refresh').addEventListener('click', function () { loadSummary(true); });
+        document.getElementById('hist-csv').addEventListener('click', downloadHistory);
+
+        // ---- Boot ---------------------------------------------------------------
+        betSelect.value = String(CFG.bets[3]);
+        render();
+        renderMath();
+        restore();
+    })();
+    </script>
+    <script>
+        function hasSession() { return Object.keys(localStorage).some(function(k){return k.startsWith('sb-') && localStorage.getItem(k);}); }
+        if (sessionStorage.getItem('editor_logged_in') === 'true') {
+            document.getElementById('editor-dropdown').style.display = 'inline-block';
+            document.getElementById('admin-link').style.display = 'inline';
+            document.getElementById('logout-link').style.display = 'inline';
+            document.getElementById('login-link').style.display = 'none';
+        }
+        if (localStorage.getItem('user_logged_in') === 'true' || hasSession()) {
+            document.getElementById('login-link').style.display = 'none';
+            document.getElementById('signup-link').style.display = 'none';
+            document.getElementById('admin-link').style.display = 'inline';
+            document.getElementById('logout-link').style.display = 'inline';
+        }
+        function logout() {
+            Object.keys(localStorage).filter(function(k){return k.startsWith('sb-');}).forEach(function(k){localStorage.removeItem(k);});
+            sessionStorage.removeItem('editor_logged_in');
+            sessionStorage.removeItem('editor_name');
+            localStorage.removeItem('user_logged_in');
+            localStorage.removeItem('username');
+            location.reload();
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex,nofollow">
+    <title>Vault admin - HukoDB</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: "Inter", sans-serif; max-width: 1100px; margin: 0 auto; padding: 20px; background: #1a1a1a; color: #ccc; }
+        a { color: #8787FF; }
+        h1, h2, h3 { color: #C0C0C0; }
+        h1 { font-size: 22px; margin-bottom: 4px; }
+        input { padding: 8px; background: #111; color: #eee; border: 1px solid #555; border-radius: 3px; font-family: "Inter", sans-serif; font-size: 13px; }
+        input:focus { outline: 1px solid #FFD700; }
+        button { padding: 8px 14px; background: #333; color: #ccc; border: 1px solid #555; border-radius: 3px; cursor: pointer; font-family: "Inter", sans-serif; }
+        button:hover { background: #444; }
+        .panel { background: #222; border: 1px solid #333; border-radius: 8px; padding: 16px; margin-top: 16px; }
+        .field { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 8px 0; font-size: 13px; }
+        .field label { color: #888; }
+        .kv { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-size: 13px; }
+        .kv div:nth-child(even) { text-align: right; color: #C0C0C0; }
+        .gold { color: #FFD700; }
+        .ok { color: #44dd44; }
+        .bad { color: #ff4444; }
+        .warn { color: #ffaa00; }
+        .tiny { font-size: 11px; color: #777; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+        th { text-align: left; color: #888; font-weight: normal; border-bottom: 1px solid #333; padding: 6px 4px; }
+        td { padding: 5px 4px; border-bottom: 1px solid #262626; vertical-align: top; }
+        code { color: #7CFC9E; }
+        #unlock { max-width: 420px; }
+        .mono { font-family: monospace; }
+    </style>
+</head>
+<body>
+    <h1>Vault admin</h1>
+    <p class="tiny">Read-only. Requires the bot secret from <code>schema-casino.sql</code>; it is kept in this tab only. <a href="casino.html">Back to the casino</a></p>
+
+    <section class="panel" id="unlock">
+        <div class="field">
+            <label for="secret">Bot secret</label>
+            <input type="password" id="secret" size="36" autocomplete="off">
+            <button id="unlock-btn">Unlock</button>
+        </div>
+        <div id="unlock-msg" class="tiny"></div>
+    </section>
+
+    <div id="tools" style="display:none;">
+        <section class="panel">
+            <h2>Character</h2>
+            <div class="field">
+                <label for="who">Name</label>
+                <input type="text" id="who" size="18" autocomplete="off">
+                <button id="check-btn">Look up</button>
+                <button id="spins-btn">Spins only</button>
+                <button id="verify-btn">Verify log chain</button>
+                <button id="lock-btn" style="margin-left:auto;">Lock</button>
+            </div>
+            <div id="account"></div>
+        </section>
+
+        <section class="panel">
+            <h2>Reference</h2>
+            <div class="field">
+                <label for="ref">WD-XXXXXX</label>
+                <input type="text" id="ref" size="14" autocomplete="off">
+                <button id="ref-btn">Look up</button>
+            </div>
+            <div id="ref-out"></div>
+        </section>
+    </div>
+
+    <script>
+    (function () {
+        'use strict';
+
+        var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
+        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
+        var KEY = 'vault_admin_secret';
+        var secret = sessionStorage.getItem(KEY) || '';
+
+        function rpc(fn, args) {
+            return fetch(SUPABASE_URL + '/rest/v1/rpc/' + fn, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+                },
+                body: JSON.stringify(args)
+            }).then(function (res) {
+                return res.text().then(function (text) {
+                    var data = null;
+                    try { data = text ? JSON.parse(text) : null; } catch (e) { /* not json */ }
+                    if (!res.ok) throw new Error((data && (data.message || data.error)) || ('HTTP ' + res.status));
+                    return data;
+                });
+            });
+        }
+
+        function esc(v) {
+            return String(v == null ? '' : v)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+        function fmt(n) { return Math.floor(Number(n) || 0).toLocaleString('en-US'); }
+        function when(s) { return s ? new Date(s).toLocaleString() : '—'; }
+        function row(k, v) { return '<div>' + k + '</div><div>' + v + '</div>'; }
+
+        var LABELS = {
+            account_created: 'Account created', password_reset: 'Password reset',
+            login: 'Login', login_failed: 'Login failed', balance_check: 'Balance check',
+            deposit: 'Deposit', deposit_held: 'Deposit held',
+            refund_taken: 'Refund issued', refund_returned: 'Refund returned',
+            withdraw: 'Withdrawal', withdraw_cancelled: 'Withdrawal cancelled',
+            payout_paid: 'Payout sent', payout_failed: 'Payout refunded',
+            spin: 'Spin', jackpot: 'Jackpot'
+        };
+
+        function eventsTable(events) {
+            if (!events || !events.length) return '<p class="tiny">No events.</p>';
+            var rows = events.map(function (e) {
+                var meta = e.meta && typeof e.meta === 'object' ? JSON.stringify(e.meta) : '';
+                return '<tr>' +
+                    '<td class="tiny mono">' + esc(e.id) + '</td>' +
+                    '<td class="tiny">' + esc(when(e.at)) + '</td>' +
+                    '<td>' + esc(LABELS[e.action] || e.action) + '</td>' +
+                    '<td class="tiny">' + esc(e.actor) + '</td>' +
+                    '<td class="' + ((e.delta || 0) > 0 ? 'ok' : '') + '">' +
+                        ((e.delta || 0) > 0 ? '+' : '') + fmt(e.delta) + '</td>' +
+                    '<td>' + fmt(e.balance) + '</td>' +
+                    '<td class="tiny">' + esc(e.ref || '') + '</td>' +
+                    '<td class="tiny mono">' + esc(meta) + '</td>' +
+                    '<td class="tiny mono">' + esc((e.hash || '').slice(0, 10)) + '</td>' +
+                    '</tr>';
+            }).join('');
+            return '<table><thead><tr><th>ID</th><th>When</th><th>Action</th><th>Actor</th>' +
+                '<th>Gold</th><th>Balance</th><th>Ref</th><th>Detail</th><th>Hash</th></tr></thead><tbody>' +
+                rows + '</tbody></table>';
+        }
+
+        function showAccount(r, spinsOnly) {
+            var L = r.lifetime || {};
+            var html = '<div class="kv" style="max-width:460px;">' +
+                row('Character', esc(r.character)) +
+                row('Balance', '<span class="gold">' + fmt(r.gold) + '</span> gold') +
+                row('Pending gold', fmt(r.pending)) +
+                row('Events', fmt(r.events)) +
+                row('Account since', when(r.created_at)) +
+                row('Last login', when(r.last_login)) +
+                row('Deposited', fmt(L.deposited) + ' gold') +
+                row('Withdrawn', fmt(L.withdrawn) + ' gold') +
+                row('Wagered', fmt(L.wagered) + ' gold') +
+                row('Won', fmt(L.won) + ' gold') +
+                row('Net', fmt(r.net) + ' gold') +
+                row('Balance check', r.balanced ? '<span class="ok">matches the ledger</span>'
+                                                : '<span class="bad">MISMATCH</span>') +
+                row('Spins', fmt(L.spins)) +
+                row('Biggest win', fmt(L.biggest) + ' gold') +
+                row('Jackpots', fmt(L.jackpots)) +
+                row('Last action', when(L.last_seen)) +
+                '</div>';
+
+            if (r.payouts && r.payouts.length) {
+                html += '<h3>Open payouts</h3><table><thead><tr><th>Ref</th><th>Asked</th><th>Net</th>' +
+                    '<th>Source</th><th>Requested</th></tr></thead><tbody>' +
+                    r.payouts.map(function (p) {
+                        return '<tr><td class="mono">' + esc(p.ref) + '</td><td>' + fmt(p.amount) +
+                            '</td><td>' + fmt(p.net) + '</td><td>' + esc(p.source) +
+                            '</td><td class="tiny">' + esc(when(p.requested_at)) + '</td></tr>';
+                    }).join('') + '</tbody></table>';
+            }
+
+            html += '<h3>' + (spinsOnly ? 'Recent spins' : 'Last 20 events') + '</h3>' +
+                eventsTable(r.events || r.recent || []);
+            document.getElementById('account').innerHTML = html;
+        }
+
+        function lookup(spinsOnly) {
+            var who = document.getElementById('who').value.trim();
+            if (!who) return;
+            document.getElementById('account').innerHTML = '<p class="tiny">Looking up ' + esc(who) + '…</p>';
+
+            if (spinsOnly) {
+                rpc('casino_admin_history', {
+                    p_secret: secret, p_character: who, p_limit: 30, p_offset: 0, p_action: 'spins'
+                }).then(function (r) {
+                    if (!r || !r.ok) {
+                        document.getElementById('account').innerHTML = '<p class="bad">Lookup failed.</p>';
+                        return;
+                    }
+                    document.getElementById('account').innerHTML =
+                        '<h3>' + esc(who) + ' - last 30 spins</h3>' + eventsTable(r.events);
+                }).catch(function (e) {
+                    document.getElementById('account').innerHTML = '<p class="bad">' + esc(e.message) + '</p>';
+                });
+                return;
+            }
+
+            rpc('casino_admin_account', { p_secret: secret, p_character: who }).then(function (r) {
+                if (!r || !r.ok) {
+                    document.getElementById('account').innerHTML =
+                        '<p class="bad">' + (r && r.error === 'no_account' ? 'No account for that character.' : 'Lookup failed.') + '</p>';
+                    return;
+                }
+                showAccount(r, false);
+            }).catch(function (e) {
+                document.getElementById('account').innerHTML = '<p class="bad">' + esc(e.message) + '</p>';
+            });
+        }
+
+        function lookupRef() {
+            var ref = document.getElementById('ref').value.trim().toUpperCase();
+            if (!ref) return;
+            var out = document.getElementById('ref-out');
+            out.innerHTML = '<p class="tiny">Looking up ' + esc(ref) + '…</p>';
+
+            rpc('casino_admin_ref', { p_secret: secret, p_ref: ref }).then(function (r) {
+                if (!r || !r.ok) {
+                    out.innerHTML = '<p class="bad">No record for ' + esc(ref) + '.</p>';
+                    return;
+                }
+                var html = '';
+                var p = r.payout;
+                if (p && typeof p === 'object') {
+                    html += '<div class="kv" style="max-width:460px;">' +
+                        row('Ref', esc(p.ref)) +
+                        row('Character', esc(p.character)) +
+                        row('Asked', fmt(p.amount) + ' gold') +
+                        row('Fee', fmt(p.fee) + ' gold') +
+                        row('Net', fmt(p.net) + ' gold') +
+                        row('Source', esc(p.source)) +
+                        row('Status', esc(p.status)) +
+                        row('Requested', when(p.requested_at)) +
+                        row('Paid', when(p.paid_at)) +
+                        '</div>';
+                }
+                html += '<h3>Events for this ref</h3>' + eventsTable(r.events);
+                out.innerHTML = html;
+            }).catch(function (e) {
+                out.innerHTML = '<p class="bad">' + esc(e.message) + '</p>';
+            });
+        }
+
+        function verify() {
+            var out = document.getElementById('account');
+            out.innerHTML = '<p class="tiny">Checking the hash chain…</p>';
+            rpc('casino_verify_chain', { p_secret: secret }).then(function (r) {
+                if (!r || !r.ok) {
+                    out.innerHTML = '<p class="bad">Verify failed.</p>';
+                    return;
+                }
+                if (r.valid) {
+                    out.innerHTML = '<div class="kv" style="max-width:520px;">' +
+                        row('Chain', '<span class="ok">intact</span>') +
+                        row('Events checked', fmt(r.checked)) +
+                        row('Rows before chain', fmt(r.skipped)) +
+                        row('Head', '<span class="mono tiny">' + esc(r.head) + '</span>') +
+                        '</div>';
+                } else {
+                    out.innerHTML = '<div class="kv" style="max-width:520px;">' +
+                        row('Chain', '<span class="bad">BROKEN</span>') +
+                        row('First bad event', fmt(r.broken_at)) +
+                        row('Checked before it', fmt(r.checked)) +
+                        '</div>';
+                }
+            }).catch(function (e) {
+                out.innerHTML = '<p class="bad">' + esc(e.message) + '</p>';
+            });
+        }
+
+        function unlock() {
+            var value = document.getElementById('secret').value.trim();
+            if (!value) {
+                document.getElementById('unlock-msg').textContent = 'Enter the secret.';
+                return;
+            }
+            secret = value;
+            sessionStorage.setItem(KEY, value);
+            document.getElementById('secret').value = '';
+            document.getElementById('unlock-msg').textContent = '';
+            document.getElementById('unlock').style.display = 'none';
+            document.getElementById('tools').style.display = 'block';
+        }
+
+        document.getElementById('unlock-btn').addEventListener('click', unlock);
+        document.getElementById('secret').addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') unlock();
+        });
+        document.getElementById('check-btn').addEventListener('click', function () { lookup(false); });
+        document.getElementById('spins-btn').addEventListener('click', function () { lookup(true); });
+        document.getElementById('ref-btn').addEventListener('click', lookupRef);
+        document.getElementById('verify-btn').addEventListener('click', verify);
+        document.getElementById('lock-btn').addEventListener('click', function () {
+            sessionStorage.removeItem(KEY);
+            location.reload();
+        });
+        document.getElementById('who').addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') lookup(false);
+        });
+        document.getElementById('ref').addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') lookupRef();
+        });
+
+        if (secret) {
+            document.getElementById('unlock').style.display = 'none';
+            document.getElementById('tools').style.display = 'block';
+        }
+    })();
+    </script>
+</body>
+</html>
