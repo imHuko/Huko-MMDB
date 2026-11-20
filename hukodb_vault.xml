@@ -224,9 +224,9 @@ local ok_ssl, https = pcall(require, "ssl.https")
 
 local VAULT = {
 
-  url          = "https://fpvwpxtsrmrmdvnswrzx.supabase.co",
+  url          = "https://dnklaemuuqckoriotrcv.supabase.co",
 
-  anon         = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY",
+  anon         = "sb_publishable_kp8O84wZUwzqEc2o8YTbxA_yiZVy3LV",
 
   bot_name     = "HukoDB",
 
@@ -518,7 +518,7 @@ local function rpc(fn, args)
 
       ["apikey"]         = VAULT.anon,
 
-      ["Authorization"]  = "Bearer " .. VAULT.anon
+      ["Authorization"]  = VAULT.anon:sub(1, 3) ~= "sb_" and ("Bearer " .. VAULT.anon) or nil
 
     },
 
