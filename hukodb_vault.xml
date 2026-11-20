@@ -1574,6 +1574,36 @@ end
 
 
 
+-- One whisper per paid request, sent only after the site has recorded the
+
+-- row, so it can say the request is closed. 'tell' is the game's private
+
+-- channel: the bot has no other way to reach a single player.
+
+local function whisperPaid(row, recipient)
+
+  local net = tonumber(row.net) or 0
+
+  local fee = tonumber(row.fee) or 0
+
+  local amount = tonumber(row.amount) or (net + fee)
+
+  local feeNote = ""
+
+  if fee > 0 then
+
+    feeNote = " (" .. fmt(amount) .. " requested, " .. fmt(fee) .. " bank fee)"
+
+  end
+
+  tell(recipient, "Payout " .. tostring(row.ref) .. " sent and closed: " ..
+
+    fmt(net) .. " gold is in your bank account" .. feeNote .. ".")
+
+end
+
+
+
 -- Operator: send every payout the site has queued, oldest first, from one
 
 -- command. Each row still goes through settlePayout, so a request is only
@@ -1657,6 +1687,8 @@ function vaultPayAll()
         paid = paid + 1
 
         total = total + (tonumber(row.net) or 0)
+
+        whisperPaid(row, row.character)
 
         if i < #rows then wait.time(1) end
 

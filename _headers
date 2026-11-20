@@ -6,6 +6,11 @@
   X-Frame-Options: DENY
   Cross-Origin-Resource-Policy: same-origin
 
+# Recorded machine sounds are large and rarely change, so let the browser keep
+# them. A day, not a year: they are still being re-recorded and swapped.
+/audio/*
+  Cache-Control: public, max-age=86400
+
 # The admin page holds a vault-wide credential in the tab. Do not index it and
 # do not let it sit in any cache. (.git is not published at all: see
 # .assetsignore.)

@@ -223,6 +223,7 @@
                 rpc('casino_admin_history', {
                     p_secret: secret, p_character: who, p_limit: 30, p_offset: 0, p_action: 'spins'
                 }).then(function (r) {
+                    if (denied(r)) return;
                     if (!r || !r.ok) {
                         document.getElementById('account').innerHTML = '<p class="bad">Lookup failed.</p>';
                         return;
@@ -236,6 +237,7 @@
             }
 
             rpc('casino_admin_account', { p_secret: secret, p_character: who }).then(function (r) {
+                if (denied(r)) return;
                 if (!r || !r.ok) {
                     document.getElementById('account').innerHTML =
                         '<p class="bad">' + (r && r.error === 'no_account' ? 'No account for that character.' : 'Lookup failed.') + '</p>';
@@ -254,6 +256,7 @@
             out.innerHTML = '<p class="tiny">Looking up ' + esc(ref) + '…</p>';
 
             rpc('casino_admin_ref', { p_secret: secret, p_ref: ref }).then(function (r) {
+                if (denied(r)) return;
                 if (!r || !r.ok) {
                     out.innerHTML = '<p class="bad">No record for ' + esc(ref) + '.</p>';
                     return;
@@ -327,6 +330,10 @@
                         lines.push('<tr><td>' + esc(r.character) + '</td><td class="ok">' +
                             (r.granted > 0 ? '+' : '') + fmt(r.granted) + '</td><td>' +
                             fmt(r.bonus) + '</td></tr>');
+                    } else if (r && r.error === 'denied') {
+                        btn.disabled = false;
+                        showUnlock();
+                        return;
                     } else {
                         var why = (r && r.error === 'no_account') ? 'no such account'
                             : (r && r.error === 'denied') ? 'secret rejected'
@@ -351,6 +358,7 @@
             var out = document.getElementById('account');
             out.innerHTML = '<p class="tiny">Checking the hash chain…</p>';
             rpc('casino_verify_chain', { p_secret: secret }).then(function (r) {
+                if (denied(r)) return;
                 if (!r || !r.ok) {
                     out.innerHTML = '<p class="bad">Verify failed.</p>';
                     return;
@@ -380,15 +388,49 @@
             document.getElementById('tools').style.display = 'block';
         }
 
+        // A rejected credential puts the box back rather than leaving every
+        // button failing with no way to re-enter it.
+        function showUnlock() {
+            secret = '';
+            document.getElementById('tools').style.display = 'none';
+            document.getElementById('unlock').style.display = 'block';
+            document.getElementById('unlock-msg').innerHTML =
+                '<span class="bad">That credential was rejected. Enter it again.</span>';
+        }
+
+        function denied(r) {
+            if (r && r.error === 'denied') { showUnlock(); return true; }
+            return false;
+        }
+
         function unlock() {
+            var btn = document.getElementById('unlock-btn');
+            var msg = document.getElementById('unlock-msg');
             var value = document.getElementById('secret').value.trim();
-            if (!value) {
-                document.getElementById('unlock-msg').textContent = 'Enter the secret.';
-                return;
-            }
-            secret = value;
-            document.getElementById('secret').value = '';
-            showTools();
+
+            if (!value) { msg.textContent = 'Enter the secret.'; return; }
+
+            // Check the value before hiding this panel. Unlocking on an
+            // unverified secret used to take the box away, so a typo left the
+            // page with every button denied and no way back but a reload.
+            // casino_audit is the cheapest call that requires the credential.
+            btn.disabled = true;
+            msg.textContent = 'Checking…';
+            rpc('casino_audit', { p_secret: value }).then(function (r) {
+                btn.disabled = false;
+                if (!r || !r.ok) {
+                    msg.innerHTML = '<span class="bad">That secret was not accepted' +
+                        (r && r.error && r.error !== 'denied' ? ' (' + esc(r.error) + ')' : '') +
+                        '.</span>';
+                    return;
+                }
+                secret = value;
+                document.getElementById('secret').value = '';
+                showTools();
+            }).catch(function (e) {
+                btn.disabled = false;
+                msg.innerHTML = '<span class="bad">' + esc(e.message) + '</span>';
+            });
         }
 
         // An operator account opens this panel with its own casino login. What
@@ -417,7 +459,9 @@
                 if (!r.is_admin) {
                     // Do not leave a session open for an account that is not an operator.
                     rpc('casino_logout', { p_token: r.token }).catch(function () {});
-                    msg.textContent = 'That account is not an operator.';
+                    msg.textContent = (r.is_admin === undefined)
+                        ? 'This schema has no operator flag yet; use the secret until it is updated.'
+                        : 'That account is not an operator.';
                     return;
                 }
                 secret = r.token;
