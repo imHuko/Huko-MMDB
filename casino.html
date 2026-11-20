@@ -78,6 +78,8 @@
         .dcell { font-size: 30px; height: 44px; line-height: 44px; text-align: center; border-radius: 4px; user-select: none; }
         .dcell.hit { background: #2a2410; outline: 1px solid #FFD700; }
         #dgrid.spinning .dcell { filter: blur(1px); opacity: 0.75; }
+        .dcol.teasing { border-color: #FFD700; animation: teasepulse 0.45s infinite; }
+        @keyframes teasepulse { 0%, 100% { box-shadow: 0 0 0 rgba(255,215,0,0); } 50% { box-shadow: 0 0 14px rgba(255,215,0,0.5); } }
         .freebar { display: none; text-align: center; border: 1px solid #7CFC9E; background: #0e1f12; color: #7CFC9E; border-radius: 6px; padding: 8px; font-size: 13px; letter-spacing: 1px; margin-top: 12px; }
         .freebar.on { display: block; animation: fpulse 1.6s infinite; }
         @keyframes fpulse { 0%, 100% { box-shadow: 0 0 0 rgba(124,252,158,0); } 50% { box-shadow: 0 0 14px rgba(124,252,158,0.45); } }
@@ -88,6 +90,9 @@
         .spinlog td.w { color: #44dd44; text-align: right; }
         .pt-panel { display: none; }
         .pt-panel.on { display: block; }
+        ul.rules { font-size: 12px; color: #999; line-height: 1.65; margin: 6px 0 10px; padding-left: 18px; }
+        ul.rules li { margin-bottom: 5px; }
+        ul.rules strong { color: #C0C0C0; }
     </style>
 </head>
 <body>
@@ -266,6 +271,17 @@
             <p class="note">Multiples of the <strong>line</strong> bet (the scatter pays the total bet). Wins run left to right on nine fixed lines; the dragon is wild for every symbol.</p>
             <h2>Free spins</h2>
             <p class="note" style="margin-top:0;">Three gold bags anywhere pay the scatter prize and start <strong>8 free spins</strong>. Every win in the round is doubled, and three more bags add <strong>5</strong> to the count. Free spins are held by the vault: log out, come back, and the round is still there.</p>
+            <h2>Rules</h2>
+            <ul class="rules">
+                <li>Nine fixed lines cross the grid, taking one symbol from each of the five reels. A total bet of 90 gold means 10 gold on each of the nine lines.</li>
+                <li><strong>A line pays from the far-left reel only.</strong> Three, four or five of the same symbol, in a row, starting on reel 1. The same three symbols starting one reel further right pay <strong>nothing</strong>.</li>
+                <li><strong>Only symbols on a line count.</strong> Three 💎 on three different lines, or in rows that do not line up left to right, are not a win &mdash; the rest of the grid is decoration.</li>
+                <li>The dragon 🐉 is wild: it stands in for every symbol except the bag, so 🐉💎💎 also pays as three gems.</li>
+                <li>Each of the nine lines is judged and paid on its own, and the paytable above is a multiple of the <strong>line</strong> bet, not the total.</li>
+                <li>💰 is the exception: bags pay <strong>anywhere</strong> on the grid (2&times;, 10&times;, 60&times; the total bet) and three of them start the free spins.</li>
+                <li>Free spins are played at the bet that won them and cannot be changed mid-round; leaving the page does not lose them.</li>
+            </ul>
+            <p class="note" style="margin-top:0;">In short: a payout always starts at the left edge of the grid. Gems that dropped in the middle reels, or that are not on one of the nine lines, pay nothing &mdash; that is the machine working as designed, not a lost win.</p>
             <h2>Machine numbers</h2>
             <div class="kv" id="dragon-math"></div>
             </div>
@@ -1178,25 +1194,99 @@
                 row('Top prize', '1280&times; line bet');
         }
 
+        // ---- Reveal ------------------------------------------------------------
+        // The grid is already decided when the spin comes back from the vault;
+        // this only controls how it is shown. A reel the outcome still depends
+        // on turns a beat longer with its column lit, so the symbol that makes
+        // the line lands on its own instead of with the rest of the grid.
+        var D_STOPS = [700, 900, 1100, 1300, 1500];
+        var D_FRAME_MS = 70;
+        var TEASE_HOLD_MS = 240;      // a line is still alive through this reel
+        var TEASE_BAGS_MS = 320;      // two bags are already showing
+
+        function dColumn(c) { return dcellEls[c * 3].parentNode; }
+
+        function dTeaseHolds(grid, result) {
+            var holds = [0, 0, 0, 0, 0];
+            var lines = (result && result.lines) || [];
+            var i, c, r;
+
+            // A line only pays if it reaches this reel, so hold every reel the
+            // winning run passes through.
+            for (i = 0; i < lines.length; i++) {
+                var n = Math.min(Number(lines[i].count) || 0, 5);
+                for (c = 1; c < n; c++) {
+                    if (holds[c] < TEASE_HOLD_MS) holds[c] = TEASE_HOLD_MS;
+                }
+            }
+
+            // Bags: once two are in view, whatever is left is worth waiting for.
+            var bags = 0;
+            for (c = 0; c < 5; c++) {
+                for (r = 0; r < 3; r++) if (grid[c][r] === 'scatter') bags++;
+                if (bags >= 2 && c < 4 && holds[c + 1] < TEASE_BAGS_MS) {
+                    holds[c + 1] = TEASE_BAGS_MS;
+                }
+            }
+            return holds;
+        }
+
+        // A grid can hold three of a symbol and still pay nothing, because a
+        // line only counts from the far-left reel. Name the symbol so the
+        // player can see why instead of only being told that nothing landed.
+        function dNearMiss(grid) {
+            var counts = {}, best = null;
+            for (var c = 0; c < 5; c++) {
+                for (var r = 0; r < 3; r++) {
+                    var id = grid[c][r];
+                    if (id === 'scatter') continue;
+                    counts[id] = (counts[id] || 0) + 1;
+                }
+            }
+            for (var k in counts) {
+                if (!best || counts[k] > counts[best]) best = k;
+            }
+            return best && counts[best] >= 3 ? { id: best, n: counts[best] } : null;
+        }
+
         function dAnimate(grid, result) {
             dClearHits();
             dgridEl.classList.add('spinning');
-            var stops = [700, 900, 1100, 1300, 1500];
+
+            var holds = dTeaseHolds(grid, result);
+            var stops = [];
+            for (var i = 0; i < 5; i++) {
+                var at = D_STOPS[i] + holds[i];
+                // Reels must land left to right whatever the holds add up to.
+                if (i > 0 && at < stops[i - 1] + 100) at = stops[i - 1] + 100;
+                stops.push(at);
+                dColumn(i).classList.remove('teasing');
+            }
+
             var done = [false, false, false, false, false];
             var started = Date.now();
+
+            function land(c) {
+                done[c] = true;
+                dColumn(c).classList.remove('teasing');
+                for (var r = 0; r < 3; r++) {
+                    dcellEls[c * 3 + r].textContent = dGlyph(grid[c][r]);
+                }
+            }
+
             var timer = setInterval(function () {
                 var elapsed = Date.now() - started;
                 var still = false;
                 for (var c = 0; c < 5; c++) {
                     if (done[c]) continue;
                     if (elapsed >= stops[c]) {
-                        done[c] = true;
-                        for (var r = 0; r < 3; r++) {
-                            dcellEls[c * 3 + r].textContent = dGlyph(grid[c][r]);
-                        }
+                        land(c);
                     } else {
                         for (var r2 = 0; r2 < 3; r2++) {
                             dcellEls[c * 3 + r2].textContent = dGlyph(dRandomSymbol());
+                        }
+                        if (holds[c] && elapsed >= D_STOPS[c]) {
+                            dColumn(c).classList.add('teasing');
                         }
                         still = true;
                     }
@@ -1206,7 +1296,7 @@
                     dgridEl.classList.remove('spinning');
                     dSettle(grid, result);
                 }
-            }, 70);
+            }, D_FRAME_MS);
         }
 
         function dSettle(grid, r) {
@@ -1239,7 +1329,13 @@
             } else if (r.free) {
                 dMsg('No win. ' + (r.freespins ? r.freespins.left : 0) + ' free spins left.', 'lose');
             } else {
-                dMsg('No win. Nine lines, nothing landed.', 'lose');
+                var near = dNearMiss(grid);
+                if (near) {
+                    dMsg('No win: ' + dGlyph(near.id) + ' ×' + near.n + ' were on the grid, but a ' +
+                        'line only pays three or more in a row starting on the far-left reel.', 'lose');
+                } else {
+                    dMsg('No win. Nine lines, nothing landed.', 'lose');
+                }
             }
 
             if (r.lines && r.lines.length) dShowHits(r.lines);
