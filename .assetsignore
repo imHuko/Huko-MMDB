@@ -1,0 +1,28 @@
+# Everything in this folder is uploaded as a public static asset, because
+# wrangler.jsonc points assets.directory at the repo root. Workers Assets reads
+# .assetsignore (not .gitignore, and not .wranglerignore), so this file is what
+# actually decides what the internet can download. Keep it in step with the repo.
+
+# --- source control and tooling -------------------------------------------
+.git/
+.gitignore
+.wranglerignore
+.assetsignore
+.wrangler/
+.freebuff/
+.cloud-attachments/
+.tmp-check/
+New folder/
+
+# --- server-side and operator files ---------------------------------------
+*.sql
+schema-*.sql
+wrangler.jsonc
+serve.bat
+*.log
+HukoDB_vault.log
+room-data-export*.json
+
+# The bot source is not a download. mmgearcap.xml IS (info.html links to it and
+# the plugin updates from https://hukodb.com/mmgearcap.xml), so it stays.
+hukodb_vault.xml

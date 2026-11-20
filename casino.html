@@ -85,6 +85,14 @@
         @keyframes fpulse { 0%, 100% { box-shadow: 0 0 0 rgba(124,252,158,0); } 50% { box-shadow: 0 0 14px rgba(124,252,158,0.45); } }
         #dragon-spin { background: #7CFC9E; color: #001a08; border: none; font-weight: bold; font-size: 16px; padding: 12px 26px; letter-spacing: 1px; }
         #dragon-spin:hover:not(:disabled) { background: #9dffb9; }
+        .auto-toggle { background: #1a1a1a; border: 1px solid #555; color: #999; font-size: 12px; padding: 9px 12px; letter-spacing: 1px; }
+        .auto-toggle:hover:not(:disabled) { color: #C0C0C0; }
+        .auto-toggle.running { border-color: #FFD700; color: #FFD700; }
+        #dragon-auto-btn.running { border-color: #7CFC9E; color: #7CFC9E; }
+        #auto-count, #dragon-auto-count { padding: 8px 4px; font-size: 12px; }
+        .auto-opt { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: #888; cursor: pointer; }
+        .auto-opt input { accent-color: #FFD700; margin: 0; }
+        .auto-opt:hover { color: #C0C0C0; }
         .spinlog { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
         .spinlog td { padding: 3px 4px; border-bottom: 1px solid #262626; color: #888; }
         .spinlog td.w { color: #44dd44; text-align: right; }
@@ -93,6 +101,15 @@
         ul.rules { font-size: 12px; color: #999; line-height: 1.65; margin: 6px 0 10px; padding-left: 18px; }
         ul.rules li { margin-bottom: 5px; }
         ul.rules strong { color: #C0C0C0; }
+        details.fold { border: 1px solid #333; border-radius: 6px; background: #1f1f1f; margin: 10px 0; }
+        details.fold > summary { cursor: pointer; padding: 10px 12px; font-size: 13px; color: #C0C0C0; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        details.fold > summary::-webkit-details-marker { display: none; }
+        details.fold > summary::marker { content: ''; }
+        details.fold > summary:hover { color: #FFD700; }
+        details.fold > summary::after { content: '+'; color: #888; font-weight: bold; }
+        details.fold[open] > summary::after { content: '\2212'; }
+        details.fold > .fold-body { padding: 0 12px 12px; }
+        details.fold > .fold-body > h2:first-child, details.fold > .fold-body > h3:first-child { margin-top: 0; }
     </style>
 </head>
 <body>
@@ -152,7 +169,7 @@
     </div>
 
     <h1 style="margin-bottom:4px;">The Gold Vault</h1>
-    <p style="color:#888;font-size:13px;margin-top:0;">Three-reel slots, one payline, one progressive jackpot. Played with gold only.</p>
+    <p style="color:#888;font-size:13px;margin-top:0;">Two machines, both paid in gold only: a classic three-reel machine and the five-reel Dragon&rsquo;s Hoard. The rules and numbers for each are behind its summary bar.</p>
 
     <div class="layout">
       <div class="machines">
@@ -184,6 +201,16 @@
                     <option value="500">500 gold (jackpot eligible)</option>
                 </select>
                 <button id="spin-btn">SPIN</button>
+                <button id="auto-btn" class="auto-toggle" title="Spin again and again until stopped">AUTO</button>
+                <select id="auto-count" title="Spins in one auto run">
+                    <option value="10">10</option>
+                    <option value="25" selected>25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+                <label class="auto-opt" title="Stop the run whenever a spin pays anything">
+                    <input type="checkbox" id="auto-pause"> Pause on win
+                </label>
             </div>
 
             <div id="result-msg" class="lose">Log in below to play.</div>
@@ -221,6 +248,16 @@
                     <option value="50">50 gold</option>
                 </select>
                 <button id="dragon-spin">SPIN</button>
+                <button id="dragon-auto-btn" class="auto-toggle" title="Spin again and again until stopped">AUTO</button>
+                <select id="dragon-auto-count" title="Spins in one auto run">
+                    <option value="10">10</option>
+                    <option value="25" selected>25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+                <label class="auto-opt" title="Stop the run whenever a spin pays anything">
+                    <input type="checkbox" id="dragon-auto-pause"> Pause on win
+                </label>
             </div>
 
             <div id="dragon-msg" class="lose" style="text-align:center;font-size:15px;min-height:22px;margin-top:10px;">Log in below to play.</div>
@@ -231,13 +268,21 @@
                 <span class="tiny" style="flex-basis:100%;">Every spin stores the exact five-by-three grid it drew. That record is what settles a dispute.</span>
             </div>
 
-            <div class="tiny" id="dragon-session" style="margin-top:10px;"></div>
-            <table class="spinlog"><tbody id="dragon-log"></tbody></table>
+            <details class="fold" style="margin-top:12px;">
+                <summary>This session</summary>
+                <div class="fold-body">
+                    <div class="tiny" id="dragon-session" style="margin-top:0;"></div>
+                    <table class="spinlog"><tbody id="dragon-log"></tbody></table>
+                </div>
+            </details>
         </section>
       </div>
 
         <aside class="paytable">
             <div id="pt-classic" class="pt-panel on">
+            <details class="fold" style="margin-top:0;">
+            <summary>Paytable &amp; odds</summary>
+            <div class="fold-body">
             <h2 style="margin-top:0;">Paytable</h2>
             <table class="pt" id="paytable-body">
                 <tr><td>🍒 🍒 🍒</td><td>6&times;</td></tr>
@@ -254,8 +299,13 @@
             <div class="kv" id="math-body"></div>
             <p class="note">Base return is fixed by the paytable and reel weights. The jackpot adds value on top at max bet, so max-bet RTP rises as the pool grows.</p>
             </div>
+            </details>
+            </div>
 
             <div id="pt-dragon" class="pt-panel">
+            <details class="fold" style="margin-top:0;">
+            <summary>Paytable, rules &amp; odds</summary>
+            <div class="fold-body">
             <h2 style="margin-top:0;">Dragon&rsquo;s Hoard pays</h2>
             <table class="pt">
                 <tr><td class="tiny"></td><td class="tiny">3</td><td class="tiny">4</td><td class="tiny">5</td></tr>
@@ -285,13 +335,15 @@
             <h2>Machine numbers</h2>
             <div class="kv" id="dragon-math"></div>
             </div>
+            </details>
+            </div>
         </aside>
     </div>
 
-    <section class="panel">
-        <h2>Session</h2>
-        <div class="kv" id="stats-body"></div>
-    </section>
+    <details class="fold">
+        <summary>Session stats &amp; return</summary>
+        <div class="fold-body"><div class="kv" id="stats-body"></div></div>
+    </details>
 
     <section class="panel" id="account">
         <h2>Your vault account</h2>
@@ -319,19 +371,29 @@
                 <div>Gold in account</div><div class="gold" id="acct-gold">0</div>
             </div>
 
-            <h3 style="margin:16px 0 4px;">Deposit</h3>
-            <p class="note" style="margin:0 0 4px;">From any bank, while HukoDB is connected &mdash; this works even when the vault is in social mode:</p>
-            <code class="cmd">bank transfer 10000 HukoDB</code>
-            <p class="note" style="margin:8px 0 4px;">Handing gold over in person works only during a full vault session, in the same room, and costs nothing:</p>
-            <code class="cmd">give 10000 gold to HukoDB</code>
+            <details class="fold">
+                <summary>How to deposit</summary>
+                <div class="fold-body">
+                    <p class="note" style="margin:0 0 4px;">From any bank, while HukoDB is connected &mdash; this works even when the vault is in social mode:</p>
+                    <code class="cmd">bank transfer 10000 HukoDB</code>
+                    <p class="note" style="margin:8px 0 4px;">Handing gold over in person works only during a full vault session, in the same room, and costs nothing:</p>
+                    <code class="cmd">give 10000 gold to HukoDB</code>
+                </div>
+            </details>
 
             <h3 style="margin:16px 0 4px;">Withdraw</h3>
-            <p class="note" style="margin:0 0 4px;">
-                Start it here or in game with <code>tell HukoDB withdraw 5000</code>. Either way the request and the
-                payout are recorded together, and HukoDB only settles the exact net the site recorded. The request
-                waits until HukoDB is next connected, then you <code>tell HukoDB pay</code> while you are both online.
-                The bank fee is deducted.
-            </p>
+            <details class="fold">
+                <summary>How payouts work</summary>
+                <div class="fold-body">
+                    <p class="note" style="margin:0;">
+                        Start it here or in game with <code>tell HukoDB withdraw 5000</code>. Either way the request and the
+                        payout are recorded together, and HukoDB only settles the exact net the site recorded. The request
+                        waits until HukoDB is next connected, then you <code>tell HukoDB pay</code> while you are both online.
+                        The bank fee is deducted. Up to five requests can wait at once, so cancel one if this
+                        one is not wanted.
+                    </p>
+                </div>
+            </details>
             <div class="field">
                 <label for="wd-amount">Gold</label>
                 <input type="number" id="wd-amount" min="1000" step="1000" value="5000" size="10">
@@ -339,21 +401,30 @@
                 <span class="tiny">then <code>tell HukoDB pay</code> to collect</span>
             </div>
 
-            <table class="wd">
-                <thead><tr><th>Date</th><th>Ref</th><th>Asked</th><th>You get</th><th>Status</th><th></th></tr></thead>
-                <tbody id="wd-list"></tbody>
-            </table>
+            <details class="fold">
+                <summary>Your withdrawals</summary>
+                <div class="fold-body">
+                    <table class="wd" style="margin-top:0;">
+                        <thead><tr><th>Date</th><th>Ref</th><th>Asked</th><th>You get</th><th>Status</th><th></th></tr></thead>
+                        <tbody id="wd-list"></tbody>
+                    </table>
+                </div>
+            </details>
 
-            <h3 style="margin:16px 0 4px;">Lifetime summary</h3>
-            <div class="kv" id="sum-body"></div>
-            <div class="field" style="margin-top:8px;">
-                <button id="hist-refresh">Refresh summary</button>
-                <button id="hist-csv">Download statement (CSV)</button>
-            </div>
-            <table class="wd">
-                <thead><tr><th>When</th><th>Action</th><th>Gold</th><th>Balance</th><th>Ref</th></tr></thead>
-                <tbody id="hist-body"></tbody>
-            </table>
+            <details class="fold">
+                <summary>Lifetime summary &amp; statement</summary>
+                <div class="fold-body">
+                    <div class="kv" id="sum-body"></div>
+                    <div class="field" style="margin-top:8px;">
+                        <button id="hist-refresh">Refresh summary</button>
+                        <button id="hist-csv">Download statement (CSV)</button>
+                    </div>
+                    <table class="wd">
+                        <thead><tr><th>When</th><th>Action</th><th>Gold</th><th>Balance</th><th>Ref</th></tr></thead>
+                        <tbody id="hist-body"></tbody>
+                    </table>
+                </div>
+            </details>
 
             <div class="field" style="margin-top:12px;">
                 <button id="acct-refresh">Refresh balance</button>
@@ -452,6 +523,8 @@
         var spinning = false;
         var activeMachine = 'classic';
         var dragonState = { busy: false, freeLeft: 0, freeBet: 0, freeMult: 2 };
+        var autoC = { on: false, left: 0 };
+        var autoD = { on: false, left: 0 };
 
         // ---- DOM ----------------------------------------------------------------
         var reelsEl = document.getElementById('reels');
@@ -465,6 +538,14 @@
         var acctMsgEl = document.getElementById('acct-msg');
 
         function fmt(n) { return Math.floor(n).toLocaleString('en-US'); }
+
+        // Anything the vault stores without control over its content (refs,
+        // action names, error text) is escaped before it goes near innerHTML.
+        function esc(v) {
+            return String(v == null ? '' : v)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
 
         function renderReel(reelIndex, strip) {
             var cells = reelEls[reelIndex].children;
@@ -516,16 +597,16 @@
             return CFG.bets.indexOf(v) >= 0 ? v : CFG.bets[0];
         }
         function updateButtons() {
-            spinBtn.disabled = spinning || !acct.token || acct.gold < currentBet();
-            betSelect.disabled = spinning;
+            spinBtn.disabled = spinning || autoC.on || !acct.token || acct.gold < currentBet();
+            betSelect.disabled = spinning || autoC.on;
             var dragonBtn = document.getElementById('dragon-spin');
             var dragonSel = document.getElementById('dragon-bet');
             if (dragonBtn) {
                 var free = dragonState.freeLeft > 0;
                 var cost = (free ? dragonState.freeBet : dragonBet()) * 9;
-                dragonBtn.disabled = spinning || dragonState.busy || !acct.token || (!free && acct.gold < cost);
+                dragonBtn.disabled = spinning || dragonState.busy || autoD.on || !acct.token || (!free && acct.gold < cost);
             }
-            if (dragonSel) dragonSel.disabled = spinning || dragonState.busy || dragonState.freeLeft > 0;
+            if (dragonSel) dragonSel.disabled = spinning || dragonState.busy || autoD.on || dragonState.freeLeft > 0;
         }
 
         // ---- Website ------------------------------------------------------------
@@ -575,6 +656,8 @@
         }
 
         function showAccount(loggedIn) {
+            classicAutoStop('');
+            dragonAutoStop('');
             document.getElementById('acct-out').style.display = loggedIn ? 'none' : 'block';
             document.getElementById('acct-in').style.display = loggedIn ? 'block' : 'none';
             if (!loggedIn) {
@@ -604,6 +687,7 @@
                 if (!r || !r.ok) {
                     if (r && r.error === 'no_account') acctMsg('No account for that character. Tell HukoDB: login', true);
                     else if (r && r.error === 'bad_password') acctMsg('Wrong password. Tell HukoDB: reset', true);
+                    else if (r && r.error === 'throttled') acctMsg('Too many attempts on that character. Wait ten minutes, then try again.', true);
                     else acctMsg('Login failed. Try again.', true);
                     return;
                 }
@@ -648,6 +732,15 @@
         }
 
         function logout() {
+            var token = acct.token || sessionStorage.getItem(TOKEN_KEY);
+            // Clearing the browser is not enough: the session row stays valid
+            // for 30 days, so a copied token would keep working. Ask the vault
+            // to drop it, then clear locally whatever the answer.
+            if (token) {
+                try {
+                    rpc('casino_logout', { p_token: token }).catch(function () {});
+                } catch (e) { /* offline: still clear the browser copy */ }
+            }
             sessionStorage.removeItem(TOKEN_KEY);
             showAccount(false);
             acctMsg('Logged out.');
@@ -686,11 +779,11 @@
                     : p.status === 'cancelled' ? 'Cancelled'
                     : 'Failed';
                 var act = p.status === 'requested'
-                    ? '<button data-cancel="' + p.id + '" style="font-size:11px;padding:2px 6px;">Cancel</button>'
+                    ? '<button data-cancel="' + esc(p.id) + '" style="font-size:11px;padding:2px 6px;">Cancel</button>'
                     : '';
-                return '<tr><td class="tiny">' + when + '</td><td class="tiny">' + p.ref +
+                return '<tr><td class="tiny">' + esc(when) + '</td><td class="tiny">' + esc(p.ref) +
                     '</td><td class="gold">' + fmt(p.amount) + '</td><td class="gold">' + fmt(p.net) +
-                    '</td><td>' + label + '</td><td>' + act + '</td></tr>';
+                    '</td><td>' + esc(label) + '</td><td>' + act + '</td></tr>';
             }).join('');
             body.querySelectorAll('[data-cancel]').forEach(function (btn) {
                 btn.addEventListener('click', function () { cancelPayout(btn.getAttribute('data-cancel')); });
@@ -724,6 +817,8 @@
             rpc('casino_request_payout', { p_token: acct.token, p_amount: amount }).then(function (r) {
                 if (!r || !r.ok) {
                     if (r && r.error === 'funds') acctMsg('You only have ' + fmt(r.gold) + ' gold in your account.', true);
+                    else if (r && r.error === 'amount') acctMsg('The smallest payout is ' + fmt((r && r.min) || 1000) + ' gold.', true);
+                    else if (r && r.error === 'queue_full') acctMsg('You already have ' + ((r && r.open) || 5) + ' payouts waiting. Cancel one, or wait for HukoDB to pay them.', true);
                     else if (r && r.error === 'session') { acctMsg('Your login expired. Log in again.', true); logout(); }
                     else acctMsg('Could not request that payout.', true);
                     return;
@@ -785,11 +880,11 @@
             }
             body.innerHTML = rows.map(function (e) {
                 var cls = e.delta > 0 ? 'win' : '';
-                return '<tr><td class="tiny">' + new Date(e.at).toLocaleString() +
-                    '</td><td>' + (ACTION_LABELS[e.action] || e.action) +
+                return '<tr><td class="tiny">' + esc(new Date(e.at).toLocaleString()) +
+                    '</td><td>' + esc(ACTION_LABELS[e.action] || e.action) +
                     '</td><td class="' + cls + '">' + (e.delta > 0 ? '+' : '') + fmt(e.delta) +
                     '</td><td>' + fmt(e.balance) +
-                    '</td><td class="tiny">' + (e.ref || '') + '</td></tr>';
+                    '</td><td class="tiny">' + esc(e.ref || '') + '</td></tr>';
             }).join('');
         }
 
@@ -838,7 +933,11 @@
                 });
                 var csv = rows.map(function (cols) {
                     return cols.map(function (v) {
-                        return '"' + String(v).replace(/"/g, '""') + '"';
+                        var s = String(v == null ? '' : v).replace(/"/g, '""');
+                        // A cell starting with =, +, - or @ is a formula to
+                        // Excel, not text. Prefix it so it opens as data.
+                        if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+                        return '"' + s + '"';
                     }).join(',');
                 }).join('\r\n');
 
@@ -869,12 +968,14 @@
         function spin() {
             if (spinning) return;
             if (!acct.token) {
+                classicAutoStop('');
                 msgEl.className = 'warn';
                 msgEl.textContent = 'Log in below to play with the gold in your account.';
                 return;
             }
             var bet = currentBet();
             if (acct.gold < bet) {
+                classicAutoStop('not enough gold for the next spin.');
                 msgEl.className = 'warn';
                 msgEl.textContent = 'Not enough gold. Deposit with HukoDB in game.';
                 return;
@@ -889,6 +990,7 @@
                 if (!r || !r.ok) {
                     reelsEl.classList.remove('spinning');
                     setBusy(false);
+                    classicAutoStop('');
                     if (r && r.error === 'session') {
                         msgEl.className = 'warn';
                         msgEl.textContent = 'Your login expired. Log in again.';
@@ -904,6 +1006,7 @@
             }).catch(function () {
                 reelsEl.classList.remove('spinning');
                 setBusy(false);
+                classicAutoStop('');
                 msgEl.className = 'warn';
                 msgEl.textContent = 'The vault did not answer. Refresh your balance before spinning again.';
             });
@@ -976,6 +1079,8 @@
             renderMath();
             loadSummary(false);
             setBusy(false);
+            if (autoC.on && win > 0 && classicPauseOnWin()) classicAutoPause(win);
+            else classicAutoNext();
         }
 
         // ---- Dragon's Hoard: five reels, nine lines, free spins ----------------
@@ -1344,11 +1449,14 @@
             dragonState.busy = false;
             render();
             loadSummary(false);
+            if (autoD.on && win > 0 && dragonPauseOnWin()) dragonAutoPause(win);
+            else dragonAutoNext();
         }
 
         function dragonSpin() {
             if (dragonState.busy || spinning) return;
             if (!acct.token) {
+                dragonAutoStop('');
                 dMsg('Log in below to play with the gold in your account.', 'warn');
                 return;
             }
@@ -1356,6 +1464,7 @@
             var bet = free ? dragonState.freeBet : dragonBet();
             var cost = free ? 0 : bet * 9;
             if (!free && acct.gold < cost) {
+                dragonAutoStop('not enough gold for the next spin.');
                 dMsg('Not enough gold. A spin here costs ' + fmt(cost) + '.', 'warn');
                 return;
             }
@@ -1369,6 +1478,7 @@
                 if (!r || !r.ok) {
                     dragonState.busy = false;
                     updateButtons();
+                    dragonAutoStop('');
                     if (r && r.error === 'no_free') {
                         dMsg('Those free spins were already used. Balance refreshed.', 'warn');
                         refresh();
@@ -1386,6 +1496,7 @@
             }).catch(function (e) {
                 dragonState.busy = false;
                 updateButtons();
+                dragonAutoStop('');
                 var why = (e && e.message) ? String(e.message) : '';
                 if (/PGRST202|Could not find the function/i.test(why)) {
                     dMsg("Dragon's Hoard is not installed on the server yet. Run schema-casino.sql in Supabase, then spin again.", 'warn');
@@ -1397,8 +1508,163 @@
             });
         }
 
+        // ---- Auto play ----------------------------------------------------------
+        // Repeats the active machine's spin while it can be paid for, so a run
+        // does not need a click per pull. Free spins play without spending the
+        // count. The run stops on its own when the count runs out, the balance
+        // cannot cover the next spin, the vault refuses, or you log out; moving
+        // to the other machine stops it too. Every spin is still the same
+        // server call a single spin makes, so the ledger does not change shape.
+        function setAutoUi(which, on, left) {
+            var dragon = which === 'dragon';
+            var btn = document.getElementById(dragon ? 'dragon-auto-btn' : 'auto-btn');
+            var sel = document.getElementById(dragon ? 'dragon-auto-count' : 'auto-count');
+            if (btn) {
+                btn.textContent = on ? 'STOP (' + left + ')' : (left > 0 ? 'AUTO (' + left + ')' : 'AUTO');
+                btn.classList.toggle('running', on);
+            }
+            if (sel) sel.disabled = on;
+        }
+        function autoCountOf(id) {
+            var sel = document.getElementById(id);
+            var n = Number(sel ? sel.value : 25);
+            return (isFinite(n) && n >= 1) ? Math.floor(n) : 25;
+        }
+
+        function classicPauseOnWin() {
+            var box = document.getElementById('auto-pause');
+            return !!(box && box.checked);
+        }
+        function dragonPauseOnWin() {
+            var box = document.getElementById('dragon-auto-pause');
+            return !!(box && box.checked);
+        }
+
+        // Pause on win: stop with whatever is left of the count intact, so the
+        // same run picks up again when you press AUTO. Free spins are part of
+        // the run, so a win in the round pauses it too.
+        function classicAutoPause(win) {
+            if (!autoC.on) return;
+            autoC.on = false;
+            setAutoUi('classic', false, autoC.left);
+            updateButtons();
+            msgEl.className = 'win';
+            msgEl.textContent = 'Auto paused on a win of ' + fmt(win) + ' gold' +
+                (autoC.left > 0
+                    ? ' - ' + autoC.left + ' spin' + (autoC.left === 1 ? '' : 's') +
+                      ' left, press AUTO to carry on.'
+                    : '.');
+        }
+        function dragonAutoPause(win) {
+            if (!autoD.on) return;
+            autoD.on = false;
+            setAutoUi('dragon', false, autoD.left);
+            updateButtons();
+            dMsg('Auto paused on a win of ' + fmt(win) + ' gold' +
+                (autoD.left > 0
+                    ? ' - ' + autoD.left + ' spin' + (autoD.left === 1 ? '' : 's') +
+                      ' left, press AUTO to carry on.'
+                    : '.'), 'win');
+        }
+
+        function classicAutoStop(why) {
+            if (!autoC.on) return;
+            autoC.on = false;
+            autoC.left = 0;
+            setAutoUi('classic', false, 0);
+            updateButtons();
+            if (why) {
+                msgEl.className = 'warn';
+                msgEl.textContent = 'Auto stopped. ' + why;
+            }
+        }
+        function classicAutoNext() {
+            if (!autoC.on) return;
+            if (!acct.token) { classicAutoStop(''); return; }
+            if (autoC.left <= 0) {
+                autoC.on = false;
+                setAutoUi('classic', false, 0);
+                updateButtons();
+                msgEl.className = 'lose';
+                msgEl.textContent = 'Auto finished.';
+                return;
+            }
+            if (acct.gold < currentBet()) { classicAutoStop('not enough gold for the next spin.'); return; }
+            autoC.left--;
+            setAutoUi('classic', true, autoC.left);
+            updateButtons();
+            setTimeout(function () { if (autoC.on) spin(); }, 320);
+        }
+        function classicAutoToggle() {
+            if (autoC.on) {
+                classicAutoStop('');
+                msgEl.className = 'lose';
+                msgEl.textContent = 'Auto stopped.';
+                return;
+            }
+            if (!acct.token) {
+                msgEl.className = 'warn';
+                msgEl.textContent = 'Log in below to play with the gold in your account.';
+                return;
+            }
+            autoC.on = true;
+            // A paused run resumes where it stopped; otherwise take the count.
+            if (autoC.left < 1) autoC.left = autoCountOf('auto-count');
+            setAutoUi('classic', true, autoC.left);
+            updateButtons();
+            if (!spinning) classicAutoNext();
+        }
+
+        function dragonAutoStop(why) {
+            if (!autoD.on) return;
+            autoD.on = false;
+            autoD.left = 0;
+            setAutoUi('dragon', false, 0);
+            updateButtons();
+            if (why) dMsg('Auto stopped. ' + why, 'warn');
+        }
+        function dragonAutoNext() {
+            if (!autoD.on) return;
+            if (!acct.token) { dragonAutoStop(''); return; }
+            var free = dragonState.freeLeft > 0;
+            var cost = (free ? dragonState.freeBet : dragonBet()) * 9;
+            if (!free) {
+                if (autoD.left <= 0) {
+                    autoD.on = false;
+                    setAutoUi('dragon', false, 0);
+                    updateButtons();
+                    dMsg('Auto finished.', 'lose');
+                    return;
+                }
+                if (acct.gold < cost) { dragonAutoStop('not enough gold for the next spin.'); return; }
+                autoD.left--;
+            }
+            setAutoUi('dragon', true, autoD.left);
+            updateButtons();
+            setTimeout(function () { if (autoD.on) dragonSpin(); }, 360);
+        }
+        function dragonAutoToggle() {
+            if (autoD.on) {
+                dragonAutoStop('');
+                dMsg('Auto stopped.', 'lose');
+                return;
+            }
+            if (!acct.token) {
+                dMsg('Log in below to play with the gold in your account.', 'warn');
+                return;
+            }
+            autoD.on = true;
+            if (autoD.left < 1) autoD.left = autoCountOf('dragon-auto-count');
+            setAutoUi('dragon', true, autoD.left);
+            updateButtons();
+            if (!dragonState.busy) dragonAutoNext();
+        }
+
         function switchMachine(name) {
             activeMachine = name;
+            // A run belongs to the machine it was started on.
+            if (name === 'dragon') classicAutoStop('');
+            else dragonAutoStop('');
             document.querySelectorAll('.machine-tabs button').forEach(function (b) {
                 b.classList.toggle('active', b.getAttribute('data-machine') === name);
             });
@@ -1412,6 +1678,7 @@
             btn.addEventListener('click', function () { switchMachine(btn.getAttribute('data-machine')); });
         });
         document.getElementById('dragon-spin').addEventListener('click', dragonSpin);
+        document.getElementById('dragon-auto-btn').addEventListener('click', dragonAutoToggle);
         document.getElementById('dragon-bet').addEventListener('change', function () {
             updateDragonUi();
             updateButtons();
@@ -1419,12 +1686,14 @@
 
         // ---- Controls -----------------------------------------------------------
         spinBtn.addEventListener('click', spin);
+        document.getElementById('auto-btn').addEventListener('click', classicAutoToggle);
         betSelect.addEventListener('change', function () {
             updateButtons();
             renderMath();
         });
         document.addEventListener('keydown', function (e) {
             if (e.code === 'Space' && !/^(INPUT|SELECT|TEXTAREA|BUTTON)$/.test(document.activeElement.tagName)) {
+                if (autoC.on || autoD.on) return;
                 e.preventDefault();
                 if (activeMachine === 'dragon') dragonSpin();
                 else spin();

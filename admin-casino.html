@@ -77,8 +77,11 @@
 
         var SUPABASE_URL = 'https://fpvwpxtsrmrmdvnswrzx.supabase.co';
         var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY';
-        var KEY = 'vault_admin_secret';
-        var secret = sessionStorage.getItem(KEY) || '';
+        // The secret is the vault's master key: it can create accounts, reset
+        // any player's password and credit gold. Keep it in this tab's memory
+        // only. Caching it in sessionStorage left it readable by anything that
+        // ran in the tab, and it survived every reload.
+        var secret = '';
 
         function rpc(fn, args) {
             return fetch(SUPABASE_URL + '/rest/v1/rpc/' + fn, {
@@ -277,7 +280,6 @@
                 return;
             }
             secret = value;
-            sessionStorage.setItem(KEY, value);
             document.getElementById('secret').value = '';
             document.getElementById('unlock-msg').textContent = '';
             document.getElementById('unlock').style.display = 'none';
@@ -293,7 +295,7 @@
         document.getElementById('ref-btn').addEventListener('click', lookupRef);
         document.getElementById('verify-btn').addEventListener('click', verify);
         document.getElementById('lock-btn').addEventListener('click', function () {
-            sessionStorage.removeItem(KEY);
+            secret = '';
             location.reload();
         });
         document.getElementById('who').addEventListener('keydown', function (e) {
@@ -303,10 +305,7 @@
             if (e.key === 'Enter') lookupRef();
         });
 
-        if (secret) {
-            document.getElementById('unlock').style.display = 'none';
-            document.getElementById('tools').style.display = 'block';
-        }
+
     })();
     </script>
 </body>

@@ -54,7 +54,7 @@ Park HukoDB at a bank and leave this plugin loaded. Players then:
 
   tell HukoDB withdraw 5000      - pays gold out of their account
 
-  tell HukoDB pay                - collects a payout requested on the site
+  tell HukoDB pay                - collects a payout requested on the site (needs a bank)
 
   tell HukoDB refund             - returns gold held for them
 
@@ -70,6 +70,18 @@ refund (the bank fee is deducted from a bank refund).
 
 
 
+Payouts can only leave by bank transfer, which means HukoDB has to be
+
+standing in a bank when they are sent. Requests wait in the queue until
+
+then: a transfer that cannot be made is never refunded and never marked
+
+paid, so a run from the wrong room costs nothing and is simply repeated
+
+from a bank.
+
+
+
 Local (operator) commands:
 
   vault secret <value>   - set the bot secret from schema-casino.sql
@@ -80,7 +92,13 @@ Local (operator) commands:
 
   vault flush            - retry the upload queue now
 
-  vault payall           - pay every queued payout in one go
+  vault payall           - pay every queued payout in one go (needs a bank)
+
+                           stops cleanly on "not in a bank" or "bank short",
+
+                           leaving every unpaid request queued
+
+  vault void <ref>       - refund one request the bank can never send
 
   vault audit            - reconcile payouts against the ledger
 
@@ -232,7 +250,7 @@ local SECRET = ""
 
 local queue = {}          -- deposits the website has not confirmed yet
 
-local BUILD = "2026-11-20e"
+local BUILD = "2026-11-20h"
 
 local seen = {}           -- dedupe repeated give/receive lines
 
@@ -376,9 +394,31 @@ end
 
 
 
+local refSeq = 0
+
+
+
 local function newRef(prefix)
 
-  return prefix .. "-" .. tostring(os.time()) .. "-" .. tostring(math.random(100000, 999999))
+
+
+  -- os.time() is only second-accurate, so two deposits from one player in
+
+  -- the same second used to share a random ref. casino_deposit treats a
+
+  -- repeated ref as a replay and returns the first answer, which silently
+
+  -- swallowed the second deposit. The counter keeps every ref unique.
+
+  refSeq = refSeq + 1
+
+
+
+  return prefix .. "-" .. tostring(os.time()) .. "-" .. tostring(refSeq) ..
+
+         "-" .. tostring(math.random(100000, 999999))
+
+
 
 end
 
@@ -802,15 +842,59 @@ end
 
 function doLogin(speaker)
 
+
+
   wait.make(function()
 
-    local password = randomPassword()
+
+
+    -- Ask the vault to generate the password with gen_random_bytes. Lua's
+
+    -- math.random is a seeded LCG: every password came from one shared
+
+    -- stream, so seeing a few outputs helped predict other players'.
 
     local result, err = rpcRetry("casino_register", {
 
-      p_secret = secret(), p_character = speaker, p_password = password
+
+
+      p_secret = secret(), p_character = speaker
+
+
 
     })
+
+
+
+    local password = result and result.password
+
+
+
+    local no_param = (not result and (tostring(err):find("PGRST202") or
+
+                        tostring(err):lower():find("could not find the function")))
+
+                     or (result and not result.ok and result.error == "password")
+
+
+
+    if no_param then
+
+      -- Schema without server-side generation: fall back to a local one.
+
+      password = randomPassword()
+
+      result, err = rpcRetry("casino_register", {
+
+
+
+        p_secret = secret(), p_character = speaker, p_password = password
+
+
+
+      })
+
+    end
 
 
 
@@ -868,15 +952,51 @@ end
 
 function doReset(speaker)
 
+
+
   wait.make(function()
 
-    local password = randomPassword()
+
 
     local result, err = rpcRetry("casino_set_password", {
 
-      p_secret = secret(), p_character = speaker, p_password = password
+
+
+      p_secret = secret(), p_character = speaker
+
+
 
     })
+
+
+
+    local password = result and result.password
+
+
+
+    local no_param = (not result and (tostring(err):find("PGRST202") or
+
+                        tostring(err):lower():find("could not find the function")))
+
+                     or (result and not result.ok and result.error == "password")
+
+
+
+    if no_param then
+
+      password = randomPassword()
+
+      result, err = rpcRetry("casino_set_password", {
+
+
+
+        p_secret = secret(), p_character = speaker, p_password = password
+
+
+
+      })
+
+    end
 
     if not result then
 
@@ -976,15 +1096,103 @@ end
 
 -- reported as paid.
 
+--
+
+-- Transfers only work with HukoDB standing in a bank, which is not every
+
+-- session, so a transfer that cannot be made leaves the request exactly as
+
+-- it was: still queued, never refunded. It is paid by a later run made from
+
+-- a bank. 'vault void <ref>' is the only thing that refunds one.
+
+-- What the bank can say back. The two refusals are worth telling apart:
+
+--   "You can't do that here." / "You can only use the BANK command at a
+
+--   banking location."            -> HukoDB is not standing in a bank
+
+--   "Transferring [N] gp would be impossible, as you only have [M] gp in
+
+--   this account."                -> the bank balance is short
+
+-- Anything else is silence, which is treated as unknown: never a refund.
+
+local BANK_WAIT = [[^(?:You transfer \[?([\d,]+)\]? gp to |Transferring \[?([\d,]+)\]? gp would be impossible, as you only have \[?([\d,]+)\]? gp|You can only use the BANK command at a banking location|You can't do that here\.)]]
+
+
+
+local function goldOf(text)
+
+  return tonumber((tostring(text or ""):gsub(",", ""))) or 0
+
+end
+
+
+
 local function settlePayout(row, recipient)
 
+
+
   local net = tonumber(row.net) or 0
+
+
+
+  -- Claim the request on the server before any gold moves. A player can only
+
+  -- cancel a request that is still "requested", so this closes the window
+
+  -- where someone cancelled (and was refunded) while the transfer was in
+
+  -- flight, ending up with both the gold and the refund.
+
+  local claim, claimErr = rpcRetry("casino_payout_claim", { p_secret = secret(), p_id = row.id })
+
+
+
+  if not claim then
+
+    local why = tostring(claimErr or "")
+
+    local legacy = why:find("PGRST202") or why:lower():find("could not find the function")
+
+    if not legacy then
+
+      note("PAYOUT NOT CLAIMED " .. tostring(row.ref) .. ": the vault did not answer. Left queued.", "orange")
+
+      errorLog("payout claim failed " .. tostring(row.ref) .. ": " .. why)
+
+      return false, "notclaimed"
+
+    end
+
+  elseif not claim.ok then
+
+    note("PAYOUT NOT CLAIMED " .. tostring(row.ref) .. ": " .. tostring(claim.error or "?") ..
+
+      ". Left queued.", "orange")
+
+    return false, "notclaimed"
+
+  end
+
+
+
+  -- Hand the request back if nothing left the bank, so it can be cancelled.
+
+  local function release()
+
+    rpc("casino_payout_release", { p_secret = secret(), p_id = row.id })
+
+  end
+
+
 
   Send("bank transfer " .. tostring(net) .. " " .. recipient)
 
 
 
-  local matched, w = wait.regexp([[^You transfer \[?([\d,]+)\]? gp to ]], 10)
+  local matched, w = wait.regexp(BANK_WAIT, 10)
 
   if not matched or not w then
 
@@ -992,13 +1200,15 @@ local function settlePayout(row, recipient)
 
     if GetRecentLines then ctx = GetRecentLines(8) or "" end
 
-    note("PAYOUT NOT SENT " .. tostring(row.ref) .. ": the game never confirmed the transfer", "red")
+    note("PAYOUT NOT MADE " .. tostring(row.ref) .. ": the game did not confirm the transfer. " ..
 
-    errorLog("payout not sent " .. tostring(row.ref) .. " (" .. fmt(net) .. " to " .. recipient ..
+      "Left queued, nothing refunded.", "orange")
 
-      "): no transfer confirmation in 10s. Recent output:\n" .. ctx)
+    errorLog("payout not made " .. tostring(row.ref) .. " (" .. fmt(net) .. " to " .. recipient ..
 
-    failPayout(row)
+      "): no transfer confirmation in 10s. Left queued, no refund. Recent output:\n" .. ctx)
+
+    release()
 
     return false, "notsent"
 
@@ -1006,7 +1216,47 @@ local function settlePayout(row, recipient)
 
 
 
-  local got = tonumber((tostring(w[1] or ""):gsub(",", "")) or "")
+  local got = goldOf(w[1])
+
+  local wanted = goldOf(w[2])
+
+  local have = goldOf(w[3])
+
+
+
+  if got == 0 and wanted == 0 then
+
+    note("PAYOUT NOT MADE " .. tostring(row.ref) .. ": " .. VAULT.bot_name ..
+
+      " is not in a bank, so the bank refused. Still queued, nothing refunded.", "orange")
+
+    errorLog("payout not made " .. tostring(row.ref) .. " (" .. fmt(net) .. " to " .. recipient ..
+
+      "): not at a banking location. Request left queued.")
+
+    release()
+
+    return false, "notbank"
+
+  end
+
+
+
+  if got == 0 then
+
+    note("PAYOUT NOT MADE " .. tostring(row.ref) .. ": the bank is short - asked for " ..
+
+      fmt(wanted) .. " gp and the account holds " .. fmt(have) .. ". Still queued.", "orange")
+
+    errorLog("payout not made " .. tostring(row.ref) .. ": bank short, wanted " .. fmt(wanted) ..
+
+      ", available " .. fmt(have) .. ". Request left queued.")
+
+    release()
+
+    return false, "short"
+
+  end
 
   if got ~= net then
 
@@ -1110,6 +1360,16 @@ function doWithdraw(speaker, rest)
 
         tell(speaker, "You only have " .. fmt(result.gold) .. " gold in your account.")
 
+      elseif result.error == "amount" then
+
+        tell(speaker, "The smallest payout is " .. fmt(tonumber(result.min) or VAULT.min_withdraw) .. " gold.")
+
+      elseif result.error == "queue_full" then
+
+        tell(speaker, "You already have " .. tostring(result.open) .. " payouts waiting. Tell me 'pay' " ..
+
+          "to collect them, or cancel one on the site.")
+
       else
 
         tell(speaker, "Could not withdraw that. Try again shortly.")
@@ -1122,7 +1382,9 @@ function doWithdraw(speaker, rest)
 
 
 
-    -- They are talking to us, so they are online; the bank transfer can land.
+    -- They are talking to us, so they are online - but the transfer still needs
+
+-- HukoDB in a bank, so the request waits if this one cannot be made.
 
     local sent, why = settlePayout(result, result.character)
 
@@ -1136,11 +1398,29 @@ function doWithdraw(speaker, rest)
 
         "). Tell " .. VAULT.owner .. " so they can check the audit.")
 
+    elseif why == "notbank" then
+
+      tell(speaker, "I am not standing in a bank, so I cannot send it yet. Your " ..
+
+        fmt(result.amount) .. " gold is queued as " .. tostring(result.ref) ..
+
+        "; tell me 'pay' when I am at a bank.")
+
+    elseif why == "short" then
+
+      tell(speaker, "There is not enough gold in my bank account for that yet. Your " ..
+
+        fmt(result.amount) .. " gold is queued as " .. tostring(result.ref) ..
+
+        "; tell me 'pay' once it is topped up.")
+
     else
 
-      tell(speaker, "I could not send it - the bank refused or I am short at the bank. " ..
+      tell(speaker, "I could not confirm the transfer, so I have not paid it. Your " ..
 
-        "Nothing was taken from your account; tell me 'pay' again in a minute.")
+        fmt(result.amount) .. " gold is queued as " .. tostring(result.ref) ..
+
+        " and nothing was refunded; ask me 'pay' again in a minute.")
 
     end
 
@@ -1180,13 +1460,13 @@ function doPay(speaker, rest)
 
     local wanted = trim(rest or ""):upper()
 
-    local paid, total, failed = 0, 0, 0
+    local paid, total, failed, lastWhy = 0, 0, 0, nil
 
     for _, row in ipairs(list.payouts or {}) do
 
       if wanted == "" or tostring(row.ref):upper() == wanted then
 
-        local sent = settlePayout(row, speaker)
+        local sent, why = settlePayout(row, speaker)
 
         if sent then
 
@@ -1197,6 +1477,14 @@ function doPay(speaker, rest)
         else
 
           failed = failed + 1
+
+          lastWhy = why
+
+          -- Not being in a bank fails every request the same way, so stop
+
+          -- rather than bouncing off the bank once per payout.
+
+          if why == "notbank" then break end
 
         end
 
@@ -1210,17 +1498,35 @@ function doPay(speaker, rest)
 
       tell(speaker, "Nothing is waiting to be paid.")
 
+    elseif paid == 0 and lastWhy == "notbank" then
+
+      tell(speaker, "I am not standing in a bank, so the bank refused. Your gold is still " ..
+
+        "queued (" .. failed .. " request" .. (failed == 1 and "" or "s") ..
+
+        ") and nothing was refunded; ask me 'pay' when I am at one.")
+
+    elseif paid == 0 and lastWhy == "short" then
+
+      tell(speaker, "There is not enough gold in my bank account for that yet. Your gold is " ..
+
+        "still queued and nothing was refunded; ask " .. VAULT.owner .. " to top the bank up, " ..
+
+        "then 'pay' again.")
+
     elseif paid == 0 then
 
-      tell(speaker, "I could not send " .. failed .. ": the bank refused or I am short at the bank. " ..
+      tell(speaker, "I could not confirm the transfer, so nothing was paid. Your gold is still " ..
 
-        "Nothing was taken from your account; tell me 'pay' again in a minute.")
+        "queued (" .. failed .. " request" .. (failed == 1 and "" or "s") ..
+
+        ") and nothing was refunded; ask me 'pay' again in a minute.")
 
     elseif failed > 0 then
 
       tell(speaker, "Sent " .. fmt(total) .. " gold for " .. paid .. " payout" .. (paid == 1 and "" or "s") ..
 
-        ", but " .. failed .. " failed. Tell me 'pay' again in a minute.")
+        ". " .. failed .. " could not be sent and are still queued; ask me 'pay' again at a bank.")
 
     else
 
@@ -1294,7 +1600,9 @@ function vaultPayAll()
 
     note(#rows .. " payout" .. (#rows == 1 and "" or "s") .. " queued, " ..
 
-      fmt(due) .. " gold net. Sending now...", "white")
+      fmt(due) .. " gold net. Sending now - this needs " .. VAULT.bot_name ..
+
+      " in a bank; anything that cannot be sent stays queued.", "white")
 
 
 
@@ -1340,15 +1648,39 @@ function vaultPayAll()
 
         fmt(total) .. " gold. Queue is clear.", "lime")
 
+    elseif stopped == "notbank" then
+
+      note("STOPPED at " .. tostring(stopRef) .. " (" .. tostring(stopWho) ..
+
+        "): " .. VAULT.bot_name .. " is not standing in a bank, so the bank refused. " ..
+
+        "Nothing was paid and nothing was refunded - the whole queue is intact. " ..
+
+        paid .. " paid, " .. fmt(total) .. " gold. Walk to a bank and run 'payall' again.", "orange")
+
+    elseif stopped == "short" then
+
+      note("STOPPED at " .. tostring(stopRef) .. " (" .. tostring(stopWho) ..
+
+        "): there is not enough gold in the bank account for that one. Nothing was paid " ..
+
+        "for it and nothing was refunded; it is still queued. " .. paid .. " paid, " ..
+
+        fmt(total) .. " gold. Bank the carried gold ('vault bankall') and run 'payall' again.", "orange")
+
     elseif stopped == "notsent" then
 
       note("STOPPED at " .. tostring(stopRef) .. " (" .. tostring(stopWho) ..
 
-        "): the game did not confirm the transfer, so that one was refunded. " ..
+        "): the game did not confirm the transfer, so nothing was paid for it - " ..
 
-        paid .. " paid, " .. fmt(total) .. " gold. Check the bank and " ..
+        "it is still queued and was NOT refunded. " .. paid .. " paid, " ..
 
-        "HukoDB_vault.log, then run 'payall' again.", "red")
+        fmt(total) .. " gold, and the rest are still queued too. Get " .. VAULT.bot_name ..
+
+        " into a bank and run 'payall' again; 'vault void " .. tostring(stopRef) ..
+
+        "' refunds that one by hand if it can never be sent.", "orange")
 
     else
 
@@ -1373,6 +1705,106 @@ function vaultPayAll()
   end)
 
 end
+
+
+
+-- Refund a request that can never be delivered (the character is gone, or the
+
+-- operator waives it). Nothing refunds automatically any more: every other
+
+-- failure leaves the request queued for a later run from a bank.
+
+function vaultVoid(name, line, wildcards)
+
+
+
+  local ref = trim((wildcards and wildcards[1]) or ""):upper()
+
+
+
+  if ref == "" then note("Usage: vault void WD-XXXXXX", "orange"); return end
+
+
+
+  if secret() == "" then note("No secret set.", "orange"); return end
+
+
+
+  wait.make(function()
+
+
+
+    local r = rpcRetry("casino_admin_ref", { p_secret = secret(), p_ref = ref })
+
+
+
+    if not r or not r.ok then
+
+
+
+      note("No record for " .. ref, "orange")
+
+
+
+      return
+
+
+
+    end
+
+
+
+    local p = r.payout
+
+
+
+    if type(p) ~= "table" then
+
+
+
+      note(ref .. " is not a payout ref.", "orange")
+
+
+
+      return
+
+
+
+    end
+
+
+
+    if p.status ~= "requested" then
+
+
+
+      note(ref .. " is already " .. tostring(p.status) .. "; nothing to void.", "orange")
+
+
+
+      return
+
+
+
+    end
+
+
+
+    note("Voiding " .. ref .. " - refunding " .. fmt(p.amount) .. " to " .. tostring(p.character), "silver")
+
+
+
+    failPayout({ id = p.id, ref = p.ref, amount = p.amount })
+
+
+
+  end)
+
+
+
+end
+
+
 
 
 
@@ -1868,55 +2300,97 @@ end
 
 
 
+-- Chat, tells and emotes are echoed into the same window as game output, so
+
+-- anything a player can type reaches the money triggers. A real credit line
+
+-- is one unquoted sentence that starts with the sender name; a quoted line,
+
+-- a channel line, or a line that begins with someone speaking is never a
+
+-- credit. Without this, "say Mallory gives you 1000000 gold" credited gold.
+
+local CHAT_VERBS = {
+
+  says = true, say = true, tells = true, tell = true, asks = true, ask = true,
+
+  exclaims = true, exclaim = true, shouts = true, shout = true, yells = true,
+
+  yell = true, whispers = true, whisper = true, emotes = true, emote = true,
+
+  sings = true, sing = true, mutters = true, mutter = true, replies = true,
+
+  reply = true, answers = true, answer = true
+
+}
+
+
+
+local function isChatLine(line)
+
+
+
+  local s = tostring(line or "")
+
+
+
+  if s:find('"', 1, true) then return true end
+
+  if s:match("^%s*%[") then return true end
+
+
+
+  local verb = s:match("^%s*%S+%s+([%a]+)")
+
+  if verb and CHAT_VERBS[verb:lower()] then return true end
+
+
+
+  return false
+
+end
+
+
+
+-- Anchored on purpose. These patterns used to match anywhere in the line,
+
+-- which is what let echoed chat mint gold.
+
 local function parseGold(line)
 
-  local chunk = grab(line, "([%w]+) gives you [%d,]+ gold")
 
-  if chunk then
 
-    return chunk:match("^(%w+)"), chunk:match("([%d,]+)%s*gold"), "give"
-
-  end
+  local s = trim(tostring(line or ""))
 
 
 
-  chunk = grab(line, "([%w]+) has given you [%d,]+ gold")
+  local sender, amount = s:match("^([%w]+) gives you ([%d,]+) gold")
 
-  if chunk then
-
-    return chunk:match("^(%w+)"), chunk:match("([%d,]+)"), "give"
-
-  end
+  if sender then return sender, amount, "give" end
 
 
 
-  chunk = grab(line, "([%w]+) transferred [%d,]+ gold to you")
+  sender, amount = s:match("^([%w]+) has given you ([%d,]+) gold")
 
-  if chunk then
-
-    return chunk:match("^(%w+)"), chunk:match("([%d,]+)"), "bank"
-
-  end
+  if sender then return sender, amount, "give" end
 
 
 
-  chunk = grab(line, "you receive [%d,]+ gold from [%w]+")
+  sender, amount = s:match("^([%w]+) transferred ([%d,]+) gold to you")
 
-  if chunk then
-
-    return chunk:match("from (%w+)"), chunk:match("([%d,]+)"), "bank"
-
-  end
+  if sender then return sender, amount, "bank" end
 
 
 
-  chunk = grab(line, "bank transfer of [%d,]+ gold from [%w]+")
+  amount, sender = s:match("^[Yy]ou receive ([%d,]+) gold from ([%w]+)")
 
-  if chunk then
+  if sender then return sender, amount, "bank" end
 
-    return chunk:match("from (%w+)"), chunk:match("([%d,]+)"), "bank"
 
-  end
+
+  amount, sender = s:match("^[Bb]ank transfer of ([%d,]+) gold from ([%w]+)")
+
+  if sender then return sender, amount, "bank" end
 
 
 
@@ -1929,6 +2403,16 @@ end
 function vaultGoldLine(name, line)
 
   if not line then return end
+
+
+
+  if isChatLine(line) then
+
+    if VAULT.debug then note("ignored chat line near a gold trigger: " .. line, "grey") end
+
+    return
+
+  end
 
 
 
@@ -1992,7 +2476,19 @@ function vaultBankCredit(name, line, wildcards)
 
   if not line then return end
 
+
+
+  if isChatLine(line) then return end
+
+
+
+  -- The line has to begin with the name the trigger caught. Echoed text
+
+  -- cannot satisfy this even if a pattern ever loosens again.
+
   local sender = wildcards and wildcards[1]
+
+  if sender and trim(line):sub(1, #sender):lower() ~= sender:lower() then return end
 
   local amount = amountOf(wildcards and wildcards[2])
 
@@ -2190,7 +2686,7 @@ function vaultCommand(rest)
 
     bankall = vaultBankAll, last = vaultLast, help = vaultHelpLocal,
 
-    payall = vaultPayAll
+    payall = vaultPayAll, void = vaultVoid
 
   }
 
@@ -2326,7 +2822,7 @@ end
 
 function vaultHelpLocal()
 
-  note("vault secret <value> | status | debug | flush | payall | audit | verify | check <char> | spins <char> | ref <id> | errors | help", "white")
+  note("vault secret <value> | status | debug | flush | payall | audit | verify | check <char> | spins <char> | ref <id> | void <ref> | errors | help", "white")
 
 end
 
