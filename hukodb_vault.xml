@@ -2686,7 +2686,7 @@ function vaultCommand(rest)
 
     bankall = vaultBankAll, last = vaultLast, help = vaultHelpLocal,
 
-    payall = vaultPayAll, void = vaultVoid
+    payall = vaultPayAll, void = vaultVoid, beat = vaultBeat
 
   }
 
@@ -2715,6 +2715,11 @@ function vaultSetSecret(name, line, wildcards)
   SaveState()
 
   note("Secret set (" .. #value .. " characters).", "lime")
+
+  -- Beat once immediately: the site's "deposits open" banner then flips
+  -- without waiting for the vault_beat timer, and any failure shows up now.
+
+  vaultBeat()
 
 end
 
@@ -2877,6 +2882,12 @@ function OnPluginConnect()
     if secret() == "" then loadSecretFromFile() end
 
     if #queue > 0 then flushQueue() end
+
+    -- Also beat on connect, so a restart does not leave the site showing the
+
+    -- vault as offline until the timer catches up.
+
+    vaultBeat()
 
     pollPayouts()
 
