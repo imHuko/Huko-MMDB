@@ -1,1012 +1,2242 @@
 <?xml version="1.0" encoding="iso-8859-1"?>
+
 <!DOCTYPE muclient>
 
+
+
 <muclient>
+
 <plugin
+
    name="HukoDB_Vault"
+
    author="HukoDB"
+
    id="b7c1e4a09f2d4c8e51a63d77"
+
    language="Lua"
+
    purpose="Runs the in-game vault: accounts, deposits, balances and payouts for the casino"
+
    save_state="y"
+
    date_written="2026-11-19"
+
    requires="4.71"
+
    version="1.0"
+
    >
 
+
+
 <description trim="y">
+
 <![CDATA[
+
 .------------------.
+
  | HukoDB Vault    |
+
 `------------------'
+
+
 
 Park HukoDB at a bank and leave this plugin loaded. Players then:
 
+
+
   tell HukoDB login              - makes an account, tells them a password
+
   tell HukoDB reset              - new password if they lost it
+
   tell HukoDB balance            - gold in their account
+
   tell HukoDB withdraw 5000      - pays gold out of their account
+
   tell HukoDB pay                - collects a payout requested on the site
+
   tell HukoDB refund             - returns gold held for them
+
   tell HukoDB help
 
+
+
 Gold sent to HukoDB by GIVE or BANK TRANSFER is credited to the sender's
+
 account. If they have no account the gold is held and they are offered a
+
 refund (the bank fee is deducted from a bank refund).
 
+
+
 Local (operator) commands:
+
   vault secret <value>   - set the bot secret from schema-casino.sql
+
   vault status           - secret loaded? queue length? debug?
+
   vault debug            - toggle line logging
+
   vault flush            - retry the upload queue now
+
   vault audit            - reconcile payouts against the ledger
+
   vault verify           - check the event log hash chain
+
   vault check <char>     - account, lifetime, balance check, last 20 events
+
   vault spins <char> [n] - a character's recent spin results
+
   vault ref WD-XXXXXX    - one withdrawal request and its events
+
   vault errors           - recent bot errors (also HukoDB_vault.log)
+
   vault test             - send the secret and show what the server says
+
+  vault bankall          - bank all carried gold (needs a full session)
+
+  vault last             - the last gold lines the plugin parsed
+
   vault help
+
 ]]>
+
 </description>
+
+
 
 </plugin>
 
+
+
 <triggers>
+
+  <trigger enabled="y" match="(?i)(\w+) has transferred ([\d,]+) gold into your .+ bank account" regexp="y" send_to="12" sequence="90" script="vaultBankCredit"/>
+
   <trigger enabled="y" match="(?i)tells you" regexp="y" send_to="12" sequence="100" script="vaultTell"/>
+
   <trigger enabled="y" match="(?i)gives you" regexp="y" send_to="12" sequence="101" script="vaultGoldLine"/>
+
   <trigger enabled="y" match="(?i)has given you" regexp="y" send_to="12" sequence="102" script="vaultGoldLine"/>
+
   <trigger enabled="y" match="(?i)you receive" regexp="y" send_to="12" sequence="103" script="vaultGoldLine"/>
+
   <trigger enabled="y" match="(?i)bank transfer" regexp="y" send_to="12" sequence="104" script="vaultGoldLine"/>
+
   <trigger enabled="y" match="(?i)transferred .+ to you" regexp="y" send_to="12" sequence="105" script="vaultGoldLine"/>
+
   <trigger enabled="y" match="(?i)^you give " regexp="y" send_to="12" sequence="106" script="vaultGiveSent"/>
+
   <trigger enabled="y" match="(?i)(aren't here|isn't here|no longer here)" regexp="y" send_to="12" sequence="107" script="vaultGiveFailed"/>
+
 </triggers>
 
+
+
 <aliases>
+
   <!-- One alias on purpose: aliases without enabled="y" load disabled, and
+
        <send> is the form mmgearcap.xml uses. -->
+
   <alias match="^\s*vault\s*(.*)$" enabled="y" regexp="y" ignore_case="y"
+
          send_to="12" sequence="99" keep_evaluating="n">
+
     <send>vaultCommand("%1")</send>
+
   </alias>
+
 </aliases>
 
+
+
 <timers>
+
   <timer name="vault_flush" minute="2" second="0" enabled="y" send_to="12" script="vaultFlush"/>
+
   <timer name="vault_payouts" minute="3" second="0" enabled="y" send_to="12" script="vaultPayouts"/>
+
+  <timer name="vault_beat" minute="1" second="0" enabled="y" send_to="12" script="vaultBeat"/>
+
 </timers>
 
+
+
 <script>
+
 <![CDATA[
+
+
 
 require "wait"
 
+
+
 local json = require("json")
+
 local ltn12 = require("ltn12")
+
 local ok_ssl, https = pcall(require, "ssl.https")
 
+
+
 -- ============================================================
+
 -- SETTINGS
+
 -- ============================================================
+
+
 
 local VAULT = {
+
   url          = "https://fpvwpxtsrmrmdvnswrzx.supabase.co",
+
   anon         = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwdndweHRzcm1ybWR2bnN3cnp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzkyNTksImV4cCI6MjA5Mzg1NTI1OX0.gxsUTibmHHUhPydl9DTjpjfjGIghjW8WwGyIlAbFgMY",
+
   bot_name     = "HukoDB",
+
   owner        = "Huko",
+
   min_withdraw = 1000,
+
   max_move     = 100000000,
+
   fee_pct      = 1,     -- match your bank's transfer rate (see: bank info)
+
   fee_flat     = 0,
+
   debug        = false
+
 }
 
+
+
 local SECRET = ""
+
 local queue = {}          -- deposits the website has not confirmed yet
+
+local BUILD = "2026-11-20c"
+
 local seen = {}           -- dedupe repeated give/receive lines
+
+local recent = {}         -- last gold lines seen, for 'vault last'
+
+
+
+local function remember(text)
+
+  table.insert(recent, os.date("%H:%M:%S") .. "  " .. text)
+
+  if #recent > 8 then table.remove(recent, 1) end
+
+end
+
 local lastGive = nil      -- a give we are waiting on the room check for
 
+
+
 -- ============================================================
+
 -- SMALL HELPERS
+
 -- ============================================================
+
+
 
 local function trim(s)
+
   return (tostring(s or ""):gsub("^%s+", ""):gsub("%s+$", ""))
+
 end
+
+
 
 local function fmt(n)
+
   local s = tostring(math.floor(tonumber(n) or 0))
+
   local out = s:reverse():gsub("(%d%d%d)", "%1,"):reverse()
+
   return (out:gsub("^,", ""))
+
 end
+
+
 
 local function amountOf(s)
+
   s = tostring(s or ""):gsub(",", "")
+
   local n = tonumber(s)
+
   if not n or n ~= n or n < 1 then return nil end
+
   return math.floor(n)
+
 end
+
+
 
 local function note(text, colour)
+
   ColourNote(colour or "silver", "black", "[Vault] " .. text)
+
 end
+
+
 
 -- Recent problems, kept in memory and appended to HukoDB_vault.log.
+
 local errors = {}
 
+
+
 local function errorLog(message)
+
   local stamp = os.date("%Y-%m-%d %H:%M:%S")
+
   local line = stamp .. "  " .. tostring(message)
+
   table.insert(errors, line)
+
   if #errors > 200 then table.remove(errors, 1) end
 
+
+
   local dir = GetInfo(67) or ""
+
   local f = io.open(dir .. "HukoDB_vault.log", "a")
+
   if f then
+
     f:write(line .. "\n")
+
     f:close()
+
   end
+
 end
+
+
 
 local function tell(name, text)
+
   Send("tell " .. name .. " " .. text)
+
 end
+
+
 
 local function feeFor(amount)
+
   local fee = math.floor(amount * VAULT.fee_pct / 100) + VAULT.fee_flat
+
   if fee < 0 then fee = 0 end
+
   return fee
+
 end
+
+
 
 local function randomPassword()
+
   local chars = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
   local out = {}
+
   for i = 1, 10 do
+
     local n = math.random(1, #chars)
+
     out[i] = chars:sub(n, n)
+
   end
+
   return table.concat(out)
+
 end
+
+
 
 local function newRef(prefix)
+
   return prefix .. "-" .. tostring(os.time()) .. "-" .. tostring(math.random(100000, 999999))
+
 end
+
+
 
 local function secret()
+
   if SECRET == "" then SECRET = trim(GetVariable("bot_secret")) end
+
   return SECRET
+
 end
+
+
 
 local function loadSecretFromFile()
+
   if secret() ~= "" then return true end
+
   local dir = GetInfo(67) or ""
+
   local paths = {
+
     dir .. "HukoDB_secret.txt",
+
     dir .. "plugins/HukoDB_secret.txt",
+
     "HukoDB_secret.txt"
+
   }
+
   for _, path in ipairs(paths) do
+
     local f = io.open(path, "r")
+
     if f then
+
       local value = trim(f:read("*a"))
+
       f:close()
+
       if value ~= "" then
+
         SECRET = value
+
         SetVariable("bot_secret", value)
+
         SaveState()
+
         note("Secret loaded from " .. path, "lime")
+
         return true
+
       end
+
     end
+
   end
+
   return false
+
 end
 
+
+
 -- ============================================================
+
 -- WEBSITE
+
 -- ============================================================
+
+
 
 local function rpc(fn, args)
+
   if not ok_ssl then return nil, "ssl.https unavailable" end
 
+
+
   local body = json.encode(args)
+
   local response = {}
+
   local ok, code = https.request({
+
     url     = VAULT.url .. "/rest/v1/rpc/" .. fn,
+
     method  = "POST",
+
     protocol = "tlsv1_2",
+
     headers = {
+
       ["Content-Type"]   = "application/json",
+
       ["Content-Length"] = tostring(#body),
+
       ["apikey"]         = VAULT.anon,
+
       ["Authorization"]  = "Bearer " .. VAULT.anon
+
     },
+
     source  = ltn12.source.string(body),
+
     sink    = ltn12.sink.table(response)
+
   })
 
+
+
   local text = table.concat(response)
+
   if VAULT.debug then
+
     note(fn .. " -> " .. tostring(code) .. " " .. tostring(text), "grey")
+
   end
+
   if not ok then return nil, "network" end
 
+
+
   local parsed
+
   local decoded, data = pcall(json.decode, text)
+
   if decoded and type(data) == "table" then parsed = data end
 
+
+
   if code ~= 200 then
+
     local message = parsed and (parsed.message or parsed.error) or ("HTTP " .. tostring(code))
+
     return nil, message
+
   end
+
   if not parsed then return nil, "bad reply" end
+
   return parsed
+
 end
+
+
 
 local function rpcRetry(fn, args, tries)
+
   tries = tries or 3
+
   local last
+
   for attempt = 1, tries do
+
     local result, err = rpc(fn, args)
+
     if result then return result end
+
     last = err
+
     if attempt < tries then wait.time(1.5) end
+
   end
+
   return nil, last
+
 end
 
+
+
 -- ============================================================
+
 -- OUTBOX: deposits the website did not confirm
+
 -- ============================================================
+
+
 
 local function persistQueue()
+
   SetVariable("outbox", json.encode(queue))
+
 end
+
+
 
 local function saveQueue()
+
   persistQueue()
+
   SaveState()
+
 end
+
+
 
 local function loadQueue()
+
   queue = {}
+
   local raw = GetVariable("outbox")
+
   if raw and raw ~= "" then
+
     local ok, data = pcall(json.decode, raw)
+
     if ok and type(data) == "table" then
+
       for _, item in ipairs(data) do
+
         if type(item) == "table" and item.name and item.amount then
+
           table.insert(queue, item)
+
         end
+
       end
+
     end
+
   end
+
 end
+
+
 
 local function queueAdd(name, amount, method, ref)
+
   table.insert(queue, { name = name, amount = amount, method = method, ref = ref })
+
   saveQueue()
+
 end
+
+
 
 -- Assumes it is already running inside a wait.make coroutine.
+
 local function flushQueue()
+
   if #queue == 0 or secret() == "" then return end
+
+
 
   local remaining = {}
+
   for _, item in ipairs(queue) do
+
     local result = rpcRetry("casino_deposit", {
+
       p_secret = secret(), p_character = item.name, p_amount = item.amount,
+
       p_method = item.method, p_ref = item.ref
+
     })
+
     if result and result.ok then
+
       if result.status == "credited" then
+
         tell(item.name, fmt(item.amount) .. " gold added to " .. result.character .. "'s account.")
-        Send("bank deposit " .. tostring(item.amount))
+
+        if item.method ~= "bank" then Send("bank deposit " .. tostring(item.amount)) end
+
       else
+
         tell(item.name, "You don't have an account. Tell me 'login' to make one, or 'refund' to get it back (bank fee deducted).")
+
       end
+
     else
+
       table.insert(remaining, item)
+
     end
+
   end
 
+
+
   queue = remaining
+
   saveQueue()
+
 end
+
+
 
 function vaultFlush()
+
   if #queue == 0 or secret() == "" then return end
+
   wait.make(function() flushQueue() end)
+
 end
+
+
 
 function vaultFlushNow()
+
   if secret() == "" then note("No secret set. Use: vault secret <value>", "orange"); return end
+
   note("Retrying " .. #queue .. " queued transfer(s)...")
+
   vaultFlush()
+
 end
 
+
+
 -- ============================================================
+
 -- TELLS
+
 -- ============================================================
+
+
 
 local function parseTell(line)
+
   local low = line:lower()
+
   local start, finish = low:find("tells you")
+
   if not start then return nil end
 
+
+
   local name = line:sub(1, start - 1):match("([%w]+)%s*$")
+
   if not name then return nil end
 
+
+
   local rest = line:sub(finish + 1)
+
   rest = rest:gsub("^[%s,:-]+", "")
+
   rest = rest:gsub('^"', ""):gsub('"$', "")
+
   rest = rest:gsub("^'", ""):gsub("'$", "")
+
   return name, trim(rest)
+
 end
 
+
+
 function vaultTell(name, line)
+
   if not line then return end
+
   local speaker, message = parseTell(line)
+
   if not speaker then return end
+
   if speaker:lower() == VAULT.bot_name:lower() then return end
+
+
 
   if VAULT.debug then note("tell from " .. speaker .. ": " .. message, "grey") end
 
+
+
   local command, rest = message:match("^(%S+)%s*(.*)$")
+
   command = (command or ""):lower()
+
   rest = trim(rest)
 
+
+
   -- A tell that arrives while the vault is not connected to the site is
+
   -- answered honestly rather than silently dropped.
+
   if secret() == "" then
+
     note("Tell from " .. speaker .. " ignored: no bot secret set.", "orange")
+
     return
+
   end
+
+
 
   if command == "login" or command == "register" then
+
     doLogin(speaker)
+
   elseif command == "reset" or command == "password" then
+
     doReset(speaker)
+
   elseif command == "balance" or command == "bal" or command == "gold" then
+
     doBalance(speaker)
+
   elseif command == "withdraw" or command == "with" then
+
     doWithdraw(speaker, rest)
+
   elseif command == "pay" or command == "collect" then
+
     doPay(speaker, rest)
+
   elseif command == "refund" then
+
     doRefund(speaker)
+
   elseif command == "help" then
+
     tell(speaker, "login, balance, withdraw <gold>, pay, refund, help.")
+
   end
+
 end
+
+
 
 function doLogin(speaker)
+
   wait.make(function()
+
     local password = randomPassword()
+
     local result, err = rpcRetry("casino_register", {
+
       p_secret = secret(), p_character = speaker, p_password = password
+
     })
 
+
+
     if not result then
+
       tell(speaker, "The vault is not answering right now. Try again in a minute.")
+
       note("register failed: " .. tostring(err), "red")
+
       errorLog("register failed for " .. speaker .. ": " .. tostring(err))
+
       return
+
     end
+
     if not result.ok then
+
       if result.error == "exists" then
+
         tell(speaker, "You already have an account. Tell me 'reset' if you forgot the password.")
+
       elseif result.error == "name" then
+
         tell(speaker, "That character name cannot be used for an account.")
+
       else
+
         tell(speaker, "Could not make the account. Try again shortly.")
+
         note("register error: " .. tostring(result.error), "red")
+
       end
+
       return
+
     end
+
+
 
     tell(speaker, "Account made. Password: " .. password .. " - log in at hukodb.com/casino.html")
+
     if (tonumber(result.pending) or 0) > 0 then
+
       tell(speaker, fmt(result.pending) .. " gold added to " .. result.character .. "'s account.")
+
     end
+
     note("account created for " .. result.character, "lime")
+
   end)
+
 end
+
+
 
 function doReset(speaker)
+
   wait.make(function()
+
     local password = randomPassword()
+
     local result, err = rpcRetry("casino_set_password", {
+
       p_secret = secret(), p_character = speaker, p_password = password
+
     })
+
     if not result then
+
       tell(speaker, "The vault is not answering right now. Try again in a minute.")
+
       return
+
     end
+
     if result.ok then
+
       tell(speaker, "New password: " .. password)
+
       note("password reset for " .. speaker, "yellow")
+
     elseif result.error == "no_account" then
+
       tell(speaker, "You don't have an account yet. Tell me 'login'.")
+
     else
+
       tell(speaker, "Could not reset the password. Try again shortly.")
+
       note("reset failed: " .. tostring(err or result.error), "red")
+
     end
+
   end)
+
 end
+
+
 
 function doBalance(speaker)
+
   wait.make(function()
+
     local result = rpcRetry("casino_account_info", {
+
       p_secret = secret(), p_character = speaker
+
     })
+
     if not result then
+
       tell(speaker, "The vault is not answering right now. Try again in a minute.")
+
       return
+
     end
+
     if result.ok then
+
       tell(speaker, fmt(result.gold) .. " gold in your account.")
+
     elseif result.error == "no_account" then
+
       tell(speaker, "You don't have an account yet. Tell me 'login'.")
+
     else
+
       tell(speaker, "Could not read your balance. Try again shortly.")
+
     end
+
   end)
+
 end
 
--- Send the net the site recorded, then settle that exact request. The
--- website refuses a settlement whose amount does not match its record.
+
+
+local function failPayout(row)
+
+  local v = rpcRetry("casino_payout_void", { p_secret = secret(), p_id = row.id })
+
+  if v and v.ok then
+
+    note("payout " .. tostring(row.ref) .. " not sent, refunded " .. fmt(v.amount or row.amount), "orange")
+
+  else
+
+    errorLog("payout void FAILED for " .. tostring(row.ref) .. ": " ..
+
+      tostring(v and v.error or "no answer") .. " - refund by hand")
+
+    note("COULD NOT REFUND " .. tostring(row.ref) .. " - refund by hand", "red")
+
+  end
+
+end
+
+
+
+-- Send the net the site recorded, wait for the game to confirm the transfer,
+
+-- and only then settle that request. Gold that did not move is never
+
+-- reported as paid.
+
 local function settlePayout(row, recipient)
-  Send("bank transfer " .. tostring(row.net) .. " " .. recipient)
+
+  local net = tonumber(row.net) or 0
+
+  Send("bank transfer " .. tostring(net) .. " " .. recipient)
+
+
+
+  local matched, w = wait.regexp([[^You transfer \[?([\d,]+)\]? gp to ]], 10)
+
+  if not matched or not w then
+
+    local ctx = ""
+
+    if GetRecentLines then ctx = GetRecentLines(8) or "" end
+
+    note("PAYOUT NOT SENT " .. tostring(row.ref) .. ": the game never confirmed the transfer", "red")
+
+    errorLog("payout not sent " .. tostring(row.ref) .. " (" .. fmt(net) .. " to " .. recipient ..
+
+      "): no transfer confirmation in 10s. Recent output:\n" .. ctx)
+
+    failPayout(row)
+
+    return false, "notsent"
+
+  end
+
+
+
+  local got = tonumber((tostring(w[1] or ""):gsub(",", "")) or "")
+
+  if got ~= net then
+
+    local ctx = ""
+
+    if GetRecentLines then ctx = GetRecentLines(8) or "" end
+
+    note("PAYOUT AMOUNT MISMATCH " .. tostring(row.ref) .. ": sent " .. tostring(got) ..
+
+      " but recorded " .. fmt(net), "red")
+
+    errorLog("payout amount mismatch " .. tostring(row.ref) .. ": game said " .. tostring(got) ..
+
+      ", record says " .. fmt(net) .. ". Recent output:\n" .. ctx)
+
+    note("DO NOT retry this payout until " .. VAULT.owner .. " looks at it", "red")
+
+    return false, "unsettled"
+
+  end
+
+
 
   local done = rpcRetry("casino_payout_paid", {
+
     p_secret = secret(), p_id = row.id, p_net = row.net
+
   })
 
+
+
   if done and done.ok then
-    note("payout " .. fmt(row.net) .. " to " .. recipient .. " (" .. tostring(row.ref) .. ")", "lime")
+
+    note("payout " .. fmt(net) .. " to " .. recipient .. " (" .. tostring(row.ref) .. ")", "lime")
+
     return true
+
   end
+
+
 
   local why = done and tostring(done.error or "?") or "no answer"
-  note("PAYOUT NOT SETTLED " .. tostring(row.ref) .. ": " .. why .. " - run 'vault audit'", "red")
-  errorLog("payout not settled " .. tostring(row.ref) .. ": " .. why)
-  return false
+
+  note("PAYOUT SENT BUT NOT SETTLED " .. tostring(row.ref) .. ": " .. why .. " - run 'vault audit'", "red")
+
+  errorLog("payout sent in game but not settled " .. tostring(row.ref) .. ": " .. why)
+
+  return false, "unsettled"
+
 end
+
+
 
 function doWithdraw(speaker, rest)
+
   local amount = amountOf(rest)
+
   if not amount then
+
     tell(speaker, "Usage: withdraw 5000")
+
     return
-  end
-  if amount < VAULT.min_withdraw then
-    tell(speaker, "The smallest payout is " .. fmt(VAULT.min_withdraw) .. " gold.")
-    return
+
   end
 
+  if amount < VAULT.min_withdraw then
+
+    tell(speaker, "The smallest payout is " .. fmt(VAULT.min_withdraw) .. " gold.")
+
+    return
+
+  end
+
+
+
   wait.make(function()
+
     local result, err = rpcRetry("casino_request_payout_game", {
+
       p_secret = secret(), p_character = speaker, p_amount = amount
+
     })
+
     if not result then
+
       tell(speaker, "The vault is not answering right now. Try again in a minute.")
+
       note("withdraw failed: " .. tostring(err), "red")
+
       return
+
     end
+
     if not result.ok then
+
       if result.error == "no_account" then
+
         tell(speaker, "You don't have an account yet. Tell me 'login'.")
+
       elseif result.error == "funds" then
+
         tell(speaker, "You only have " .. fmt(result.gold) .. " gold in your account.")
+
       else
+
         tell(speaker, "Could not withdraw that. Try again shortly.")
+
       end
+
       return
+
     end
+
+
 
     -- They are talking to us, so they are online; the bank transfer can land.
-    if settlePayout(result, result.character) then
+
+    local sent, why = settlePayout(result, result.character)
+
+    if sent then
+
       tell(speaker, "Sent " .. fmt(result.net) .. " gold (" .. fmt(result.fee) .. " bank fee).")
+
+    elseif why == "unsettled" then
+
+      tell(speaker, "The gold went out but I could not record it (ref " .. tostring(result.ref) ..
+
+        "). Tell " .. VAULT.owner .. " so they can check the audit.")
+
     else
-      tell(speaker, "Your payout " .. tostring(result.ref) .. " is recorded, but I could not confirm it. Ask " ..
-        VAULT.owner .. " to check the audit.")
+
+      tell(speaker, "I could not send it - the bank refused or I am short at the bank. " ..
+
+        "Nothing was taken from your account; tell me 'pay' again in a minute.")
+
     end
+
   end)
+
 end
+
+
 
 function doPay(speaker, rest)
+
   wait.make(function()
+
     local list = rpcRetry("casino_payout_list", {
+
       p_secret = secret(), p_character = speaker
+
     })
+
     if not list then
+
       tell(speaker, "The vault is not answering right now. Try again in a minute.")
+
       return
+
     end
+
     if not list.ok then
+
       tell(speaker, "Could not read your payouts. Try again shortly.")
+
       return
+
     end
+
+
 
     local wanted = trim(rest or ""):upper()
-    local paid, total = 0, 0
+
+    local paid, total, failed = 0, 0, 0
+
     for _, row in ipairs(list.payouts or {}) do
+
       if wanted == "" or tostring(row.ref):upper() == wanted then
-        if settlePayout(row, speaker) then
+
+        local sent = settlePayout(row, speaker)
+
+        if sent then
+
           paid = paid + 1
+
           total = total + (tonumber(row.net) or 0)
+
+        else
+
+          failed = failed + 1
+
         end
+
       end
+
     end
 
-    if paid == 0 then
+
+
+    if paid == 0 and failed == 0 then
+
       tell(speaker, "Nothing is waiting to be paid.")
+
+    elseif paid == 0 then
+
+      tell(speaker, "I could not send " .. failed .. ": the bank refused or I am short at the bank. " ..
+
+        "Nothing was taken from your account; tell me 'pay' again in a minute.")
+
+    elseif failed > 0 then
+
+      tell(speaker, "Sent " .. fmt(total) .. " gold for " .. paid .. " payout" .. (paid == 1 and "" or "s") ..
+
+        ", but " .. failed .. " failed. Tell me 'pay' again in a minute.")
+
     else
+
       tell(speaker, "Sent " .. fmt(total) .. " gold for " .. paid .. " payout" .. (paid == 1 and "" or "s") .. ".")
+
     end
+
   end)
+
 end
+
+
 
 local notified = {}
 
+
+
 -- Assumes it is already running inside a wait.make coroutine.
+
 local function pollPayouts()
+
   if secret() == "" then return end
 
+
+
   local result = rpc("casino_payout_queue", { p_secret = secret() })
+
   if not result or not result.ok then return end
 
+
+
   local now = os.time()
+
   for _, row in ipairs(result.payouts or {}) do
+
     local last = notified[row.id]
+
     if not last or now - last > 600 then
+
       notified[row.id] = now
+
       tell(row.character, fmt(row.net) .. " gold is waiting (" .. tostring(row.ref) .."). Tell me 'pay'.")
+
       rpc("casino_payout_notified", { p_secret = secret(), p_id = row.id })
+
     end
+
   end
+
 end
+
+
+
+-- In social mode the game refuses commands, so gold received by bank
+
+-- transfer piles up on HukoDB. Run this once you have a full session.
+
+function vaultLast()
+
+  if #recent == 0 then note("No gold lines seen yet.", "orange"); return end
+
+  note("Last gold lines seen (newest last):", "white")
+
+  for _, l in ipairs(recent) do note(l, "grey") end
+
+end
+
+
+
+function vaultBankAll()
+
+  note("Banking all carried gold...", "silver")
+
+  Send("bank deposit all")
+
+end
+
+
+
+-- Tells the site the vault is connected. Deposits need HukoDB online,
+
+-- so this is what the banner on the page reads.
+
+function vaultBeat()
+
+  if secret() == "" then return end
+
+  rpc("casino_vault_beat", { p_secret = secret() })
+
+end
+
+
 
 function vaultPayouts()
+
   wait.make(function() pollPayouts() end)
+
 end
+
+
 
 function vaultAudit()
+
   wait.make(function()
+
     local r = rpcRetry("casino_audit", { p_secret = secret() })
+
     if not r or not r.ok then
+
       note("Audit failed: " .. tostring(r and r.error or "no answer"), "red")
+
       return
+
     end
+
     local diff = tonumber(r.difference) or 0
+
     note("ledger withdrawn " .. fmt(r.ledger_withdrawn) .. " | payouts " ..
+
       fmt(r.payouts_debited) .. " | difference " .. fmt(diff),
+
       diff == 0 and "lime" or "red")
+
     note("open " .. tostring(r.open) .. " | stale " .. tostring(r.stale) ..
+
       " | bad rows " .. tostring(r.mismatched),
+
       (diff == 0 and r.mismatched == 0 and r.stale == 0) and "lime" or "orange")
+
   end)
+
 end
+
+
 
 function vaultVerify()
+
   wait.make(function()
+
     local r = rpcRetry("casino_verify_chain", { p_secret = secret() })
+
     if not r or not r.ok then
+
       note("Verify failed: " .. tostring(r and r.error or "no answer"), "red")
+
       return
+
     end
+
     if r.valid then
+
       note("Log chain intact: " .. tostring(r.checked) .. " events, head " ..
+
         tostring(r.head):sub(1, 16) .. "...", "lime")
+
     else
+
       note("LOG CHAIN BROKEN at event " .. tostring(r.broken_at) ..
+
         " (checked " .. tostring(r.checked) .. ")", "red")
+
     end
+
     if (tonumber(r.skipped) or 0) > 0 then
+
       note(tostring(r.skipped) .. " rows predate the chain", "orange")
+
     end
+
   end)
+
 end
+
+
 
 local function shortDate(value)
+
   if type(value) == "string" and #value >= 10 then return value:sub(1, 10) end
+
   return "?"
+
 end
+
+
 
 local function formatEvent(e)
+
   local meta = e.meta
+
   if type(meta) ~= "table" then meta = {} end
 
+
+
   local extra = ""
+
   if e.action == "spin" or e.action == "jackpot" then
+
     local reels = meta.reels
+
     if type(reels) == "table" then extra = " [" .. table.concat(reels, "/") .. "]" end
+
     extra = extra .. " bet " .. fmt(meta.bet or 0) .. " win " .. fmt(meta.win or 0)
+
   elseif e.action == "deposit" then
+
     extra = " via " .. tostring(meta.method or "?")
+
   elseif e.action == "withdraw" then
+
     extra = " net " .. fmt(meta.net or 0)
+
   elseif e.action == "deposit_held" then
+
     extra = " held " .. fmt(meta.held or 0)
+
   end
+
+
 
   local when = ""
+
   if type(e.at) == "string" and #e.at >= 19 then when = e.at:sub(12, 19) end
+
   local delta = tonumber(e.delta) or 0
+
   return when .. " " .. tostring(e.action) .. " " .. (delta > 0 and "+" or "") ..
+
     fmt(delta) .. " -> " .. fmt(e.balance or 0) .. extra ..
+
     (e.ref and (" " .. tostring(e.ref)) or "")
+
 end
+
+
 
 function vaultCheck(name, line, wildcards)
+
   local who = trim(wildcards and wildcards[1])
+
   if who == "" then note("Usage: vault check <character>", "orange"); return end
+
   if secret() == "" then note("No secret set.", "orange"); return end
 
+
+
   wait.make(function()
+
     local r = rpcRetry("casino_admin_account", { p_secret = secret(), p_character = who })
+
     if not r or not r.ok then
+
       note("Lookup failed: " .. tostring(r and r.error or "no answer"), "red")
+
       errorLog("account lookup failed for " .. who)
+
       return
+
     end
+
+
 
     local L = r.lifetime or {}
+
     note(r.character .. " | " .. fmt(r.gold) .. " gold | " .. fmt(r.events) ..
+
       " events | pending " .. fmt(r.pending), "white")
+
     note("dep " .. fmt(L.deposited) .. " | wd " .. fmt(L.withdrawn) ..
+
       " | wagered " .. fmt(L.wagered) .. " | won " .. fmt(L.won), "silver")
+
     note("net " .. fmt(r.net) .. " vs balance " .. fmt(r.gold) ..
+
       (r.balanced and " (OK)" or " (MISMATCH)"), r.balanced and "lime" or "red")
+
     note("spins " .. fmt(L.spins) .. " | biggest " .. fmt(L.biggest) ..
+
       " | jackpots " .. fmt(L.jackpots) .. " | since " .. shortDate(L.first_seen), "silver")
 
+
+
     for _, p in ipairs(r.payouts or {}) do
+
       note("open payout " .. tostring(p.ref) .. " asked " .. fmt(p.amount) ..
+
         " net " .. fmt(p.net), "orange")
+
     end
+
+
 
     note("Last 20 events:", "white")
+
     for _, e in ipairs(r.recent or {}) do note(formatEvent(e), "grey") end
+
   end)
+
 end
+
+
 
 function vaultSpins(name, line, wildcards)
+
   local who = trim(wildcards and wildcards[1])
+
   local count = tonumber(wildcards and wildcards[2]) or 15
+
   if who == "" then note("Usage: vault spins <character> [count]", "orange"); return end
 
+
+
   wait.make(function()
+
     local r = rpcRetry("casino_admin_history", {
+
       p_secret = secret(), p_character = who,
+
       p_limit = count, p_offset = 0, p_action = "spins"
+
     })
+
     if not r or not r.ok then
+
       note("Lookup failed: " .. tostring(r and r.error or "no answer"), "red")
+
       return
+
     end
+
+
 
     note(who .. " - last " .. tostring(count) .. " spins:", "white")
+
     local n = 0
+
     for _, e in ipairs(r.events or {}) do n = n + 1; note(formatEvent(e), "grey") end
+
     if n == 0 then note("No spins recorded.", "orange") end
+
   end)
+
 end
+
+
 
 function vaultRef(name, line, wildcards)
+
   local ref = trim(wildcards and wildcards[1]):upper()
+
   if ref == "" then note("Usage: vault ref WD-XXXXXX", "orange"); return end
 
+
+
   wait.make(function()
+
     local r = rpcRetry("casino_admin_ref", { p_secret = secret(), p_ref = ref })
+
     if not r or not r.ok then
+
       note("No record for " .. ref, "orange")
+
       return
+
     end
+
+
 
     local p = r.payout
+
     if type(p) == "table" then
+
       note(tostring(p.ref) .. " | " .. tostring(p.character) .. " | asked " .. fmt(p.amount) ..
+
         " | net " .. fmt(p.net) .. " | " .. tostring(p.status) .. " | " .. tostring(p.source), "white")
+
       note("requested " .. shortDate(p.requested_at) .. " | paid " .. shortDate(p.paid_at), "silver")
+
     end
+
+
 
     for _, e in ipairs(r.events or {}) do note(formatEvent(e), "grey") end
+
   end)
+
 end
+
+
 
 function vaultErrors()
+
   if #errors == 0 then note("No errors recorded this session.", "lime"); return end
+
   note("Last errors (also appended to HukoDB_vault.log):", "white")
+
   local first = math.max(1, #errors - 19)
+
   for i = first, #errors do note(errors[i], "grey") end
+
 end
+
+
 
 function doRefund(speaker)
+
   wait.make(function()
+
     local result = rpcRetry("casino_take_pending", {
+
       p_secret = secret(), p_character = speaker
+
     })
+
     if not result then
+
       tell(speaker, "The vault is not answering right now. Try again in a minute.")
+
       return
+
     end
+
     if not result.ok then
+
       tell(speaker, "Nothing of yours is waiting with me.")
+
       return
+
     end
+
+
 
     local gross = math.floor(tonumber(result.amount) or 0)
+
     local fee = 0
+
     if result.method ~= "give" then fee = feeFor(gross) end
+
     local net = gross - fee
 
+
+
     if net < 1 then
+
       tell(speaker, "The bank fee is bigger than what I'm holding. Ask " .. VAULT.owner .. " in game.")
+
       note("refund too small: " .. fmt(gross) .. " less fee " .. fmt(fee), "orange")
+
       return
+
     end
+
+
 
     if result.method == "give" then
+
       lastGive = { character = result.character, amount = net, ref = newRef("regive"), at = os.time() }
+
       Send("give " .. tostring(net) .. " gold to " .. result.character)
+
     else
+
       Send("bank transfer " .. tostring(net) .. " " .. result.character)
+
     end
+
+
 
     local suffix = ""
+
     if fee > 0 then suffix = " after the " .. fmt(fee) .. " bank fee" end
+
     tell(result.character, "Returning " .. fmt(net) .. " gold" .. suffix .. ".")
+
     note("refund " .. fmt(net) .. " to " .. result.character .. " (" .. result.method .. ")", "yellow")
+
   end)
+
 end
 
+
+
 -- ============================================================
+
 -- GOLD ARRIVING
+
 -- ============================================================
+
+
 
 -- Pull the matched phrase out of the original line so names keep their case.
+
 local function grab(line, lowpat)
+
   local start, finish = line:lower():find(lowpat)
+
   if not start then return nil end
+
   return line:sub(start, finish)
+
 end
+
+
 
 local function parseGold(line)
+
   local chunk = grab(line, "([%w]+) gives you [%d,]+ gold")
+
   if chunk then
+
     return chunk:match("^(%w+)"), chunk:match("([%d,]+)%s*gold"), "give"
+
   end
+
+
 
   chunk = grab(line, "([%w]+) has given you [%d,]+ gold")
+
   if chunk then
+
     return chunk:match("^(%w+)"), chunk:match("([%d,]+)"), "give"
+
   end
+
+
 
   chunk = grab(line, "([%w]+) transferred [%d,]+ gold to you")
+
   if chunk then
+
     return chunk:match("^(%w+)"), chunk:match("([%d,]+)"), "bank"
+
   end
+
+
 
   chunk = grab(line, "you receive [%d,]+ gold from [%w]+")
+
   if chunk then
+
     return chunk:match("from (%w+)"), chunk:match("([%d,]+)"), "bank"
+
   end
+
+
 
   chunk = grab(line, "bank transfer of [%d,]+ gold from [%w]+")
+
   if chunk then
+
     return chunk:match("from (%w+)"), chunk:match("([%d,]+)"), "bank"
+
   end
+
+
 
   return nil
+
 end
+
+
 
 function vaultGoldLine(name, line)
+
   if not line then return end
 
+
+
   local sender, amountText, method = parseGold(line)
+
   if VAULT.debug then note("gold line: " .. line, "grey") end
+
   if not sender then return end
 
+
+
   local amount = amountOf(amountText)
+
   if not amount then return end
+
   if sender:lower() == VAULT.bot_name:lower() then return end
 
+
+
   -- The game may print two lines for one transfer; count it once.
+
   local key = sender:lower() .. "|" .. tostring(amount)
+
   local now = os.time()
-  if seen[key] and now - seen[key] < 120 then
+
+  if seen[key] and now - seen[key] < 5 then
+
+    remember("gold DUPLICATE ignored: " .. key)
+
     if VAULT.debug then note("duplicate gold line ignored: " .. key, "grey") end
+
     return
+
   end
+
+  remember("gold " .. tostring(sender) .. " " .. fmt(amount) .. " via " .. tostring(method))
+
   seen[key] = now
 
+
+
   for oldKey, stamp in pairs(seen) do
+
     if now - stamp > 600 then seen[oldKey] = nil end
+
   end
 
+
+
   depositEvent(sender, amount, method)
+
 end
+
+
+
+-- A bank transfer lands straight in our bank account, so it is credited
+
+-- without running "bank deposit" (the gold is already banked).
+
+function vaultBankCredit(name, line, wildcards)
+
+  if not line then return end
+
+  local sender = wildcards and wildcards[1]
+
+  local amount = amountOf(wildcards and wildcards[2])
+
+  if not sender or not amount then return end
+
+  if sender:lower() == VAULT.bot_name:lower() then return end
+
+
+
+  -- No dedupe here: the game prints this line exactly once per transfer,
+
+  -- and two transfers of the same amount seconds apart are legitimate.
+
+  remember("bank " .. tostring(sender) .. " " .. fmt(amount))
+
+
+
+  if VAULT.debug then note("bank credit line: " .. line, "grey") end
+
+  depositEvent(sender, amount, "bank")
+
+end
+
+
 
 function depositEvent(sender, amount, method)
+
   wait.make(function()
+
     local ref = newRef(sender)
+
     local result, err = rpcRetry("casino_deposit", {
+
       p_secret = secret(), p_character = sender, p_amount = amount,
+
       p_method = method, p_ref = ref
+
     })
+
+
 
     if not result then
+
       queueAdd(sender, amount, method, ref)
+
       tell(sender, "I have your " .. fmt(amount) .. " gold and will add it as soon as the vault answers.")
+
       note("deposit queued (" .. tostring(err) .. "): " .. sender .. " " .. fmt(amount), "orange")
+
       errorLog("deposit queued for " .. sender .. " " .. fmt(amount) .. ": " .. tostring(err))
+
       return
+
     end
+
+
 
     if result.status == "credited" then
+
       tell(sender, fmt(amount) .. " gold added to " .. result.character .. "'s account.")
-      Send("bank deposit " .. tostring(amount))
+
+      if method ~= "bank" then Send("bank deposit " .. tostring(amount)) end
+
       note("credited " .. fmt(amount) .. " to " .. result.character, "lime")
+
     else
+
       -- A bank refund is paid out of the bank, so bank this gold. A give
+
       -- refund is paid by hand, so that gold stays on us.
+
       if method ~= "give" then Send("bank deposit " .. tostring(amount)) end
+
       tell(sender, "You don't have an account. Tell me 'login' to make one, or 'refund' to get it back (bank fee deducted).")
+
       note("held " .. fmt(amount) .. " for " .. sender .. " (no account)", "orange")
+
     end
+
   end)
+
 end
+
+
 
 function vaultGiveSent(name, line)
+
   lastGive = nil
+
 end
+
+
 
 -- A give refund only works in the same room. If the player walked off the
+
 -- gold is still ours, so put it back in the holding pot.
+
 function vaultGiveFailed(name, line)
+
   if not lastGive then return end
+
   if os.time() - (lastGive.at or 0) > 90 then lastGive = nil; return end
 
+
+
   local low = line and line:lower() or ""
+
   local named = low:find(lastGive.character:lower(), 1, true) ~= nil
+
   local generic = low:find("aren't here", 1, true) or low:find("isn't here", 1, true)
+
   if not named and not generic then return end
 
+
+
   local pending = lastGive
+
   lastGive = nil
 
+
+
   wait.make(function()
+
     local result = rpcRetry("casino_hold", {
+
       p_secret = secret(), p_character = pending.character, p_amount = pending.amount,
+
       p_method = "give", p_ref = pending.ref
+
     })
+
     if result and result.ok then
+
       tell(pending.character, "You moved out of reach, so I'm holding " ..
+
         fmt(pending.amount) .. " gold. Tell me 'refund' when you are back, or 'login'.")
+
       note("re-held " .. fmt(pending.amount) .. " for " .. pending.character, "orange")
+
     else
+
       note("COULD NOT RE-HOLD " .. fmt(pending.amount) .. " for " .. pending.character .. " - check the vault by hand!", "red")
+
       errorLog("re-hold failed for " .. pending.character .. " " .. fmt(pending.amount))
+
     end
+
   end)
+
 end
 
+
+
 -- ============================================================
+
 -- OPERATOR
+
 -- ============================================================
+
+
 
 function vaultCommand(rest)
+
   local text = trim(rest or "")
+
   local cmd, arg = text:match("^(%S+)%s*(.*)$")
+
   cmd = cmd and cmd:lower() or ""
+
   arg = trim(arg or "")
 
+
+
   local first, second = arg:match("^(%S+)%s*(%S*)$")
+
   local w = first and { first, second or "" } or { arg }
 
+
+
   local handlers = {
+
     secret = vaultSetSecret, status = vaultStatus, test = vaultTest,
+
     debug  = vaultToggleDebug, flush = vaultFlushNow, audit = vaultAudit,
+
     verify = vaultVerify, check = vaultCheck, spins = vaultSpins,
+
     ref    = vaultRef, errors = vaultErrors, log = vaultErrors,
-    help   = vaultHelpLocal
+
+    bankall = vaultBankAll, last = vaultLast, help = vaultHelpLocal
+
   }
 
+
+
   local fn = handlers[cmd]
+
   if not fn then vaultHelpLocal(); return end
+
   fn("vault", "vault " .. text, w)
+
 end
+
+
 
 function vaultSetSecret(name, line, wildcards)
+
   local value = trim(wildcards and wildcards[1])
+
   if value == "" then note("Usage: vault secret <value>", "orange"); return end
+
   SECRET = value
+
   SetVariable("bot_secret", value)
+
   SaveState()
+
   note("Secret set (" .. #value .. " characters).", "lime")
+
 end
 
+
+
 function vaultTest()
+
   local held = secret()
+
   local shown = "empty"
+
   if held ~= "" then shown = held:sub(1, 4) .. "..." .. held:sub(-4) end
+
   note("Secret held: " .. #held .. " chars, " .. shown, "silver")
+
+
 
   if held == "" then note("Nothing to send. Run: vault secret <value>", "orange"); return end
 
+
+
   wait.make(function()
+
     local r, err = rpc("casino_verify_chain", { p_secret = held })
+
     if not r then
+
       note("No answer from Supabase: " .. tostring(err), "red")
+
       errorLog("selftest failed: " .. tostring(err))
+
       return
+
     end
+
     if r.ok then
+
       note("Server accepted the secret. Chain: " .. (r.valid and "intact" or "BROKEN") ..
+
         ", events: " .. tostring(r.checked), "lime")
+
     else
+
       note("Server said: " .. tostring(r.error) .. " - the secret does not match casino_config", "red")
+
     end
+
   end)
+
 end
+
+
 
 function vaultStatus()
+
   local secretState = (secret() ~= "") and "set" or "MISSING"
-  note("Secret: " .. secretState .. " | outbox: " .. #queue .. " | debug: " ..
+
+  note("Build " .. BUILD .. " | Secret: " .. secretState .. " | outbox: " .. #queue .. " | debug: " ..
+
     (VAULT.debug and "on" or "off"), "white")
+
   if secret() == "" then
+
     note("Run schema-casino.sql in Supabase, then: vault secret <value>", "orange")
+
   elseif #queue > 0 then
+
     note("Queued: " .. json.encode(queue), "silver")
+
   end
+
+
+
+  if secret() ~= "" then
+
+    wait.make(function()
+
+      local r = rpc("casino_vault_status", {})
+
+      if r then
+
+        note("Site sees the vault as " .. (r.online and "online" or "offline") ..
+
+          " | payouts waiting: " .. tostring(r.queued), r.online and "lime" or "orange")
+
+      end
+
+    end)
+
+  end
+
 end
+
+
 
 function vaultToggleDebug()
+
   VAULT.debug = not VAULT.debug
+
   note("Debug " .. (VAULT.debug and "ON" or "OFF"), "lime")
+
 end
+
+
 
 function vaultHelpLocal()
+
   note("vault secret <value> | status | debug | flush | audit | verify | check <char> | spins <char> | ref <id> | errors | help", "white")
+
 end
 
+
+
 -- ============================================================
+
 -- LIFECYCLE
+
 -- ============================================================
+
+
 
 function OnPluginInstall()
+
   math.randomseed(os.time() % 100000 + math.floor(os.clock() * 1000))
+
   loadSecretFromFile()
+
   loadQueue()
 
+
+
   wait.make(function()
+
     wait.time(1)
-    note("HukoDB Vault v1.0 loaded. Park " .. VAULT.bot_name .. " at a bank.", "lime")
+
+    note("HukoDB Vault v1.0 [" .. BUILD .. "] loaded. Park " .. VAULT.bot_name .. " at a bank.", "lime")
+
     if secret() == "" then
+
       note("No bot secret. Run schema-casino.sql, then: vault secret <value>", "orange")
+
     else
+
       note("Ready. Players: tell " .. VAULT.bot_name .. " login", "lime")
+
     end
+
   end)
+
 end
+
+
 
 function OnPluginConnect()
+
   wait.make(function()
+
     wait.time(2)
+
     if secret() == "" then loadSecretFromFile() end
+
     if #queue > 0 then flushQueue() end
+
     pollPayouts()
+
   end)
+
 end
+
+
 
 function OnPluginSaveState()
+
   persistQueue()
+
 end
 
+
+
 ]]>
+
 </script>
 
+
+
 </muclient>
+

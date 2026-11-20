@@ -67,6 +67,27 @@
         table.wd { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
         table.wd th { text-align: left; color: #888; font-weight: normal; border-bottom: 1px solid #333; padding: 6px 4px; }
         table.wd td { padding: 6px 4px; border-bottom: 1px solid #262626; }
+        table.pt td:nth-child(n+2) { text-align: right; }
+        .machines { flex: 1 1 460px; min-width: 0; }
+        .machines .machine { flex: none; }
+        .machine-tabs { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+        .machine-tabs button { background: #1a1a1a; border: 1px solid #444; color: #999; padding: 8px 14px; font-size: 13px; }
+        .machine-tabs button.active { background: #2a2410; border-color: #FFD700; color: #FFD700; }
+        .dgrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 14px 0 10px; }
+        .dcol { background: #111; border: 1px solid #444; border-radius: 6px; padding: 4px; display: flex; flex-direction: column; gap: 4px; }
+        .dcell { font-size: 30px; height: 44px; line-height: 44px; text-align: center; border-radius: 4px; user-select: none; }
+        .dcell.hit { background: #2a2410; outline: 1px solid #FFD700; }
+        #dgrid.spinning .dcell { filter: blur(1px); opacity: 0.75; }
+        .freebar { display: none; text-align: center; border: 1px solid #7CFC9E; background: #0e1f12; color: #7CFC9E; border-radius: 6px; padding: 8px; font-size: 13px; letter-spacing: 1px; margin-top: 12px; }
+        .freebar.on { display: block; animation: fpulse 1.6s infinite; }
+        @keyframes fpulse { 0%, 100% { box-shadow: 0 0 0 rgba(124,252,158,0); } 50% { box-shadow: 0 0 14px rgba(124,252,158,0.45); } }
+        #dragon-spin { background: #7CFC9E; color: #001a08; border: none; font-weight: bold; font-size: 16px; padding: 12px 26px; letter-spacing: 1px; }
+        #dragon-spin:hover:not(:disabled) { background: #9dffb9; }
+        .spinlog { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
+        .spinlog td { padding: 3px 4px; border-bottom: 1px solid #262626; color: #888; }
+        .spinlog td.w { color: #44dd44; text-align: right; }
+        .pt-panel { display: none; }
+        .pt-panel.on { display: block; }
     </style>
 </head>
 <body>
@@ -129,7 +150,12 @@
     <p style="color:#888;font-size:13px;margin-top:0;">Three-reel slots, one payline, one progressive jackpot. Played with gold only.</p>
 
     <div class="layout">
-        <section class="machine">
+      <div class="machines">
+        <div class="machine-tabs">
+            <button class="active" data-machine="classic">Classic &middot; 3 reels</button>
+            <button data-machine="dragon">Dragon&rsquo;s Hoard &middot; 5 reels</button>
+        </div>
+        <section class="machine" id="machine-classic">
             <div class="jackpot">
                 <div class="label">Progressive Jackpot</div>
                 <div class="amount" id="jackpot-value">0</div>
@@ -164,7 +190,49 @@
             </div>
         </section>
 
+        <section class="machine" id="machine-dragon" style="display:none;">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;">
+                <div>
+                    <div class="label" style="color:#7CFC9E;font-size:11px;letter-spacing:2px;text-transform:uppercase;">Dragon&rsquo;s Hoard</div>
+                    <div class="sub" style="color:#8a7a3a;font-size:11px;">5 reels &middot; 3 rows &middot; 9 paylines</div>
+                </div>
+                <div style="text-align:right;">
+                    <div class="sub" style="color:#8a7a3a;font-size:11px;">Total bet</div>
+                    <div class="gold" id="dragon-totalbet" style="font-size:20px;font-weight:bold;">90</div>
+                </div>
+            </div>
+
+            <div class="dgrid" id="dgrid"></div>
+
+            <div class="freebar" id="dragon-free"></div>
+
+            <div class="controls">
+                <label for="dragon-bet" style="font-size:13px;color:#888;">Bet / line</label>
+                <select id="dragon-bet">
+                    <option value="2">2 gold</option>
+                    <option value="5">5 gold</option>
+                    <option value="10" selected>10 gold</option>
+                    <option value="25">25 gold</option>
+                    <option value="50">50 gold</option>
+                </select>
+                <button id="dragon-spin">SPIN</button>
+            </div>
+
+            <div id="dragon-msg" class="lose" style="text-align:center;font-size:15px;min-height:22px;margin-top:10px;">Log in below to play.</div>
+
+            <div class="balances">
+                <span>Account: <strong class="gold" id="dragon-balance">0</strong> gold</span>
+                <span>Free spins: <strong id="dragon-left">0</strong></span>
+                <span class="tiny" style="flex-basis:100%;">Every spin stores the exact five-by-three grid it drew. That record is what settles a dispute.</span>
+            </div>
+
+            <div class="tiny" id="dragon-session" style="margin-top:10px;"></div>
+            <table class="spinlog"><tbody id="dragon-log"></tbody></table>
+        </section>
+      </div>
+
         <aside class="paytable">
+            <div id="pt-classic" class="pt-panel on">
             <h2 style="margin-top:0;">Paytable</h2>
             <table class="pt" id="paytable-body">
                 <tr><td>🍒 🍒 🍒</td><td>6&times;</td></tr>
@@ -180,6 +248,27 @@
             <h2>Machine numbers</h2>
             <div class="kv" id="math-body"></div>
             <p class="note">Base return is fixed by the paytable and reel weights. The jackpot adds value on top at max bet, so max-bet RTP rises as the pool grows.</p>
+            </div>
+
+            <div id="pt-dragon" class="pt-panel">
+            <h2 style="margin-top:0;">Dragon&rsquo;s Hoard pays</h2>
+            <table class="pt">
+                <tr><td class="tiny"></td><td class="tiny">3</td><td class="tiny">4</td><td class="tiny">5</td></tr>
+                <tr><td>🐉 🐉 🐉</td><td>26&times;</td><td>155&times;</td><td>1280&times;</td></tr>
+                <tr><td>⭐ ⭐ ⭐</td><td>21&times;</td><td>105&times;</td><td>520&times;</td></tr>
+                <tr><td>7️⃣ 7️⃣ 7️⃣</td><td>13&times;</td><td>62&times;</td><td>260&times;</td></tr>
+                <tr><td>💎 💎 💎</td><td>8&times;</td><td>31&times;</td><td>130&times;</td></tr>
+                <tr><td>🔔 🔔 🔔</td><td>5&times;</td><td>15&times;</td><td>62&times;</td></tr>
+                <tr><td>🍋 🍋 🍋</td><td>3&times;</td><td>8&times;</td><td>31&times;</td></tr>
+                <tr><td>🍒 🍒 🍒</td><td>1&times;</td><td>4&times;</td><td>15&times;</td></tr>
+                <tr class="jackpot-row"><td>💰 anywhere</td><td>2&times; total</td><td>10&times; total</td><td>60&times; total</td></tr>
+            </table>
+            <p class="note">Multiples of the <strong>line</strong> bet (the scatter pays the total bet). Wins run left to right on nine fixed lines; the dragon is wild for every symbol.</p>
+            <h2>Free spins</h2>
+            <p class="note" style="margin-top:0;">Three gold bags anywhere pay the scatter prize and start <strong>8 free spins</strong>. Every win in the round is doubled, and three more bags add <strong>5</strong> to the count. Free spins are held by the vault: log out, come back, and the round is still there.</p>
+            <h2>Machine numbers</h2>
+            <div class="kv" id="dragon-math"></div>
+            </div>
         </aside>
     </div>
 
@@ -208,22 +297,24 @@
         </div>
 
         <div id="acct-in" style="display:none;">
+            <p class="tiny" id="vault-status" style="margin:0 0 10px;"></p>
             <div class="kv" style="max-width:340px;">
                 <div>Character</div><div id="acct-name"></div>
                 <div>Gold in account</div><div class="gold" id="acct-gold">0</div>
             </div>
 
             <h3 style="margin:16px 0 4px;">Deposit</h3>
-            <p class="note" style="margin:0 0 4px;">In the same room as HukoDB, exact and free:</p>
-            <code class="cmd">give 10000 gold to HukoDB</code>
-            <p class="note" style="margin:8px 0 4px;">Or from any bank, while HukoDB is online:</p>
+            <p class="note" style="margin:0 0 4px;">From any bank, while HukoDB is connected &mdash; this works even when the vault is in social mode:</p>
             <code class="cmd">bank transfer 10000 HukoDB</code>
+            <p class="note" style="margin:8px 0 4px;">Handing gold over in person works only during a full vault session, in the same room, and costs nothing:</p>
+            <code class="cmd">give 10000 gold to HukoDB</code>
 
             <h3 style="margin:16px 0 4px;">Withdraw</h3>
             <p class="note" style="margin:0 0 4px;">
                 Start it here or in game with <code>tell HukoDB withdraw 5000</code>. Either way the request and the
-                payout are recorded together, and HukoDB only settles the exact net the site recorded. Gold still
-                moves in game, so you must be online when it is sent. The bank fee is deducted.
+                payout are recorded together, and HukoDB only settles the exact net the site recorded. The request
+                waits until HukoDB is next connected, then you <code>tell HukoDB pay</code> while you are both online.
+                The bank fee is deducted.
             </p>
             <div class="field">
                 <label for="wd-amount">Gold</label>
@@ -343,6 +434,8 @@
         };
         var session = { spins: 0, wagered: 0, won: 0 };
         var spinning = false;
+        var activeMachine = 'classic';
+        var dragonState = { busy: false, freeLeft: 0, freeBet: 0, freeMult: 2 };
 
         // ---- DOM ----------------------------------------------------------------
         var reelsEl = document.getElementById('reels');
@@ -366,7 +459,11 @@
             jackpotEl.textContent = fmt(acct.jackpot);
             sessionEl.textContent = session.spins + (session.spins === 1 ? ' spin' : ' spins');
             document.getElementById('acct-gold').textContent = fmt(acct.gold);
+            var dragonBalance = document.getElementById('dragon-balance');
+            if (dragonBalance) dragonBalance.textContent = fmt(acct.gold);
             renderStats();
+            updateDragonUi();
+            updateButtons();
         }
         function renderStats() {
             var s = session, l = acct.lifetime;
@@ -396,12 +493,23 @@
 
         function setBusy(busy) {
             spinning = busy;
-            spinBtn.disabled = busy || !acct.token || acct.gold < currentBet();
-            betSelect.disabled = busy;
+            updateButtons();
         }
         function currentBet() {
             var v = Number(betSelect.value);
             return CFG.bets.indexOf(v) >= 0 ? v : CFG.bets[0];
+        }
+        function updateButtons() {
+            spinBtn.disabled = spinning || !acct.token || acct.gold < currentBet();
+            betSelect.disabled = spinning;
+            var dragonBtn = document.getElementById('dragon-spin');
+            var dragonSel = document.getElementById('dragon-bet');
+            if (dragonBtn) {
+                var free = dragonState.freeLeft > 0;
+                var cost = (free ? dragonState.freeBet : dragonBet()) * 9;
+                dragonBtn.disabled = spinning || dragonState.busy || !acct.token || (!free && acct.gold < cost);
+            }
+            if (dragonSel) dragonSel.disabled = spinning || dragonState.busy || dragonState.freeLeft > 0;
         }
 
         // ---- Website ------------------------------------------------------------
@@ -430,6 +538,7 @@
             acct.token = r.token || acct.token;
             acct.character = r.character || acct.character;
             acct.gold = Number(r.gold) || 0;
+            applyFreeSpins(r.freespins);
             if (r.jackpot !== undefined && r.jackpot !== null) acct.jackpot = Number(r.jackpot);
             if (r.lifetime) {
                 acct.lifetime = {
@@ -456,10 +565,13 @@
                 acct.token = null;
                 acct.character = '';
                 acct.gold = 0;
+                dragonState.freeLeft = 0;
+                dragonState.freeBet = 0;
                 document.getElementById('acct-name').textContent = '';
                 renderPayouts([]);
                 render();
             }
+            dMsg(loggedIn ? 'Press SPIN to play.' : 'Log in below to play.', 'lose');
             setBusy(false);
         }
 
@@ -644,7 +756,9 @@
             payout_paid: 'Payout sent',
             payout_failed: 'Payout refunded',
             spin: 'Spin',
-            jackpot: 'Jackpot'
+            jackpot: 'Jackpot',
+            spin5: 'Dragon spin',
+            freespin: 'Free spin'
         };
 
         function renderHistory(rows) {
@@ -848,16 +962,369 @@
             setBusy(false);
         }
 
+        // ---- Dragon's Hoard: five reels, nine lines, free spins ----------------
+        var D = {
+            symbols: [
+                { id: 'cherry',  glyph: '🍒', weight: 30 },
+                { id: 'lemon',   glyph: '🍋', weight: 25 },
+                { id: 'bell',    glyph: '🔔', weight: 22 },
+                { id: 'diamond', glyph: '💎', weight: 16 },
+                { id: 'seven',   glyph: '7️⃣', weight: 12 },
+                { id: 'star',    glyph: '⭐', weight: 9 },
+                { id: 'wild',    glyph: '🐉', weight: 10 },
+                { id: 'scatter', glyph: '💰', weight: 4 }
+            ],
+            pay: {
+                cherry: [1, 4, 15], lemon: [3, 8, 31], bell: [5, 15, 62],
+                diamond: [8, 31, 130], seven: [13, 62, 260], star: [21, 105, 520],
+                wild: [26, 155, 1280]
+            },
+            scatterPay: [0, 0, 0, 2, 10, 60],
+            lines: [
+                [2, 2, 2, 2, 2], [1, 1, 1, 1, 1], [3, 3, 3, 3, 3],
+                [1, 2, 3, 2, 1], [3, 2, 1, 2, 3], [1, 2, 1, 2, 1],
+                [3, 2, 3, 2, 3], [2, 1, 1, 1, 2], [2, 3, 3, 3, 2]
+            ],
+            bets: [2, 5, 10, 25, 50],
+            freeTrigger: 8,
+            freeRetrigger: 5,
+            freeMult: 2
+        };
+        var dBy = {};
+        D.symbols.forEach(function (s) { dBy[s.id] = s; });
+        var D_WEIGHT = D.symbols.reduce(function (a, s) { return a + s.weight; }, 0);
+
+        function dLineWin(seq) {
+            var base = null, i;
+            for (i = 0; i < seq.length; i++) {
+                if (seq[i] !== 'wild') { base = seq[i]; break; }
+            }
+            if (base === null) base = 'wild';
+            if (base === 'scatter') return 0;
+            var run = 0;
+            for (i = 0; i < seq.length; i++) {
+                if (seq[i] === base || seq[i] === 'wild') run++;
+                else break;
+            }
+            if (run < 3 || !D.pay[base]) return 0;
+            return D.pay[base][run - 3];
+        }
+
+        var DMATH = (function () {
+            var p = {}, lineRtp = 0, lineHit = 0;
+            D.symbols.forEach(function (s) { p[s.id] = s.weight / D_WEIGHT; });
+            for (var a = 0; a < 8; a++) for (var b = 0; b < 8; b++) for (var c = 0; c < 8; c++)
+            for (var d = 0; d < 8; d++) for (var e = 0; e < 8; e++) {
+                var seq = [D.symbols[a].id, D.symbols[b].id, D.symbols[c].id,
+                           D.symbols[d].id, D.symbols[e].id];
+                var pr = 1;
+                for (var x = 0; x < 5; x++) pr *= p[seq[x]];
+                var w = dLineWin(seq);
+                lineRtp += pr * w;
+                if (w > 0) lineHit += pr;
+            }
+            function binom(n, k) {
+                var r = 1;
+                for (var t = 1; t <= k; t++) r = r * (n - k + t) / t;
+                return r;
+            }
+            var psc = p.scatter, scatterRtp = 0, pTrigger = 0;
+            for (var k2 = 0; k2 <= 15; k2++) {
+                var ps = binom(15, k2) * Math.pow(psc, k2) * Math.pow(1 - psc, 15 - k2);
+                if (k2 >= 3) pTrigger += ps;
+                scatterRtp += ps * (D.scatterPay[Math.min(k2, 5)] || 0);
+            }
+            var baseRtp = lineRtp + scatterRtp;
+            var expectedFree = D.freeTrigger / (1 - D.freeRetrigger * pTrigger);
+            var freeRtp = pTrigger * expectedFree * D.freeMult * baseRtp;
+            return {
+                lineRtp: lineRtp, scatterRtp: scatterRtp, baseRtp: baseRtp,
+                pTrigger: pTrigger, expectedFree: expectedFree, freeRtp: freeRtp,
+                rtp: baseRtp + freeRtp, lineHit: lineHit,
+                anyLine: 1 - Math.pow(1 - lineHit, 9)
+            };
+        })();
+
+        function dGlyph(id) { return (dBy[id] || dBy.cherry).glyph; }
+        function dRandomSymbol() {
+            var n = Math.floor(Math.random() * D_WEIGHT), acc = 0;
+            for (var i = 0; i < D.symbols.length; i++) {
+                acc += D.symbols[i].weight;
+                if (n < acc) return D.symbols[i].id;
+            }
+            return 'cherry';
+        }
+        function dragonBet() {
+            var sel = document.getElementById('dragon-bet');
+            var v = sel ? Number(sel.value) : 10;
+            return D.bets.indexOf(v) >= 0 ? v : 10;
+        }
+        function dMsg(text, cls) {
+            var el = document.getElementById('dragon-msg');
+            if (!el) return;
+            el.className = cls || 'lose';
+            el.textContent = text;
+        }
+        function applyFreeSpins(f) {
+            if (!f) {
+                dragonState.freeLeft = 0;
+                dragonState.freeBet = 0;
+                dragonState.freeMult = 2;
+            } else {
+                dragonState.freeLeft = Number(f.left) || 0;
+                dragonState.freeBet = Number(f.bet) || 0;
+                dragonState.freeMult = Number(f.multiplier) || 2;
+            }
+            updateDragonUi();
+        }
+        function updateDragonUi() {
+            var banner = document.getElementById('dragon-free');
+            var btn = document.getElementById('dragon-spin');
+            if (!banner) return;
+            if (dragonState.freeLeft > 0) {
+                banner.className = 'freebar on';
+                banner.innerHTML = 'FREE SPINS &middot; <strong>' + dragonState.freeLeft +
+                    '</strong> left &middot; every win &times;' + dragonState.freeMult;
+                if (btn && !dragonState.busy) btn.textContent = 'FREE SPIN';
+            } else {
+                banner.className = 'freebar';
+                banner.innerHTML = '';
+                if (btn && !dragonState.busy) btn.textContent = 'SPIN';
+            }
+            var leftEl = document.getElementById('dragon-left');
+            if (leftEl) leftEl.textContent = String(dragonState.freeLeft);
+            var totalEl = document.getElementById('dragon-totalbet');
+            if (totalEl) {
+                totalEl.textContent = fmt((dragonState.freeLeft > 0 ? dragonState.freeBet : dragonBet()) * 9);
+            }
+        }
+
+        var dgridEl = document.getElementById('dgrid');
+        var dcellEls = [];
+        (function () {
+            for (var c = 0; c < 5; c++) {
+                var col = document.createElement('div');
+                col.className = 'dcol';
+                for (var r = 0; r < 3; r++) {
+                    var cell = document.createElement('div');
+                    cell.className = 'dcell';
+                    cell.textContent = '·';
+                    col.appendChild(cell);
+                    dcellEls.push(cell);
+                }
+                dgridEl.appendChild(col);
+            }
+        })();
+
+        function dSetGrid(grid) {
+            for (var c = 0; c < 5; c++) {
+                for (var r = 0; r < 3; r++) {
+                    dcellEls[c * 3 + r].textContent = dGlyph(grid[c][r]);
+                }
+            }
+        }
+        function dClearHits() {
+            dcellEls.forEach(function (cell) { cell.classList.remove('hit'); });
+        }
+        function dShowHits(lines) {
+            lines.forEach(function (l) {
+                var rows = D.lines[l.line - 1];
+                for (var r = 0; r < l.count && r < 5; r++) {
+                    dcellEls[r * 3 + (rows[r] - 1)].classList.add('hit');
+                }
+            });
+        }
+
+        var dlog = [];
+        var dSession = { spins: 0, free: 0, wagered: 0, won: 0 };
+        function dRenderLog() {
+            var body = document.getElementById('dragon-log');
+            var summary = document.getElementById('dragon-session');
+            if (summary) {
+                summary.textContent = dSession.spins + ' spins · ' + fmt(dSession.wagered) +
+                    ' wagered · ' + fmt(dSession.won) + ' won' +
+                    (dSession.free ? ' · ' + dSession.free + ' free' : '');
+            }
+            if (!body) return;
+            if (!dlog.length) {
+                body.innerHTML = '<tr><td class="tiny">No spins yet this session.</td><td></td></tr>';
+                return;
+            }
+            body.innerHTML = dlog.map(function (row) {
+                var cells = row.grid.map(function (col) {
+                    return col.map(dGlyph).join('');
+                }).join(' ');
+                return '<tr><td>' + (row.free ? '<span style="color:#7CFC9E">free</span> ' : '') +
+                    cells + '</td><td class="w">' +
+                    (row.win > 0 ? '+' + fmt(row.win) : '—') + '</td></tr>';
+            }).join('');
+        }
+        function dPushLog(grid, r) {
+            dlog.unshift({ grid: grid, win: Number(r.win) || 0, free: !!r.free });
+            if (dlog.length > 8) dlog.length = 8;
+            dRenderLog();
+        }
+
+        function dRenderMath() {
+            var el = document.getElementById('dragon-math');
+            if (!el) return;
+            el.innerHTML =
+                row('Return to player', (DMATH.rtp * 100).toFixed(2) + '%') +
+                row('From the nine lines', (DMATH.lineRtp * 100).toFixed(2) + '%') +
+                row('From scatters and free spins', ((DMATH.scatterRtp + DMATH.freeRtp) * 100).toFixed(2) + '%') +
+                row('Hit frequency', (DMATH.anyLine * 100).toFixed(1) + '%') +
+                row('Three gold bags', '1 in ' + fmt(Math.round(1 / DMATH.pTrigger))) +
+                row('Free spins per trigger', DMATH.expectedFree.toFixed(1)) +
+                row('Top prize', '1280&times; line bet');
+        }
+
+        function dAnimate(grid, result) {
+            dClearHits();
+            dgridEl.classList.add('spinning');
+            var stops = [700, 900, 1100, 1300, 1500];
+            var done = [false, false, false, false, false];
+            var started = Date.now();
+            var timer = setInterval(function () {
+                var elapsed = Date.now() - started;
+                var still = false;
+                for (var c = 0; c < 5; c++) {
+                    if (done[c]) continue;
+                    if (elapsed >= stops[c]) {
+                        done[c] = true;
+                        for (var r = 0; r < 3; r++) {
+                            dcellEls[c * 3 + r].textContent = dGlyph(grid[c][r]);
+                        }
+                    } else {
+                        for (var r2 = 0; r2 < 3; r2++) {
+                            dcellEls[c * 3 + r2].textContent = dGlyph(dRandomSymbol());
+                        }
+                        still = true;
+                    }
+                }
+                if (!still) {
+                    clearInterval(timer);
+                    dgridEl.classList.remove('spinning');
+                    dSettle(grid, result);
+                }
+            }, 70);
+        }
+
+        function dSettle(grid, r) {
+            var win = Number(r.win) || 0;
+            var bet = Number(r.bet) || 0;
+            var cost = Number(r.cost) || 0;
+
+            var paidGold = Number(r.gold);
+            if (!isNaN(paidGold)) acct.gold = paidGold;
+            applyFreeSpins(r.freespins);
+
+            dSession.spins++;
+            if (r.free) dSession.free++;
+            dSession.wagered += cost;
+            dSession.won += win;
+
+            if (r.free_awarded) {
+                var left = r.freespins ? Number(r.freespins.left) || 0 : 0;
+                dMsg('💰 ' + r.free_awarded + ' FREE SPINS — all wins ×' + D.freeMult +
+                    (win > 0 ? '. This spin paid ' + fmt(win) + '.' : '.') +
+                    ' ' + left + ' left.', 'jackpot-hit');
+            } else if (win > 0) {
+                var bits = [];
+                (r.lines || []).forEach(function (l) {
+                    bits.push('line ' + l.line + ' ' + dGlyph(l.symbol) + '×' + l.count);
+                });
+                if (Number(r.scatter_win) > 0) bits.push(r.scatters + ' bags');
+                dMsg((r.free ? '×2 free spin — ' : '') + bits.join(' · ') +
+                    ' — ' + fmt(win) + ' gold', 'win');
+            } else if (r.free) {
+                dMsg('No win. ' + (r.freespins ? r.freespins.left : 0) + ' free spins left.', 'lose');
+            } else {
+                dMsg('No win. Nine lines, nothing landed.', 'lose');
+            }
+
+            if (r.lines && r.lines.length) dShowHits(r.lines);
+            dPushLog(grid, r);
+
+            dragonState.busy = false;
+            render();
+            loadSummary(false);
+        }
+
+        function dragonSpin() {
+            if (dragonState.busy || spinning) return;
+            if (!acct.token) {
+                dMsg('Log in below to play with the gold in your account.', 'warn');
+                return;
+            }
+            var free = dragonState.freeLeft > 0;
+            var bet = free ? dragonState.freeBet : dragonBet();
+            var cost = free ? 0 : bet * 9;
+            if (!free && acct.gold < cost) {
+                dMsg('Not enough gold. A spin here costs ' + fmt(cost) + '.', 'warn');
+                return;
+            }
+
+            dragonState.busy = true;
+            dClearHits();
+            dMsg(free ? 'Free spin…' : 'Spinning…', 'lose');
+            updateButtons();
+
+            rpc('casino_spin5', { p_token: acct.token, p_bet_line: free ? 0 : bet }).then(function (r) {
+                if (!r || !r.ok) {
+                    dragonState.busy = false;
+                    updateButtons();
+                    if (r && r.error === 'no_free') {
+                        dMsg('Those free spins were already used. Balance refreshed.', 'warn');
+                        refresh();
+                    } else if (r && r.error === 'session') {
+                        dMsg('Your login expired. Log in again.', 'warn');
+                        logout();
+                    } else if (r && r.error === 'funds') {
+                        dMsg('Not enough gold for that bet.', 'warn');
+                    } else {
+                        dMsg('The vault refused the spin. Refresh and try again.', 'warn');
+                    }
+                    return;
+                }
+                dAnimate(r.grid, r);
+            }).catch(function () {
+                dragonState.busy = false;
+                updateButtons();
+                dMsg('The vault did not answer. Refresh your balance before spinning again.', 'warn');
+            });
+        }
+
+        function switchMachine(name) {
+            activeMachine = name;
+            document.querySelectorAll('.machine-tabs button').forEach(function (b) {
+                b.classList.toggle('active', b.getAttribute('data-machine') === name);
+            });
+            document.getElementById('machine-classic').style.display = name === 'classic' ? 'block' : 'none';
+            document.getElementById('machine-dragon').style.display = name === 'dragon' ? 'block' : 'none';
+            document.getElementById('pt-classic').classList.toggle('on', name === 'classic');
+            document.getElementById('pt-dragon').classList.toggle('on', name === 'dragon');
+        }
+
+        document.querySelectorAll('.machine-tabs button').forEach(function (btn) {
+            btn.addEventListener('click', function () { switchMachine(btn.getAttribute('data-machine')); });
+        });
+        document.getElementById('dragon-spin').addEventListener('click', dragonSpin);
+        document.getElementById('dragon-bet').addEventListener('change', function () {
+            updateDragonUi();
+            updateButtons();
+        });
+
         // ---- Controls -----------------------------------------------------------
         spinBtn.addEventListener('click', spin);
         betSelect.addEventListener('change', function () {
-            spinBtn.disabled = spinning || !acct.token || acct.gold < currentBet();
+            updateButtons();
             renderMath();
         });
         document.addEventListener('keydown', function (e) {
             if (e.code === 'Space' && !/^(INPUT|SELECT|TEXTAREA|BUTTON)$/.test(document.activeElement.tagName)) {
                 e.preventDefault();
-                spin();
+                if (activeMachine === 'dragon') dragonSpin();
+                else spin();
             }
         });
         document.getElementById('acct-login').addEventListener('click', login);
@@ -867,13 +1334,35 @@
         document.getElementById('acct-logout').addEventListener('click', logout);
         document.getElementById('acct-refresh').addEventListener('click', refresh);
         document.getElementById('acct-withdraw').addEventListener('click', requestPayout);
+
+        function loadVaultStatus() {
+            rpc('casino_vault_status', {}).then(function (r) {
+                var el = document.getElementById('vault-status');
+                if (!el || !r) return;
+                if (r.online) {
+                    el.innerHTML = '<span style="color:#44dd44">Vault online</span> &mdash; bank-transfer deposits are open.';
+                } else {
+                    el.innerHTML = '<span style="color:#ffaa00">Vault offline</span> &mdash; play still works; ' +
+                        'deposits wait until HukoDB is connected, and payouts queue for the next session.';
+                }
+                if (r.queued) {
+                    el.innerHTML += ' <span style="color:#888">(' + r.queued + ' payout' +
+                        (r.queued === 1 ? '' : 's') + ' waiting)</span>';
+                }
+            }).catch(function () {});
+        }
+        loadVaultStatus();
+        setInterval(loadVaultStatus, 60000);
         document.getElementById('hist-refresh').addEventListener('click', function () { loadSummary(true); });
         document.getElementById('hist-csv').addEventListener('click', downloadHistory);
 
         // ---- Boot ---------------------------------------------------------------
         betSelect.value = String(CFG.bets[3]);
+        dRenderMath();
+        dRenderLog();
         render();
         renderMath();
+        updateDragonUi();
         restore();
     })();
     </script>
