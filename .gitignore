@@ -8,3 +8,7 @@ schema-casino.sql
 .tmp-check/c0.js
 .tmp-check/c1.js
 .tmp-check/c2.js
+.tmp-check/lua_err.txt
+.tmp-check/lua_out.txt
+.tmp-check/script.lua
+schema-casino-hardening.sql
