@@ -548,6 +548,11 @@
         var MAX_BET = CFG.bets[CFG.bets.length - 1];
         var STOP_MS = [700, 950, 1200];
         var FRAME_MS = 70;
+        // Two reels on the same symbol hold the third one back. That pause is
+        // the whole point of a three-reel machine: the pair lights up, the held
+        // reel turns over at a slower beat, and the tease ticks under it.
+        var SUSPENSE_MS = 900;
+        var SUSPENSE_FLIP_MS = 140;
 
         var SUPABASE_URL = 'https://dnklaemuuqckoriotrcv.supabase.co';
         var SUPABASE_ANON_KEY = 'sb_publishable_kp8O84wZUwzqEc2o8YTbxA_yiZVy3LV';
@@ -1086,6 +1091,9 @@
             var storedVol = localStorage.getItem(KEY_VOL);
             var vol = storedVol === null ? 0.5 : Number(storedVol);
             var last = {}, teaseTimer = null, teaseStep = 0;
+            // Tease ticks are spaced off the recording itself, not a fixed beat:
+            // a 0.37s clip retriggered every 220ms stacked on top of itself.
+            var TEASE_MIN_MS = 300, TEASE_PAD_MS = 90, TEASE_MAX_TICKS = 3;
 
             if (!isFinite(vol) || vol < 0 || vol > 1) vol = 0.5;
 
@@ -1265,18 +1273,30 @@
                 synth(name, pitch, level);
             }
 
-            // The held reel in an anticipation stop, ticked while it spins.
+            // The held reel in an anticipation stop, ticked while it turns.
+            // One tick at a time, each scheduled for after the previous one has
+            // finished playing, so the recording is never laid over itself.
+            function teaseGap() {
+                var clip = (ready_.tease && ready_.tease !== 'loading')
+                    ? ready_.tease.duration * 1000
+                    : TEASE_MIN_MS;
+                return Math.round(Math.max(TEASE_MIN_MS, clip + TEASE_PAD_MS));
+            }
+            function teaseTick() {
+                teaseTimer = null;
+                if (teaseStep >= TEASE_MAX_TICKS) return;
+                teaseStep++;
+                play('tease');
+                teaseTimer = setTimeout(teaseTick, teaseGap());
+            }
             function teaseStart() {
                 if (!on || !audio() || teaseTimer) return;
-                teaseStep = 0;
+                teaseStep = 1;
                 play('tease');
-                teaseTimer = setInterval(function () {
-                    teaseStep = Math.min(teaseStep + 1, 8);
-                    play('tease');
-                }, 220);
+                teaseTimer = setTimeout(teaseTick, teaseGap());
             }
             function teaseStop() {
-                if (teaseTimer) { clearInterval(teaseTimer); teaseTimer = null; }
+                if (teaseTimer) { clearTimeout(teaseTimer); teaseTimer = null; }
             }
 
             function apply() {
@@ -1354,6 +1374,13 @@
         }
         function classicLightRow() {
             for (var i = 0; i < 3; i++) {
+                var cell = reelEls[i].children[1];
+                if (cell) cell.classList.add('lit');
+            }
+        }
+        // The matches that are already down while the last reel is held.
+        function classicLightPair() {
+            for (var i = 0; i < 2; i++) {
                 var cell = reelEls[i].children[1];
                 if (cell) cell.classList.add('lit');
             }
@@ -1440,17 +1467,39 @@
 
         function animate(line, result) {
             var strips = [null, null, null];
+            var stopAt = STOP_MS.slice();
             var started = Date.now();
+            var suspenseAt = -1;
+            var lastFlip = 0;
 
             var timer = setInterval(function () {
                 var elapsed = Date.now() - started;
                 var stillSpinning = false;
                 for (var i = 0; i < 3; i++) {
                     if (strips[i]) continue;
-                    if (elapsed >= STOP_MS[i]) {
+                    if (elapsed >= stopAt[i]) {
                         strips[i] = finalStrip(line[i]);
                         renderReel(i, strips[i]);
                         SND.play('stop', { pitch: i });
+                        // Two of a kind already on the line: hold the last reel
+                        // back and light the pair that got you this far. A third
+                        // reel that matches anyway needs no help from anyone.
+                        if (i === 1 && line[0] === line[1] && line[2] !== line[0]) {
+                            stopAt[2] = Math.max(stopAt[2], elapsed + SUSPENSE_MS);
+                            suspenseAt = elapsed;
+                            lastFlip = elapsed;
+                            classicLightPair();
+                            SND.teaseStart();
+                        }
+                    } else if (suspenseAt >= 0 && elapsed - suspenseAt > 120) {
+                        // Only the last reel is left by now. It turns over at a
+                        // slower beat instead of freezing, so the pause reads as
+                        // a reel coming to rest rather than a stall.
+                        if (elapsed - lastFlip >= SUSPENSE_FLIP_MS) {
+                            lastFlip = elapsed;
+                            renderReel(2, randomStrip());
+                        }
+                        stillSpinning = true;
                     } else {
                         renderReel(i, randomStrip());
                         stillSpinning = true;
@@ -1458,6 +1507,7 @@
                 }
                 if (!stillSpinning) {
                     clearInterval(timer);
+                    SND.teaseStop();
                     reelsEl.classList.remove('spinning');
                     setSpinningLight('classic', false);
                     settle(line, result);
@@ -1513,6 +1563,8 @@
             } else {
                 msgEl.className = 'lose';
                 msgEl.textContent = 'No win on the payline.';
+                // A held pair that did not pay must not stay lit.
+                classicClearLit();
                 noteLoss(pairThree, SND.auto());
             }
 
@@ -1523,7 +1575,7 @@
             var stopMode = autoStopMode('auto-pause');
             if (autoC.on && autoPauseHit(stopMode, win, bet, { jackpot: r.jackpot_hit })) {
                 classicAutoPause(win, autoStopLabel(stopMode));
-            } else classicAutoNext();
+            } else classicAutoNext(autoGapFor(win, bet, { big: !!r.jackpot_hit }));
         }
 
         // ---- Dragon's Hoard: five reels, nine lines, free spins ----------------
@@ -1927,7 +1979,7 @@
             var stopMode = autoStopMode('dragon-auto-pause');
             if (autoD.on && autoPauseHit(stopMode, win, stake, { free: r.free_awarded })) {
                 dragonAutoPause(win, autoStopLabel(stopMode));
-            } else dragonAutoNext();
+            } else dragonAutoNext(autoGapFor(win, stake, { big: !!r.free_awarded }));
         }
 
         function dragonSpin() {
@@ -2010,6 +2062,25 @@
             return (isFinite(n) && n >= 1) ? Math.floor(n) : 25;
         }
 
+        // Pace of a run. The next spin used to follow the last result after a
+        // third of a second, so the win sound was still playing when the reels
+        // took off again and the payline went by unread. The gap now follows
+        // what landed: a dud gets a beat, a win longer, a jackpot or a free
+        // spin award longest. Nudge these three numbers to taste.
+        var AUTO_GAP = { lose: 900, win: 1500, big: 2400 };
+        function autoGapFor(win, stake, ev) {
+            ev = ev || {};
+            if (ev.big) return AUTO_GAP.big;
+            if (!(win > 0)) return AUTO_GAP.lose;
+            return (stake > 0 && win >= stake * 20) ? AUTO_GAP.big : AUTO_GAP.win;
+        }
+        // A little jitter so a long run does not tick like a metronome.
+        function autoDelay(gap) {
+            if (gap === 0) return 0;
+            var base = gap > 0 ? gap : AUTO_GAP.lose;
+            return base + Math.round(Math.random() * 150);
+        }
+
         // Stop-on-win modifiers. 'off' never pauses, 'any' pauses on every
         // paying spin, 'big<N>' only when the win is at least N times the
         // total stake, 'free' only when a spin awards free spins, and
@@ -2077,7 +2148,7 @@
                 msgEl.textContent = 'Auto stopped. ' + why;
             }
         }
-        function classicAutoNext() {
+        function classicAutoNext(gap) {
             if (!autoC.on) return;
             if (!acct.token) { classicAutoStop(''); return; }
             if (autoC.left <= 0) {
@@ -2092,7 +2163,7 @@
             autoC.left--;
             setAutoUi('classic', true, autoC.left);
             updateButtons();
-            setTimeout(function () { if (autoC.on) spin(); }, 320);
+            setTimeout(function () { if (autoC.on) spin(); }, autoDelay(gap));
         }
         function classicAutoToggle() {
             if (autoC.on) {
@@ -2111,7 +2182,7 @@
             if (autoC.left < 1) autoC.left = autoCountOf('auto-count');
             setAutoUi('classic', true, autoC.left);
             updateButtons();
-            if (!spinning) classicAutoNext();
+            if (!spinning) classicAutoNext(0);
         }
 
         function dragonAutoStop(why) {
@@ -2122,7 +2193,7 @@
             updateButtons();
             if (why) dMsg('Auto stopped. ' + why, 'warn');
         }
-        function dragonAutoNext() {
+        function dragonAutoNext(gap) {
             if (!autoD.on) return;
             if (!acct.token) { dragonAutoStop(''); return; }
             var free = dragonState.freeLeft > 0;
@@ -2140,7 +2211,7 @@
             }
             setAutoUi('dragon', true, autoD.left);
             updateButtons();
-            setTimeout(function () { if (autoD.on) dragonSpin(); }, 360);
+            setTimeout(function () { if (autoD.on) dragonSpin(); }, autoDelay(gap));
         }
         function dragonAutoToggle() {
             if (autoD.on) {
@@ -2156,7 +2227,7 @@
             if (autoD.left < 1) autoD.left = autoCountOf('dragon-auto-count');
             setAutoUi('dragon', true, autoD.left);
             updateButtons();
-            if (!dragonState.busy) dragonAutoNext();
+            if (!dragonState.busy) dragonAutoNext(0);
         }
 
         function switchMachine(name) {

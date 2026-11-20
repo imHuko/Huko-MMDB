@@ -18,8 +18,9 @@ FILES
   stop.mp3        one reel landing                (fires 3x classic, 5x dragon,
                                                    pitched slightly per reel,
                                                    so a short dry "thunk" works)
-  tease.mp3       anticipation blip               (looped every ~0.2s while a
-                                                   reel is held; keep it short)
+  tease.mp3       anticipation blip               (held reel: plays once, then
+                                                   again only after the clip
+                                                   has finished, max 3 times)
   gasp.mp3        two gold bags in view           (dragon scatter tease)
   win-small.mp3   any small win
   win-big.mp3     triple in the classic, or a 25x+ win on the dragon
