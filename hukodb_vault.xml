@@ -80,6 +80,8 @@ Local (operator) commands:
 
   vault flush            - retry the upload queue now
 
+  vault payall           - pay every queued payout in one go
+
   vault audit            - reconcile payouts against the ledger
 
   vault verify           - check the event log hash chain
@@ -112,7 +114,7 @@ Local (operator) commands:
 
 <triggers>
 
-  <trigger enabled="y" match="(?i)(\w+) has transferred ([\d,]+) gold into your .+ bank account" regexp="y" send_to="12" sequence="90" script="vaultBankCredit"/>
+  <trigger enabled="y" match="(?i)(\w+) has transferred ([\d,]+) gold into your (.+) bank account" regexp="y" send_to="12" sequence="90" script="vaultBankCredit"/>
 
   <trigger enabled="y" match="(?i)tells you" regexp="y" send_to="12" sequence="100" script="vaultTell"/>
 
@@ -145,6 +147,18 @@ Local (operator) commands:
          send_to="12" sequence="99" keep_evaluating="n">
 
     <send>vaultCommand("%1")</send>
+
+  </alias>
+
+
+
+  <!-- One word for the payout run in the description above. -->
+
+  <alias match="^\s*payall\s*$" enabled="y" regexp="y" ignore_case="y"
+
+         send_to="12" sequence="98" keep_evaluating="n">
+
+    <send>vaultCommand("payall")</send>
 
   </alias>
 
@@ -218,7 +232,7 @@ local SECRET = ""
 
 local queue = {}          -- deposits the website has not confirmed yet
 
-local BUILD = "2026-11-20c"
+local BUILD = "2026-11-20e"
 
 local seen = {}           -- dedupe repeated give/receive lines
 
@@ -592,9 +606,9 @@ end
 
 
 
-local function queueAdd(name, amount, method, ref)
+local function queueAdd(name, amount, method, ref, bank)
 
-  table.insert(queue, { name = name, amount = amount, method = method, ref = ref })
+  table.insert(queue, { name = name, amount = amount, method = method, ref = ref, bank = bank })
 
   saveQueue()
 
@@ -618,7 +632,7 @@ local function flushQueue()
 
       p_secret = secret(), p_character = item.name, p_amount = item.amount,
 
-      p_method = item.method, p_ref = item.ref
+      p_method = item.method, p_ref = item.ref, p_bank = item.bank
 
     })
 
@@ -1220,6 +1234,148 @@ end
 
 
 
+-- Operator: send every payout the site has queued, oldest first, from one
+
+-- command. Each row still goes through settlePayout, so a request is only
+
+-- marked paid once the game has confirmed the transfer.
+
+local paying = false
+
+
+
+function vaultPayAll()
+
+  if secret() == "" then note("No secret set. Use: vault secret <value>", "orange"); return end
+
+  if paying then note("A payout run is already in progress.", "orange"); return end
+
+  paying = true
+
+
+
+  wait.make(function()
+
+    local list, err = rpcRetry("casino_payout_queue", { p_secret = secret() })
+
+    if not list or not list.ok then
+
+      paying = false
+
+      local why = err or (list and list.error) or "no answer"
+
+      note("Could not read the payout queue: " .. tostring(why), "red")
+
+      errorLog("payout queue read failed: " .. tostring(why))
+
+      return
+
+    end
+
+
+
+    local rows = list.payouts or {}
+
+    if #rows == 0 then
+
+      paying = false
+
+      note("Nothing is waiting to be paid.", "lime")
+
+      return
+
+    end
+
+
+
+    local due = 0
+
+    for _, row in ipairs(rows) do due = due + (tonumber(row.net) or 0) end
+
+    note(#rows .. " payout" .. (#rows == 1 and "" or "s") .. " queued, " ..
+
+      fmt(due) .. " gold net. Sending now...", "white")
+
+
+
+    local paid, total, stopRef, stopWho, stopped = 0, 0, nil, nil, nil
+
+    for i, row in ipairs(rows) do
+
+      if stopped then break end
+
+      note("(" .. i .. "/" .. #rows .. ") " .. tostring(row.ref) .. "  " ..
+
+        tostring(row.character) .. "  " .. fmt(row.net), "silver")
+
+      local sent, why = settlePayout(row, row.character)
+
+      if sent then
+
+        paid = paid + 1
+
+        total = total + (tonumber(row.net) or 0)
+
+        if i < #rows then wait.time(1) end
+
+      else
+
+        stopped = why or "failed"
+
+        stopRef, stopWho = tostring(row.ref), tostring(row.character)
+
+      end
+
+    end
+
+
+
+    paying = false
+
+
+
+    if not stopped then
+
+      note("Paid " .. paid .. " payout" .. (paid == 1 and "" or "s") .. ", " ..
+
+        fmt(total) .. " gold. Queue is clear.", "lime")
+
+    elseif stopped == "notsent" then
+
+      note("STOPPED at " .. tostring(stopRef) .. " (" .. tostring(stopWho) ..
+
+        "): the game did not confirm the transfer, so that one was refunded. " ..
+
+        paid .. " paid, " .. fmt(total) .. " gold. Check the bank and " ..
+
+        "HukoDB_vault.log, then run 'payall' again.", "red")
+
+    else
+
+      note("STOPPED at " .. tostring(stopRef) .. " (" .. tostring(stopWho) ..
+
+        "): the gold went out but the site did not record it. " .. paid ..
+
+        " paid, " .. fmt(total) .. " gold. Run 'vault audit' before paying " ..
+
+        "anything else.", "red")
+
+    end
+
+
+
+    if #queue > 0 then
+
+      note(#queue .. " deposit(s) are still in the outbox - run 'vault flush'.", "orange")
+
+    end
+
+  end)
+
+end
+
+
+
 local notified = {}
 
 
@@ -1413,6 +1569,8 @@ local function formatEvent(e)
   elseif e.action == "deposit" then
 
     extra = " via " .. tostring(meta.method or "?")
+
+    if type(meta.bank) == "string" and meta.bank ~= "" then extra = extra .. " at " .. meta.bank end
 
   elseif e.action == "withdraw" then
 
@@ -1838,6 +1996,8 @@ function vaultBankCredit(name, line, wildcards)
 
   local amount = amountOf(wildcards and wildcards[2])
 
+  local bank = trim(wildcards and wildcards[3] or "")
+
   if not sender or not amount then return end
 
   if sender:lower() == VAULT.bot_name:lower() then return end
@@ -1848,19 +2008,21 @@ function vaultBankCredit(name, line, wildcards)
 
   -- and two transfers of the same amount seconds apart are legitimate.
 
-  remember("bank " .. tostring(sender) .. " " .. fmt(amount))
+  remember("bank " .. tostring(sender) .. " " .. fmt(amount) ..
+
+    (bank ~= "" and (" at " .. bank) or ""))
 
 
 
   if VAULT.debug then note("bank credit line: " .. line, "grey") end
 
-  depositEvent(sender, amount, "bank")
+  depositEvent(sender, amount, "bank", bank)
 
 end
 
 
 
-function depositEvent(sender, amount, method)
+function depositEvent(sender, amount, method, bank)
 
   wait.make(function()
 
@@ -1870,7 +2032,7 @@ function depositEvent(sender, amount, method)
 
       p_secret = secret(), p_character = sender, p_amount = amount,
 
-      p_method = method, p_ref = ref
+      p_method = method, p_ref = ref, p_bank = ((bank ~= nil and bank ~= "") and bank or nil)
 
     })
 
@@ -1878,7 +2040,7 @@ function depositEvent(sender, amount, method)
 
     if not result then
 
-      queueAdd(sender, amount, method, ref)
+      queueAdd(sender, amount, method, ref, bank)
 
       tell(sender, "I have your " .. fmt(amount) .. " gold and will add it as soon as the vault answers.")
 
@@ -1898,7 +2060,9 @@ function depositEvent(sender, amount, method)
 
       if method ~= "bank" then Send("bank deposit " .. tostring(amount)) end
 
-      note("credited " .. fmt(amount) .. " to " .. result.character, "lime")
+      note("credited " .. fmt(amount) .. " to " .. result.character ..
+
+        ((bank ~= nil and bank ~= "") and (" (" .. bank .. ")") or ""), "lime")
 
     else
 
@@ -2024,7 +2188,9 @@ function vaultCommand(rest)
 
     ref    = vaultRef, errors = vaultErrors, log = vaultErrors,
 
-    bankall = vaultBankAll, last = vaultLast, help = vaultHelpLocal
+    bankall = vaultBankAll, last = vaultLast, help = vaultHelpLocal,
+
+    payall = vaultPayAll
 
   }
 
@@ -2160,7 +2326,7 @@ end
 
 function vaultHelpLocal()
 
-  note("vault secret <value> | status | debug | flush | audit | verify | check <char> | spins <char> | ref <id> | errors | help", "white")
+  note("vault secret <value> | status | debug | flush | payall | audit | verify | check <char> | spins <char> | ref <id> | errors | help", "white")
 
 end
 

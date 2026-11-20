@@ -1287,10 +1287,17 @@
                     return;
                 }
                 dAnimate(r.grid, r);
-            }).catch(function () {
+            }).catch(function (e) {
                 dragonState.busy = false;
                 updateButtons();
-                dMsg('The vault did not answer. Refresh your balance before spinning again.', 'warn');
+                var why = (e && e.message) ? String(e.message) : '';
+                if (/PGRST202|Could not find the function/i.test(why)) {
+                    dMsg("Dragon's Hoard is not installed on the server yet. Run schema-casino.sql in Supabase, then spin again.", 'warn');
+                } else if (why) {
+                    dMsg('The vault answered with an error: ' + why, 'warn');
+                } else {
+                    dMsg('The vault did not answer. Refresh your balance before spinning again.', 'warn');
+                }
             });
         }
 
