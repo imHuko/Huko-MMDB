@@ -369,7 +369,9 @@
             <div class="kv" style="max-width:340px;">
                 <div>Character</div><div id="acct-name"></div>
                 <div>Gold in account</div><div class="gold" id="acct-gold">0</div>
+                <div>Bonus credit</div><div class="gold" id="acct-bonus">0</div>
             </div>
+            <p class="tiny" style="margin:6px 0 0;">Bonus credit cannot be withdrawn. It is staked before your own gold, and any win it produces is ordinary gold you can withdraw.</p>
 
             <details class="fold">
                 <summary>How to deposit</summary>
@@ -516,6 +518,7 @@
             token: null,
             character: '',
             gold: 0,
+            bonus: 0,
             jackpot: CFG.jackpotSeed,
             lifetime: { spins: 0, wagered: 0, won: 0, biggest: 0, jackpots: 0 }
         };
@@ -551,13 +554,19 @@
             var cells = reelEls[reelIndex].children;
             for (var i = 0; i < 3; i++) cells[i].textContent = strip[i].glyph;
         }
+        // What the machines can play with: withdrawable gold plus any bonus
+        // credit that has not been staked yet.
+        function playable() { return acct.gold + acct.bonus; }
+
         function render() {
-            balanceEl.textContent = fmt(acct.gold);
+            balanceEl.textContent = fmt(playable());
             jackpotEl.textContent = fmt(acct.jackpot);
             sessionEl.textContent = session.spins + (session.spins === 1 ? ' spin' : ' spins');
             document.getElementById('acct-gold').textContent = fmt(acct.gold);
+            var bonusEl = document.getElementById('acct-bonus');
+            if (bonusEl) bonusEl.textContent = fmt(acct.bonus);
             var dragonBalance = document.getElementById('dragon-balance');
-            if (dragonBalance) dragonBalance.textContent = fmt(acct.gold);
+            if (dragonBalance) dragonBalance.textContent = fmt(playable());
             renderStats();
             updateDragonUi();
             updateButtons();
@@ -597,14 +606,14 @@
             return CFG.bets.indexOf(v) >= 0 ? v : CFG.bets[0];
         }
         function updateButtons() {
-            spinBtn.disabled = spinning || autoC.on || !acct.token || acct.gold < currentBet();
+            spinBtn.disabled = spinning || autoC.on || !acct.token || playable() < currentBet();
             betSelect.disabled = spinning || autoC.on;
             var dragonBtn = document.getElementById('dragon-spin');
             var dragonSel = document.getElementById('dragon-bet');
             if (dragonBtn) {
                 var free = dragonState.freeLeft > 0;
                 var cost = (free ? dragonState.freeBet : dragonBet()) * 9;
-                dragonBtn.disabled = spinning || dragonState.busy || autoD.on || !acct.token || (!free && acct.gold < cost);
+                dragonBtn.disabled = spinning || dragonState.busy || autoD.on || !acct.token || (!free && playable() < cost);
             }
             if (dragonSel) dragonSel.disabled = spinning || dragonState.busy || autoD.on || dragonState.freeLeft > 0;
         }
@@ -644,6 +653,7 @@
             acct.token = r.token || acct.token;
             acct.character = r.character || acct.character;
             acct.gold = Number(r.gold) || 0;
+            if (r.bonus !== undefined) acct.bonus = Number(r.bonus) || 0;
             applyFreeSpins(r.freespins);
             if (r.jackpot !== undefined && r.jackpot !== null) acct.jackpot = Number(r.jackpot);
             if (r.lifetime) {
@@ -673,6 +683,7 @@
                 acct.token = null;
                 acct.character = '';
                 acct.gold = 0;
+                acct.bonus = 0;
                 dragonState.freeLeft = 0;
                 dragonState.freeBet = 0;
                 document.getElementById('acct-name').textContent = '';
@@ -819,13 +830,14 @@
                 return;
             }
             if (amount > acct.gold) {
-                acctMsg('You only have ' + fmt(acct.gold) + ' gold in your account.', true);
+                acctMsg('Only ' + fmt(acct.gold) + ' gold can be withdrawn. Bonus credit has to be played, and the winnings from it become ordinary gold.', true);
                 return;
             }
 
             rpc('casino_request_payout', { p_token: acct.token, p_amount: amount }).then(function (r) {
                 if (!r || !r.ok) {
-                    if (r && r.error === 'funds') acctMsg('You only have ' + fmt(r.gold) + ' gold in your account.', true);
+                    if (r && r.error === 'bonus_locked') acctMsg('Only ' + fmt(r.gold) + ' gold can be withdrawn; ' + fmt(r.bonus) + ' gold is bonus credit and has to be played.', true);
+                    else if (r && r.error === 'funds') acctMsg('You only have ' + fmt(r.gold) + ' gold in your account.', true);
                     else if (r && r.error === 'amount') acctMsg('The smallest payout is ' + fmt((r && r.min) || 1000) + ' gold.', true);
                     else if (r && r.error === 'queue_full') acctMsg('You already have ' + ((r && r.open) || 5) + ' payouts waiting. Cancel one, or wait for HukoDB to pay them.', true);
                     else if (r && r.error === 'session') { acctMsg('Your login expired. Log in again.', true); logout(); }
@@ -862,6 +874,7 @@
 
         var lastSummary = 0;
         var ACTION_LABELS = {
+            bonus: 'Signup bonus credit',
             account_created: 'Account created',
             password_reset: 'Password reset',
             login: 'Login',
@@ -906,6 +919,7 @@
             rpc('casino_summary', { p_token: acct.token }).then(function (r) {
                 if (!r || !r.ok) return;
                 acct.gold = Number(r.gold) || 0;
+                if (r.bonus !== undefined) acct.bonus = Number(r.bonus) || 0;
                 render();
 
                 var L = r.lifetime || {};
@@ -983,7 +997,7 @@
                 return;
             }
             var bet = currentBet();
-            if (acct.gold < bet) {
+            if (playable() < bet) {
                 classicAutoStop('not enough gold for the next spin.');
                 msgEl.className = 'warn';
                 msgEl.textContent = 'Not enough gold. Deposit with HukoDB in game.';
@@ -1053,6 +1067,7 @@
             var label = '';
 
             acct.gold = Number(r.gold) || 0;
+            if (r.bonus !== undefined) acct.bonus = Number(r.bonus) || 0;
             acct.jackpot = Number(r.jackpot);
 
             session.spins++;
@@ -1420,6 +1435,7 @@
 
             var paidGold = Number(r.gold);
             if (!isNaN(paidGold)) acct.gold = paidGold;
+            if (r.bonus !== undefined) acct.bonus = Number(r.bonus) || 0;
             applyFreeSpins(r.freespins);
 
             dSession.spins++;
@@ -1472,7 +1488,7 @@
             var free = dragonState.freeLeft > 0;
             var bet = free ? dragonState.freeBet : dragonBet();
             var cost = free ? 0 : bet * 9;
-            if (!free && acct.gold < cost) {
+            if (!free && playable() < cost) {
                 dragonAutoStop('not enough gold for the next spin.');
                 dMsg('Not enough gold. A spin here costs ' + fmt(cost) + '.', 'warn');
                 return;
@@ -1598,7 +1614,7 @@
                 msgEl.textContent = 'Auto finished.';
                 return;
             }
-            if (acct.gold < currentBet()) { classicAutoStop('not enough gold for the next spin.'); return; }
+            if (playable() < currentBet()) { classicAutoStop('not enough gold for the next spin.'); return; }
             autoC.left--;
             setAutoUi('classic', true, autoC.left);
             updateButtons();
@@ -1645,7 +1661,7 @@
                     dMsg('Auto finished.', 'lose');
                     return;
                 }
-                if (acct.gold < cost) { dragonAutoStop('not enough gold for the next spin.'); return; }
+                if (playable() < cost) { dragonAutoStop('not enough gold for the next spin.'); return; }
                 autoD.left--;
             }
             setAutoUi('dragon', true, autoD.left);

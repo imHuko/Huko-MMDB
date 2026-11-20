@@ -1200,17 +1200,35 @@ local function settlePayout(row, recipient)
 
     if GetRecentLines then ctx = GetRecentLines(8) or "" end
 
-    note("PAYOUT NOT MADE " .. tostring(row.ref) .. ": the game did not confirm the transfer. " ..
+    -- Silence is not proof that nothing happened. The transfer may have gone
 
-      "Left queued, nothing refunded.", "orange")
+    -- through with its confirmation line lost to lag, a repaint, or a trigger
 
-    errorLog("payout not made " .. tostring(row.ref) .. " (" .. fmt(net) .. " to " .. recipient ..
+    -- that ate it, and a released request is handed straight back by the queue
 
-      "): no transfer confirmation in 10s. Left queued, no refund. Recent output:\n" .. ctx)
+    -- and paid a second time. So the row stays claimed.
 
-    release()
+    --
 
-    return false, "notsent"
+    -- casino_payout_queue only returns 'requested' rows and casino_payout_cancel
+
+    -- only refunds 'requested' rows, so a claimed one can be neither re-sent nor
+
+    -- cancelled. It waits here for a human to say which of the two happened.
+
+    note("PAYOUT UNCLEAR " .. tostring(row.ref) .. " (" .. fmt(net) .. " to " .. recipient ..
+
+      "): no bank confirmation in 10s. Left CLAIMED - it will not be retried.", "red")
+
+    note("Check the bank: " .. fmt(net) .. " gp gone means it was paid, so leave it. Nothing gone " ..
+
+      "means 'vault void " .. tostring(row.ref) .. "' refunds it.", "red")
+
+    errorLog("payout unclear " .. tostring(row.ref) .. " (" .. fmt(net) .. " to " .. recipient ..
+
+      "): no transfer confirmation in 10s. Left claimed, no retry, no refund. Recent output:\n" .. ctx)
+
+    return false, "unclear"
 
   end
 
@@ -1414,6 +1432,14 @@ function doWithdraw(speaker, rest)
 
         "; tell me 'pay' once it is topped up.")
 
+    elseif why == "unclear" then
+
+      tell(speaker, "The bank went quiet, so I cannot tell whether your " .. fmt(result.net) ..
+
+        " gold left. It will not be sent again by itself - " .. VAULT.owner ..
+
+        " has to check the bank before it can be settled or refunded.")
+
     else
 
       tell(speaker, "I could not confirm the transfer, so I have not paid it. Your " ..
@@ -1484,7 +1510,7 @@ function doPay(speaker, rest)
 
           -- rather than bouncing off the bank once per payout.
 
-          if why == "notbank" then break end
+          if why == "notbank" or why == "unclear" then break end
 
         end
 
@@ -1513,6 +1539,14 @@ function doPay(speaker, rest)
         "still queued and nothing was refunded; ask " .. VAULT.owner .. " to top the bank up, " ..
 
         "then 'pay' again.")
+
+    elseif paid == 0 and lastWhy == "unclear" then
+
+      tell(speaker, "The bank went quiet on that one, so I cannot tell whether it left. It will not " ..
+
+        "be sent again by itself; " .. VAULT.owner .. " has to check the bank before it is settled " ..
+
+        "or refunded, and nothing else should be paid until then.")
 
     elseif paid == 0 then
 
@@ -1668,19 +1702,19 @@ function vaultPayAll()
 
         fmt(total) .. " gold. Bank the carried gold ('vault bankall') and run 'payall' again.", "orange")
 
-    elseif stopped == "notsent" then
+    elseif stopped == "unclear" then
 
       note("STOPPED at " .. tostring(stopRef) .. " (" .. tostring(stopWho) ..
 
-        "): the game did not confirm the transfer, so nothing was paid for it - " ..
+        "): the bank did not confirm the transfer in 10s, so whether it went out is unknown. " ..
 
-        "it is still queued and was NOT refunded. " .. paid .. " paid, " ..
+        "That request is CLAIMED now - it will not be sent again and nothing was refunded. " ..
 
-        fmt(total) .. " gold, and the rest are still queued too. Get " .. VAULT.bot_name ..
+        paid .. " paid, " .. fmt(total) .. " gold, the rest still queued. Check the bank: if the " ..
 
-        " into a bank and run 'payall' again; 'vault void " .. tostring(stopRef) ..
+        "gold left, settle it by hand; if not, 'vault void " .. tostring(stopRef) ..
 
-        "' refunds that one by hand if it can never be sent.", "orange")
+        "' refunds it. Pay nothing else until you have.", "red")
 
     else
 
@@ -1920,7 +1954,7 @@ function vaultAudit()
 
     note("open " .. tostring(r.open) .. " | stale " .. tostring(r.stale) ..
 
-      " | bad rows " .. tostring(r.mismatched),
+      " | stuck " .. tostring(r.stuck) .. " | bad rows " .. tostring(r.mismatched),
 
       (diff == 0 and r.mismatched == 0 and r.stale == 0) and "lime" or "orange")
 
@@ -2356,6 +2390,52 @@ end
 
 -- which is what let echoed chat mint gold.
 
+-- Bank transfers do not arrive as a bare sentence. The game wraps them in
+
+-- the finance imp's speech:
+
+--
+
+--   The imp tells you, 'Huko has transferred 10,000 gold into your ... bank
+
+--   account.'
+
+--
+
+-- The real sentence sits between the single quotes. The trigger catches the
+
+-- name and amount from anywhere in the line, but the handlers below require
+
+-- the line to BEGIN with the sender's name so that echoed chat cannot mint
+
+-- gold. Wrapped in the imp that check never passed, so a bank deposit was
+
+-- matched by the trigger and then silently dropped: the gold reached the
+
+-- vault and no account was credited.
+
+--
+
+-- Callers keep running isChatLine (and the any-quotes test) on the raw line,
+
+-- so quoting the imp in a say, tell or emote is still rejected before we get
+
+-- here. This only unwraps a line the game itself printed.
+
+function vaultUnwrapImp(line)
+
+  local s = trim(tostring(line or ""))
+
+  local inner = s:match("^The imp tells you, '(.*)'$")
+
+  if inner then return trim(inner) end
+
+  return s
+
+end
+
+
+
 local function parseGold(line)
 
 
@@ -2416,7 +2496,7 @@ function vaultGoldLine(name, line)
 
 
 
-  local sender, amountText, method = parseGold(line)
+  local sender, amountText, method = parseGold(vaultUnwrapImp(line))
 
   if VAULT.debug then note("gold line: " .. line, "grey") end
 
@@ -2488,7 +2568,9 @@ function vaultBankCredit(name, line, wildcards)
 
   local sender = wildcards and wildcards[1]
 
-  if sender and trim(line):sub(1, #sender):lower() ~= sender:lower() then return end
+  local body = vaultUnwrapImp(line)
+
+  if sender and body:sub(1, #sender):lower() ~= sender:lower() then return end
 
   local amount = amountOf(wildcards and wildcards[2])
 
@@ -2590,7 +2672,13 @@ end
 
 -- A give refund only works in the same room. If the player walked off the
 
--- gold is still ours, so put it back in the holding pot.
+-- gold is still ours, so put it back in the holding pot - but only on a line
+
+-- that is actually about this give. The trigger fires on the phrase anywhere
+
+-- in any line, so a stranger's "Mallory isn't here." arriving inside the
+
+-- 90s window used to re-hold the full amount to a player who already had it.
 
 function vaultGiveFailed(name, line)
 
@@ -2600,13 +2688,25 @@ function vaultGiveFailed(name, line)
 
 
 
-  local low = line and line:lower() or ""
+  local text = trim(tostring(line or ""))
 
-  local named = low:find(lastGive.character:lower(), 1, true) ~= nil
+  local low = text:lower()
 
-  local generic = low:find("aren't here", 1, true) or low:find("isn't here", 1, true)
+  -- Chat can carry this sentence word for word, from anyone.
 
-  if not named and not generic then return end
+  if isChatLine(text) then return end
+
+  -- The game names the character it could not hand the gold to: "Mallory
+
+  -- isn't here." A line that does not name ours is somebody else's business -
+
+  -- another give, a look, a who - and re-holding on one pays the player twice.
+
+  if not low:find(lastGive.character:lower(), 1, true) then return end
+
+  if not (low:find("aren't here", 1, true) or low:find("isn't here", 1, true)
+
+          or low:find("no longer here", 1, true)) then return end
 
 
 
