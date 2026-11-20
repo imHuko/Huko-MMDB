@@ -35,13 +35,21 @@
 </head>
 <body>
     <h1>Vault admin</h1>
-    <p class="tiny">Read-only. Requires the bot secret from <code>schema-casino.sql</code>; it is kept in this tab only. <a href="casino.html">Back to the casino</a></p>
+    <p class="tiny">Opened with the bot secret from <code>schema-casino.sql</code>, or with the login of an account flagged as an operator. The credential is kept in this tab only. Looking up is read-only; the promotional bonus panel writes. <a href="casino.html">Back to the casino</a></p>
 
     <section class="panel" id="unlock">
         <div class="field">
             <label for="secret">Bot secret</label>
             <input type="password" id="secret" size="36" autocomplete="off">
             <button id="unlock-btn">Unlock</button>
+        </div>
+        <p class="tiny" style="margin:10px 0 4px;">Or sign in with an operator account, which needs no secret:</p>
+        <div class="field">
+            <label for="admin-char">Character</label>
+            <input type="text" id="admin-char" size="14" autocomplete="off">
+            <label for="admin-pass">Password</label>
+            <input type="password" id="admin-pass" size="16" autocomplete="current-password">
+            <button id="admin-login-btn">Sign in</button>
         </div>
         <div id="unlock-msg" class="tiny"></div>
     </section>
@@ -58,6 +66,21 @@
                 <button id="lock-btn" style="margin-left:auto;">Lock</button>
             </div>
             <div id="account"></div>
+        </section>
+
+        <section class="panel">
+            <h2>Promotional bonus</h2>
+            <p class="tiny" style="margin-top:0;">Adds locked bonus credit: it is staked before the player's gold, cannot be withdrawn, and any win it produces is ordinary gold. A negative amount takes credit back.</p>
+            <div class="field">
+                <label for="bonus-who">Name(s)</label>
+                <input type="text" id="bonus-who" size="24" placeholder="daglar, someoneelse" autocomplete="off">
+                <label for="bonus-amount">Amount</label>
+                <input type="number" id="bonus-amount" size="10" step="1" placeholder="25000">
+                <label for="bonus-note">Note</label>
+                <input type="text" id="bonus-note" size="20" placeholder="event promo" autocomplete="off">
+                <button id="bonus-btn">Give bonus</button>
+            </div>
+            <div id="bonus-out"></div>
         </section>
 
         <section class="panel">
@@ -123,6 +146,7 @@
         var LABELS = {
             account_created: 'Account created', password_reset: 'Password reset',
             login: 'Login', login_failed: 'Login failed', balance_check: 'Balance check',
+            bonus: 'Bonus credit', admin_flag: 'Operator access',
             deposit: 'Deposit', deposit_held: 'Deposit held',
             refund_taken: 'Refund issued', refund_returned: 'Refund returned',
             withdraw: 'Withdrawal', withdraw_cancelled: 'Withdrawal cancelled',
@@ -157,6 +181,7 @@
             var html = '<div class="kv" style="max-width:460px;">' +
                 row('Character', esc(r.character)) +
                 row('Balance', '<span class="gold">' + fmt(r.gold) + '</span> gold') +
+                row('Bonus credit', fmt(r.bonus) + ' gold') +
                 row('Pending gold', fmt(r.pending)) +
                 row('Events', fmt(r.events)) +
                 row('Account since', when(r.created_at)) +
@@ -255,6 +280,73 @@
             });
         }
 
+        function giveBonus() {
+            var names = document.getElementById('bonus-who').value.split(',')
+                .map(function (s) { return s.trim(); })
+                .filter(function (s) { return s.length; });
+            var amount = Math.trunc(Number(document.getElementById('bonus-amount').value));
+            var note = document.getElementById('bonus-note').value.trim();
+            var out = document.getElementById('bonus-out');
+
+            if (!names.length) {
+                out.innerHTML = '<p class="bad">Enter at least one character name.</p>';
+                return;
+            }
+            if (!amount || isNaN(amount)) {
+                out.innerHTML = '<p class="bad">Enter a whole amount, not zero.</p>';
+                return;
+            }
+            if (names.length > 1 &&
+                !window.confirm('Give ' + fmt(amount) + ' bonus credit to ' + names.length + ' accounts?')) {
+                return;
+            }
+
+            var btn = document.getElementById('bonus-btn');
+            btn.disabled = true;
+            out.innerHTML = '<p class="tiny">Granting to ' + fmt(names.length) + ' account(s)…</p>';
+
+            // One call per name, in sequence: each grant gets its own audit row
+            // and one bad name does not hide what happened to the others.
+            var lines = [];
+            var i = 0;
+
+            function step() {
+                if (i >= names.length) {
+                    btn.disabled = false;
+                    out.innerHTML = '<table><thead><tr><th>Character</th><th>Result</th>' +
+                        '<th>Bonus now</th></tr></thead><tbody>' + lines.join('') + '</tbody></table>';
+                    return;
+                }
+
+                var who = names[i++];
+                rpc('casino_admin_bonus', {
+                    p_secret: secret, p_character: who,
+                    p_amount: amount, p_note: note || null
+                }).then(function (r) {
+                    if (r && r.ok) {
+                        lines.push('<tr><td>' + esc(r.character) + '</td><td class="ok">' +
+                            (r.granted > 0 ? '+' : '') + fmt(r.granted) + '</td><td>' +
+                            fmt(r.bonus) + '</td></tr>');
+                    } else {
+                        var why = (r && r.error === 'no_account') ? 'no such account'
+                            : (r && r.error === 'denied') ? 'secret rejected'
+                            : (r && r.error === 'amount') ? 'amount out of range'
+                            : (r && r.error === 'below_zero') ? 'would go below zero'
+                            : 'failed';
+                        lines.push('<tr><td>' + esc(who) + '</td><td class="bad">' +
+                            esc(why) + '</td><td>—</td></tr>');
+                    }
+                    step();
+                }).catch(function (e) {
+                    lines.push('<tr><td>' + esc(who) + '</td><td class="bad">' +
+                        esc(e.message) + '</td><td>—</td></tr>');
+                    step();
+                });
+            }
+
+            step();
+        }
+
         function verify() {
             var out = document.getElementById('account');
             out.innerHTML = '<p class="tiny">Checking the hash chain…</p>';
@@ -282,6 +374,12 @@
             });
         }
 
+        function showTools() {
+            document.getElementById('unlock-msg').textContent = '';
+            document.getElementById('unlock').style.display = 'none';
+            document.getElementById('tools').style.display = 'block';
+        }
+
         function unlock() {
             var value = document.getElementById('secret').value.trim();
             if (!value) {
@@ -290,9 +388,44 @@
             }
             secret = value;
             document.getElementById('secret').value = '';
-            document.getElementById('unlock-msg').textContent = '';
-            document.getElementById('unlock').style.display = 'none';
-            document.getElementById('tools').style.display = 'block';
+            showTools();
+        }
+
+        // An operator account opens this panel with its own casino login. What
+        // it holds is a session token, which the admin functions accept in
+        // place of the secret; creating accounts, resetting passwords and
+        // voiding payouts still need the secret itself.
+        function adminLogin() {
+            var who = document.getElementById('admin-char').value.trim();
+            var pass = document.getElementById('admin-pass').value;
+            var msg = document.getElementById('unlock-msg');
+
+            if (!who || !pass) {
+                msg.textContent = 'Enter the operator character and its casino password.';
+                return;
+            }
+
+            msg.textContent = 'Signing in…';
+            rpc('casino_login', { p_character: who, p_password: pass }).then(function (r) {
+                if (!r || !r.ok) {
+                    msg.textContent = (r && r.error === 'throttled') ? 'Too many attempts. Wait ten minutes.'
+                        : (r && r.error === 'bad_password') ? 'Wrong password.'
+                        : (r && r.error === 'no_account') ? 'No such account.'
+                        : 'Sign in failed.';
+                    return;
+                }
+                if (!r.is_admin) {
+                    // Do not leave a session open for an account that is not an operator.
+                    rpc('casino_logout', { p_token: r.token }).catch(function () {});
+                    msg.textContent = 'That account is not an operator.';
+                    return;
+                }
+                secret = r.token;
+                document.getElementById('admin-pass').value = '';
+                showTools();
+            }).catch(function (e) {
+                msg.textContent = e.message;
+            });
         }
 
         document.getElementById('unlock-btn').addEventListener('click', unlock);
@@ -303,7 +436,17 @@
         document.getElementById('spins-btn').addEventListener('click', function () { lookup(true); });
         document.getElementById('ref-btn').addEventListener('click', lookupRef);
         document.getElementById('verify-btn').addEventListener('click', verify);
+        document.getElementById('bonus-btn').addEventListener('click', giveBonus);
+        document.getElementById('bonus-amount').addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') giveBonus();
+        });
+        document.getElementById('admin-login-btn').addEventListener('click', adminLogin);
+        document.getElementById('admin-pass').addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') adminLogin();
+        });
         document.getElementById('lock-btn').addEventListener('click', function () {
+            // A session token is a live credential: end it, don't just forget it.
+            if (secret) rpc('casino_logout', { p_token: secret }).catch(function () {});
             secret = '';
             location.reload();
         });
