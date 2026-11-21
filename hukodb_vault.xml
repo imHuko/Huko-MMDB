@@ -690,6 +690,19 @@ local function flushQueue()
 
       end
 
+    elseif result and result.error == "daily_limit" then
+
+      -- Over the daily cap: hand the gold straight back instead of retrying
+      -- for ever. Nothing is kept.
+      if item.method ~= "give" then Send("bank deposit " .. tostring(item.amount)) end
+
+      tell(item.name, "That would go over the daily deposit limit of " .. fmt(result.limit or 0) ..
+        " gold (" .. fmt(result.remaining or 0) .. " left today). " ..
+        ((item.method ~= "give") and ("Your " .. fmt(item.amount) .. " gold is back in the bank.")
+                                 or "Tell me 'refund' and I will hand it back."))
+
+      note("deposit refused, daily limit: " .. item.name .. " " .. fmt(item.amount), "orange")
+
     else
 
       table.insert(remaining, item)
@@ -2673,6 +2686,19 @@ function depositEvent(sender, amount, method, bank)
       note("credited " .. fmt(amount) .. " to " .. result.character ..
 
         ((bank ~= nil and bank ~= "") and (" (" .. bank .. ")") or ""), "lime")
+
+    elseif result.error == "daily_limit" then
+
+      -- Over the daily cap. Return the gold rather than holding it: a refused
+      -- deposit must never leave the player's gold sitting on the vault.
+      if method ~= "give" then Send("bank deposit " .. tostring(amount)) end
+
+      tell(sender, "That would go over the daily deposit limit of " .. fmt(result.limit or 0) ..
+        " gold (" .. fmt(result.remaining or 0) .. " left today). " ..
+        ((method ~= "give") and ("Your " .. fmt(amount) .. " gold is back in the bank.")
+                          or "Tell me 'refund' and I will hand it back."))
+
+      note("deposit refused, daily limit: " .. sender .. " " .. fmt(amount), "orange")
 
     else
 

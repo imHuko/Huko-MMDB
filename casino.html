@@ -361,8 +361,8 @@
             <table class="pt" id="paytable-body">
                 <tr><td>🍒 🍒 🍒</td><td>6&times;</td></tr>
                 <tr><td>🍋 🍋 🍋</td><td>10&times;</td></tr>
-                <tr><td>🔔 🔔 🔔</td><td>20&times;</td></tr>
-                <tr><td>💎 💎 💎</td><td>50&times;</td></tr>
+                <tr><td>🔔 🔔 🔔</td><td>19&times;</td></tr>
+                <tr><td>💎 💎 💎</td><td>49&times;</td></tr>
                 <tr><td>7️⃣ 7️⃣ 7️⃣</td><td>110&times;</td></tr>
                 <tr><td>⭐ ⭐ ⭐</td><td>100&times;</td></tr>
                 <tr class="jackpot-row"><td>⭐ ⭐ ⭐ at max bet</td><td>JACKPOT</td></tr>
@@ -386,7 +386,7 @@
                 <tr><td>🐉 🐉 🐉</td><td>26&times;</td><td>155&times;</td><td>1280&times;</td></tr>
                 <tr><td>⭐ ⭐ ⭐</td><td>21&times;</td><td>105&times;</td><td>520&times;</td></tr>
                 <tr><td>7️⃣ 7️⃣ 7️⃣</td><td>13&times;</td><td>62&times;</td><td>260&times;</td></tr>
-                <tr><td>💎 💎 💎</td><td>8&times;</td><td>31&times;</td><td>130&times;</td></tr>
+                <tr><td>💎 💎 💎</td><td>7&times;</td><td>31&times;</td><td>130&times;</td></tr>
                 <tr><td>🔔 🔔 🔔</td><td>5&times;</td><td>15&times;</td><td>62&times;</td></tr>
                 <tr><td>🍋 🍋 🍋</td><td>3&times;</td><td>8&times;</td><td>31&times;</td></tr>
                 <tr><td>🍒 🍒 🍒</td><td>1&times;</td><td>4&times;</td><td>15&times;</td></tr>
@@ -454,6 +454,7 @@
                     <code class="cmd">bank transfer 10000 HukoDB</code>
                     <p class="note" style="margin:8px 0 4px;">Handing gold over in person works only during a full vault session, in the same room, and costs nothing:</p>
                     <code class="cmd">give 10000 gold to HukoDB</code>
+                    <p class="note" style="margin:10px 0 0;">Deposits are capped at <strong>100,000 gold per account per day</strong>, reset at midnight UTC. A deposit that would go over the cap is refused and the gold goes straight back to you.</p>
                 </div>
             </details>
 
@@ -533,8 +534,8 @@
         var SYMBOLS = [
             { id: 'cherry',  glyph: '🍒', weight: 40, pay3: 6 },
             { id: 'lemon',   glyph: '🍋', weight: 28, pay3: 10 },
-            { id: 'bell',    glyph: '🔔', weight: 22, pay3: 20 },
-            { id: 'diamond', glyph: '💎', weight: 18, pay3: 50 },
+            { id: 'bell',    glyph: '🔔', weight: 22, pay3: 19 },
+            { id: 'diamond', glyph: '💎', weight: 18, pay3: 49 },
             { id: 'seven',   glyph: '7️⃣', weight: 16, pay3: 110 },
             { id: 'star',    glyph: '⭐', weight: 4,  pay3: 100 }
         ];
@@ -968,6 +969,7 @@
             balance_check: 'Balance check',
             deposit: 'Deposit',
             deposit_held: 'Deposit held (no account)',
+            deposit_refused: 'Deposit refused (daily cap)',
             refund_taken: 'Refund issued',
             refund_returned: 'Refund returned',
             withdraw: 'Withdrawal requested',
