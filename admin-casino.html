@@ -66,6 +66,7 @@
                 <button id="lock-btn" style="margin-left:auto;">Lock</button>
             </div>
             <div id="account"></div>
+            <div id="log"></div>
         </section>
 
         <section class="panel">
@@ -176,7 +177,7 @@
                 rows + '</tbody></table>';
         }
 
-        function showAccount(r, spinsOnly) {
+        function showAccount(r) {
             var L = r.lifetime || {};
             var html = '<div class="kv" style="max-width:460px;">' +
                 row('Character', esc(r.character)) +
@@ -209,30 +210,94 @@
                     }).join('') + '</tbody></table>';
             }
 
-            html += '<h3>' + (spinsOnly ? 'Recent spins' : 'Last 20 events') + '</h3>' +
-                eventsTable(r.events || r.recent || []);
             document.getElementById('account').innerHTML = html;
+        }
+
+        // The ledger used to be a fixed slice: casino_admin_account returns the
+        // last 20 rows and "Spins only" asked for 30, so anything older was
+        // simply unreachable from this page. The log now starts from
+        // casino_admin_history (which already pages: p_limit caps at 500) and
+        // can step through the rest or pull the whole thing.
+        var HIST_PAGE = 500;
+        var logView = null;
+
+        function startLog(who, action, total) {
+            logView = {
+                who: who, action: action, rows: [],
+                total: total == null ? null : Number(total),
+                done: false, busy: false
+            };
+            loadHistory(false);
+        }
+
+        function loadHistory(everything) {
+            if (!logView || logView.busy || logView.done) return;
+            var view = logView;
+            var added = [];
+            view.busy = true;
+            renderLog();
+
+            function page() {
+                rpc('casino_admin_history', {
+                    p_secret: secret, p_character: view.who,
+                    p_limit: HIST_PAGE, p_offset: view.rows.length + added.length,
+                    p_action: view.action
+                }).then(function (r) {
+                    if (denied(r)) { view.busy = false; return; }
+                    if (!r || !r.ok) throw new Error('The log lookup failed.');
+                    var rows = r.events || [];
+                    added = added.concat(rows);
+                    // "Load all" walks the pages until one comes back short.
+                    if (everything && rows.length === HIST_PAGE) { page(); return; }
+                    view.rows = view.rows.concat(added);
+                    view.done = rows.length < HIST_PAGE;
+                    view.busy = false;
+                    renderLog();
+                }).catch(function (e) {
+                    view.busy = false;
+                    renderLog(e.message);
+                });
+            }
+
+            page();
+        }
+
+        function renderLog(note) {
+            var box = document.getElementById('log');
+            if (!box || !logView) return;
+            var html = '<h3>' + (logView.action === 'spins' ? 'Spins' : 'Event log') + '</h3>' +
+                eventsTable(logView.rows);
+            html += '<div class="field" style="margin-top:8px;">';
+            if (logView.busy) {
+                html += '<span class="tiny">Loading' + (logView.rows.length ? ' more' : '') + '…</span>';
+            } else {
+                html += '<span class="tiny">Showing ' + fmt(logView.rows.length) +
+                    (logView.total == null ? '' : ' of ' + fmt(logView.total)) + '</span>';
+                if (!logView.done) {
+                    html += '<button id="log-more">Load ' + fmt(HIST_PAGE) + ' more</button>' +
+                        '<button id="log-all">Load all</button>';
+                }
+            }
+            if (note) html += '<span class="bad">' + esc(note) + '</span>';
+            html += '</div>';
+            box.innerHTML = html;
+
+            var more = document.getElementById('log-more');
+            if (more) more.addEventListener('click', function () { loadHistory(false); });
+            var all = document.getElementById('log-all');
+            if (all) all.addEventListener('click', function () { loadHistory(true); });
         }
 
         function lookup(spinsOnly) {
             var who = document.getElementById('who').value.trim();
             if (!who) return;
+            var log = document.getElementById('log');
+            if (log) log.innerHTML = '';
             document.getElementById('account').innerHTML = '<p class="tiny">Looking up ' + esc(who) + '…</p>';
 
             if (spinsOnly) {
-                rpc('casino_admin_history', {
-                    p_secret: secret, p_character: who, p_limit: 30, p_offset: 0, p_action: 'spins'
-                }).then(function (r) {
-                    if (denied(r)) return;
-                    if (!r || !r.ok) {
-                        document.getElementById('account').innerHTML = '<p class="bad">Lookup failed.</p>';
-                        return;
-                    }
-                    document.getElementById('account').innerHTML =
-                        '<h3>' + esc(who) + ' - last 30 spins</h3>' + eventsTable(r.events);
-                }).catch(function (e) {
-                    document.getElementById('account').innerHTML = '<p class="bad">' + esc(e.message) + '</p>';
-                });
+                document.getElementById('account').innerHTML = '';
+                startLog(who, 'spins', null);
                 return;
             }
 
@@ -243,7 +308,8 @@
                         '<p class="bad">' + (r && r.error === 'no_account' ? 'No account for that character.' : 'Lookup failed.') + '</p>';
                     return;
                 }
-                showAccount(r, false);
+                showAccount(r);
+                startLog(r.character, null, r.events);
             }).catch(function (e) {
                 document.getElementById('account').innerHTML = '<p class="bad">' + esc(e.message) + '</p>';
             });
